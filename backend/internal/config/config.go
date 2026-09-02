@@ -1,6 +1,12 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/joho/godotenv"
+)
 
 type Config struct {
 	AppEnv             string
@@ -8,29 +14,26 @@ type Config struct {
 	DatabaseURL        string
 	RedisAddr          string
 	RedisPassword      string
-	RedisDB            string
+	RedisDB            int
 	SMTPHost           string
 	SMTPPort           string
-	CORSAllowedOrigins string
+	CORSAllowedOrigins []string
 }
 
 func Load() *Config {
-	return &Config{
-		AppEnv:             getEnv("APP_ENV", "development"),
-		AppPort:            getEnv("APP_PORT", "8080"),
-		DatabaseURL:        getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/dpdp?sslmode=disable"),
-		RedisAddr:          getEnv("REDIS_ADDR", "localhost:6379"),
-		RedisPassword:      getEnv("REDIS_PASSWORD", ""),
-		RedisDB:            getEnv("REDIS_DB", "0"),
-		SMTPHost:           getEnv("SMTP_HOST", "localhost"),
-		SMTPPort:           getEnv("SMTP_PORT", "1025"),
-		CORSAllowedOrigins: getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000"),
-	}
-}
+	godotenv.Load()
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
+	redisDB, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
+
+	return &Config{
+		AppEnv:             os.Getenv("APP_ENV"),
+		AppPort:            os.Getenv("APP_PORT"),
+		DatabaseURL:        os.Getenv("DATABASE_URL"),
+		RedisAddr:          os.Getenv("REDIS_ADDR"),
+		RedisPassword:      os.Getenv("REDIS_PASSWORD"),
+		RedisDB:            redisDB,
+		SMTPHost:           os.Getenv("SMTP_HOST"),
+		SMTPPort:           os.Getenv("SMTP_PORT"),
+		CORSAllowedOrigins: strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), ","),
 	}
-	return fallback
 }

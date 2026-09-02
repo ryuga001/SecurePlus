@@ -11,6 +11,7 @@ import (
 
 func main() {
 	ctx := context.Background()
+
 	cfg := config.Load()
 
 	db, err := database.NewPostgresPool(ctx, cfg.DatabaseURL)

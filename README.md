@@ -1,28 +1,23 @@
 # DPDP
 
+Monorepo.
+
 ## Structure
 
-- `frontend/` — Next.js + shadcn/ui
-- `backend/` — Go + Gin API
+- `frontend/` — Next.js + shadcn/ui (own `.env.local`)
+- `backend/` — Go + Gin API, `docker-compose.yml` and `.env`
 
-## Getting started
+## Backend
 
 ```bash
+cd backend
 cp .env.example .env
 docker compose up --build
 ```
 
-This starts Postgres (with pgvector), Redis, Mailpit, runs migrations, and starts the backend API on `APP_PORT` (default `8080`). Mailpit UI is available on `MAILPIT_UI_PORT` (default `8025`).
+Starts Postgres (pgvector), Redis, Mailpit, runs migrations, then the API on `APP_PORT` (default `8080`). Mailpit UI on `MAILPIT_UI_PORT` (default `8025`).
 
-Run the frontend separately:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Backend migrations
+Migrations:
 
 ```bash
 cd backend
@@ -30,3 +25,14 @@ make migrate-up
 make migrate-down
 make migrate-create name=add_something
 ```
+
+## Frontend
+
+```bash
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Runs on http://localhost:3000.

@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -19,13 +18,8 @@ func (s *Server) RegisterRoutes() *gin.Engine {
 }
 
 func (s *Server) corsMiddleware() gin.HandlerFunc {
-	origins := strings.Split(s.Config.CORSAllowedOrigins, ",")
-	for i, origin := range origins {
-		origins[i] = strings.TrimSpace(origin)
-	}
-
 	return cors.New(cors.Config{
-		AllowOrigins:     origins,
+		AllowOrigins:     s.Config.CORSAllowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,

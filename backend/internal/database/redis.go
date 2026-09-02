@@ -2,24 +2,19 @@ package database
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRedisClient(ctx context.Context, addr, password, db string) (*redis.Client, error) {
-	dbIndex, err := strconv.Atoi(db)
-	if err != nil {
-		dbIndex = 0
-	}
-
+func NewRedisClient(ctx context.Context, addr, password string, db int) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: password,
-		DB:       dbIndex,
+		DB:       db,
 	})
 
 	if err := client.Ping(ctx).Err(); err != nil {
+		client.Close()
 		return nil, err
 	}
 

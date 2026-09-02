@@ -1,0 +1,24 @@
+.env
+.env.*
+!.env.example
+
+# frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.vercel
+
+# backend (Go)
+backend/bin/
+backend/tmp/
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store

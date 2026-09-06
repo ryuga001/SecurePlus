@@ -1,22 +1,20 @@
 "use client";
 
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import {
+  AuthHeading,
+  Field,
+  FormError,
+  PasswordInput,
+} from "@/components/auth/auth-form";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ApiError, api } from "@/lib/api";
 
 export default function LoginPage() {
@@ -46,56 +44,62 @@ export default function LoginPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sign in</CardTitle>
-        <CardDescription>Access your DPDP dashboard</CardDescription>
-      </CardHeader>
+    <div>
+      <AuthHeading
+        title="Sign in"
+        description="Access your SecurePlus security console."
+      />
 
-      <form onSubmit={onSubmit}>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field id="email" label="Work email">
+          <Input
+            id="email"
+            type="email"
+            required
+            autoFocus
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </CardContent>
-
-        <CardFooter className="mt-4 flex flex-col gap-3">
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Signing in..." : "Sign in"}
-          </Button>
-
-          <div className="flex w-full justify-between text-sm text-muted-foreground">
-            <Link href="/forgot-password" className="hover:text-foreground">
+        <Field
+          id="password"
+          label="Password"
+          action={
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-primary hover:underline"
+            >
               Forgot password?
             </Link>
-            <Link href="/register" className="hover:text-foreground">
-              Create an account
-            </Link>
-          </div>
-        </CardFooter>
+          }
+        >
+          <PasswordInput
+            id="password"
+            required
+            autoComplete="current-password"
+            placeholder="••••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
+
+        <FormError message={error} />
+
+        <Button type="submit" size="lg" className="w-full" disabled={pending}>
+          {pending ? "Signing in..." : "Sign in"}
+          {pending ? null : <ArrowRight />}
+        </Button>
       </form>
-    </Card>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        New to SecurePlus?{" "}
+        <Link href="/register" className="font-medium text-primary hover:underline">
+          Create an account
+        </Link>
+      </p>
+    </div>
   );
 }

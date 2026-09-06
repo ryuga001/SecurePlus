@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DPDP",
-  description: "DPDP dashboard",
+  title: "SecurePlus",
+  description: "SecurePlus security dashboard",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>{children}</AuthProvider>
-        <Toaster richColors position="top-right" />
+        <Toaster position="top-right" />
       </body>
     </html>
   );

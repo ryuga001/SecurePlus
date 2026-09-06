@@ -1,21 +1,14 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { AuthHeading, Field, FormError } from "@/components/auth/auth-form";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ApiError, api } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
@@ -42,39 +35,40 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Reset your password</CardTitle>
-        <CardDescription>We will email you a reset code</CardDescription>
-      </CardHeader>
+    <div>
+      <AuthHeading
+        title="Reset your password"
+        description="Enter your work email and we will send you a reset code."
+      />
 
-      <form onSubmit={onSubmit}>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field id="email" label="Work email">
+          <Input
+            id="email"
+            type="email"
+            required
+            autoFocus
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
 
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </CardContent>
+        <FormError message={error} />
 
-        <CardFooter className="mt-4 flex flex-col gap-3">
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Sending..." : "Send reset code"}
-          </Button>
-
-          <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">
-            Back to sign in
-          </Link>
-        </CardFooter>
+        <Button type="submit" size="lg" className="w-full" disabled={pending}>
+          {pending ? "Sending..." : "Send reset code"}
+        </Button>
       </form>
-    </Card>
+
+      <Link
+        href="/login"
+        className="mt-6 flex items-center justify-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        Back to sign in
+      </Link>
+    </div>
   );
 }

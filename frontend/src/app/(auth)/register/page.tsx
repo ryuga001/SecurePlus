@@ -1,34 +1,43 @@
 "use client";
 
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import {
+  AuthHeading,
+  Field,
+  FormError,
+  OtpInput,
+  PasswordInput,
+} from "@/components/auth/auth-form";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ApiError, api } from "@/lib/api";
-
-type Step = "email" | "code" | "details";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { setIdentity } = useAuth();
 
-  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [verifiedEmail, setVerifiedEmail] = useState("");
   const [token, setToken] = useState("");
+
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [sending, setSending] = useState(false);
+
   const [details, setDetails] = useState({
     org_name: "",
     first_name: "",
@@ -39,50 +48,79 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
+  const verified = Boolean(token);
+  const locked = !verified;
+
   function update(field: keyof typeof details, value: string) {
     setDetails((current) => ({ ...current, [field]: value }));
   }
 
-  function fail(err: unknown) {
-    setError(err instanceof ApiError ? err.message : "Something went wrong");
+  function message(err: unknown) {
+    return err instanceof ApiError ? err.message : "Something went wrong";
   }
 
-  async function submitEmail(event: React.FormEvent) {
-    event.preventDefault();
+  async function sendCode() {
+    if (!email) return;
+
     setError("");
-    setPending(true);
+    setSending(true);
 
     try {
       await api.startRegistration(email);
-      toast.success("Verification code sent");
-      setStep("code");
+      setCode("");
+      setCodeError("");
+      setCodeOpen(true);
+      toast.success(`Verification code sent to ${email}`);
     } catch (err) {
-      fail(err);
+      setError(message(err));
     } finally {
-      setPending(false);
+      setSending(false);
     }
   }
 
   async function submitCode(event: React.FormEvent) {
     event.preventDefault();
-    setError("");
-    setPending(true);
+    setCodeError("");
+    setVerifying(true);
 
     try {
-      const verified = await api.verifyEmail(email, code.trim());
-      setToken(verified.registration_token);
+      const result = await api.verifyEmail(email, code.trim());
+      setToken(result.registration_token);
+      setVerifiedEmail(email);
+      setCodeOpen(false);
       toast.success("Email verified");
-      setStep("details");
     } catch (err) {
-      fail(err);
+      setCodeError(message(err));
     } finally {
-      setPending(false);
+      setVerifying(false);
     }
   }
 
-  async function submitDetails(event: React.FormEvent) {
+  async function resend() {
+    setCodeError("");
+
+    try {
+      await api.resendCode(email);
+      toast.success("New code sent");
+    } catch (err) {
+      setCodeError(message(err));
+    }
+  }
+
+  function changeEmail() {
+    setToken("");
+    setVerifiedEmail("");
+    setCode("");
+  }
+
+  async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+
+    if (!verified) {
+      setError("Verify your email before creating the account");
+      return;
+    }
 
     if (details.password !== details.confirm) {
       setError("Passwords do not match");
@@ -104,194 +142,185 @@ export default function RegisterPage() {
       toast.success("Account created");
       router.push("/dashboard");
     } catch (err) {
-      fail(err);
+      setError(message(err));
     } finally {
       setPending(false);
     }
   }
 
-  async function resend() {
-    setError("");
+  return (
+    <div>
+      <AuthHeading
+        title="Create your account"
+        description="Verify your work email, then set up your organisation."
+      />
 
-    try {
-      await api.resendCode(email);
-      toast.success("New code sent");
-    } catch (err) {
-      fail(err);
-    }
-  }
-
-  if (step === "email") {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Verify your email</CardTitle>
-          <CardDescription>Step 1 of 3 — we will send you a code</CardDescription>
-        </CardHeader>
-
-        <form onSubmit={submitEmail}>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field
+          id="email"
+          label="Work email"
+          action={
+            verified ? (
+              <button
+                type="button"
+                onClick={changeEmail}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Change
+              </button>
+            ) : null
+          }
+          hint={
+            verified
+              ? undefined
+              : "We will send a 6-digit code to confirm this address."
+          }
+        >
+          <div className="flex gap-2">
+            <div className="relative flex-1">
               <Input
                 id="email"
                 type="email"
                 required
                 autoFocus
                 autoComplete="email"
-                value={email}
+                placeholder="you@company.com"
+                value={verified ? verifiedEmail : email}
+                disabled={verified}
                 onChange={(e) => setEmail(e.target.value)}
+                className={verified ? "pr-10 disabled:opacity-100" : undefined}
               />
+              {verified ? (
+                <CheckCircle2 className="absolute top-1/2 right-3 size-4.5 -translate-y-1/2 text-emerald-600" />
+              ) : null}
             </div>
 
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          </CardContent>
-
-          <CardFooter className="mt-4 flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Sending code..." : "Send verification code"}
-            </Button>
-
-            <p className="text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link href="/login" className="text-foreground hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </CardFooter>
-        </form>
-      </Card>
-    );
-  }
-
-  if (step === "code") {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Enter your code</CardTitle>
-          <CardDescription>Step 2 of 3 — sent to {email}</CardDescription>
-        </CardHeader>
-
-        <form onSubmit={submitCode}>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="code">Verification code</Label>
-              <Input
-                id="code"
-                required
-                autoFocus
-                inputMode="numeric"
-                maxLength={6}
-                autoComplete="one-time-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                className="font-mono tracking-[0.4em]"
-              />
-            </div>
-
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          </CardContent>
-
-          <CardFooter className="mt-4 flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Verifying..." : "Verify email"}
-            </Button>
-
-            <div className="flex w-full justify-between text-sm text-muted-foreground">
-              <button type="button" onClick={resend} className="hover:text-foreground">
-                Resend code
-              </button>
-              <button
+            {verified ? null : (
+              <Button
                 type="button"
-                onClick={() => setStep("email")}
-                className="hover:text-foreground"
+                variant="secondary"
+                size="lg"
+                className="h-11 shrink-0"
+                onClick={sendCode}
+                disabled={!email || sending}
               >
-                Change email
-              </button>
-            </div>
-          </CardFooter>
-        </form>
-      </Card>
-    );
-  }
+                {sending ? "Sending..." : "Verify"}
+              </Button>
+            )}
+          </div>
+        </Field>
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Finish setting up</CardTitle>
-        <CardDescription>Step 3 of 3 — {email} verified</CardDescription>
-      </CardHeader>
-
-      <form onSubmit={submitDetails}>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="org_name">Organization name</Label>
+        <fieldset disabled={locked} className="flex flex-col gap-4 disabled:opacity-55">
+          <Field id="org_name" label="Organisation name">
             <Input
               id="org_name"
               required
-              autoFocus
+              placeholder="Acme Technologies Pvt Ltd"
               value={details.org_name}
               onChange={(e) => update("org_name", e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="first_name">First name</Label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="first_name" label="First name">
               <Input
                 id="first_name"
                 required
+                autoComplete="given-name"
                 value={details.first_name}
                 onChange={(e) => update("first_name", e.target.value)}
               />
-            </div>
+            </Field>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="last_name">Last name</Label>
+            <Field id="last_name" label="Last name">
               <Input
                 id="last_name"
                 required
+                autoComplete="family-name"
                 value={details.last_name}
                 onChange={(e) => update("last_name", e.target.value)}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
+          <Field id="password" label="Password" hint="Use at least 10 characters.">
+            <PasswordInput
               id="password"
-              type="password"
               required
               minLength={10}
               autoComplete="new-password"
               value={details.password}
               onChange={(e) => update("password", e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">At least 10 characters</p>
-          </div>
+          </Field>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="confirm">Confirm password</Label>
-            <Input
+          <Field id="confirm" label="Confirm password">
+            <PasswordInput
               id="confirm"
-              type="password"
               required
               autoComplete="new-password"
               value={details.confirm}
               onChange={(e) => update("confirm", e.target.value)}
             />
-          </div>
+          </Field>
+        </fieldset>
 
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </CardContent>
+        <FormError message={error} />
 
-        <CardFooter className="mt-4">
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Creating account..." : "Create account"}
-          </Button>
-        </CardFooter>
+        <Button type="submit" size="lg" className="w-full" disabled={locked || pending}>
+          {pending ? "Creating account..." : "Create account"}
+          {pending ? null : <ArrowRight />}
+        </Button>
       </form>
-    </Card>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Already have an account?{" "}
+        <Link href="/login" className="font-medium text-primary hover:underline">
+          Sign in
+        </Link>
+      </p>
+
+      <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
+        <DialogContent>
+          <DialogTitle>Check your inbox</DialogTitle>
+          <DialogDescription>
+            Enter the 6-digit code we sent to{" "}
+            <span className="font-medium text-foreground">{email}</span>
+          </DialogDescription>
+
+          <form onSubmit={submitCode} className="mt-6 flex flex-col gap-4">
+            <OtpInput value={code} onChange={setCode} autoFocus disabled={verifying} />
+
+            <FormError message={codeError} />
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={code.length < 6 || verifying}
+            >
+              {verifying ? "Verifying..." : "Verify email"}
+            </Button>
+
+            <div className="flex items-center justify-between text-sm">
+              <button
+                type="button"
+                onClick={resend}
+                className="font-medium text-primary hover:underline"
+              >
+                Resend code
+              </button>
+              <button
+                type="button"
+                onClick={() => setCodeOpen(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

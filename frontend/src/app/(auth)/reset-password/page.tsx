@@ -1,21 +1,20 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  AuthHeading,
+  Field,
+  FormError,
+  OtpInput,
+  PasswordInput,
+} from "@/components/auth/auth-form";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ApiError, api } from "@/lib/api";
 
 function ResetPasswordForm() {
@@ -52,80 +51,65 @@ function ResetPasswordForm() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Set a new password</CardTitle>
-        <CardDescription>Enter the code we emailed you</CardDescription>
-      </CardHeader>
+    <div>
+      <AuthHeading
+        title="Set a new password"
+        description="Enter the code we emailed you and choose a new password."
+      />
 
-      <form onSubmit={onSubmit}>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field id="email" label="Work email">
+          <Input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="code">Reset code</Label>
-            <Input
-              id="code"
-              required
-              inputMode="numeric"
-              maxLength={6}
-              autoComplete="one-time-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              className="font-mono tracking-[0.4em]"
-            />
-          </div>
+        <Field id="code" label="Reset code">
+          <OtpInput id="code" value={code} onChange={setCode} autoFocus={Boolean(email)} />
+        </Field>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">New password</Label>
-            <Input
-              id="password"
-              type="password"
-              required
-              minLength={10}
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">At least 10 characters</p>
-          </div>
+        <Field id="password" label="New password" hint="Use at least 10 characters.">
+          <PasswordInput
+            id="password"
+            required
+            minLength={10}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="confirm">Confirm new password</Label>
-            <Input
-              id="confirm"
-              type="password"
-              required
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-            />
-          </div>
+        <Field id="confirm" label="Confirm new password">
+          <PasswordInput
+            id="confirm"
+            required
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+        </Field>
 
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </CardContent>
+        <FormError message={error} />
 
-        <CardFooter className="mt-4 flex flex-col gap-3">
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Updating..." : "Update password"}
-          </Button>
-
-          <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">
-            Back to sign in
-          </Link>
-        </CardFooter>
+        <Button type="submit" size="lg" className="w-full" disabled={pending || code.length < 6}>
+          {pending ? "Updating..." : "Update password"}
+        </Button>
       </form>
-    </Card>
+
+      <Link
+        href="/login"
+        className="mt-6 flex items-center justify-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        Back to sign in
+      </Link>
+    </div>
   );
 }
 

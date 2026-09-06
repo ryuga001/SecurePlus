@@ -4,12 +4,10 @@ import { Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 import type { DateRangeValue, FilterConfig, FilterState, FilterValue } from "./types";
-
-const selectClass =
-  "h-11 w-full min-w-0 border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 function asText(value: FilterValue) {
   return typeof value === "string" ? value : "";
@@ -67,19 +65,13 @@ export function TableFilters({
             ) : null}
 
             {filter.type === "select" ? (
-              <select
+              <Select
                 id={`filter-${filter.key}`}
-                className={selectClass}
                 value={asText(value)}
                 onChange={(event) => onChange(filter.key, event.target.value)}
-              >
-                <option value="">{filter.placeholder ?? "All"}</option>
-                {filter.options?.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                placeholder={filter.placeholder ?? "All"}
+                options={filter.options}
+              />
             ) : null}
 
             {filter.type === "date" ? (

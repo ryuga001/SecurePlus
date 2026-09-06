@@ -14,6 +14,8 @@ const (
 	SignupTTL      = 30 * time.Minute
 	ResendCooldown = time.Minute
 	PrivCacheTTL   = 10 * time.Minute
+
+	ProviderTokenTTL = 365 * 24 * time.Hour
 )
 
 type Auth struct {

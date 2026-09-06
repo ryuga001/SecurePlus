@@ -1,5 +1,6 @@
 import type { DataTableQueryArgs, PaginatedResponse } from "@/components/data-table/types";
 import { baseApi } from "@/store/api/base-api";
+import { listParams } from "@/store/api/list-params";
 
 export type User = {
   id: number;
@@ -20,15 +21,6 @@ export type UserRole = {
   privileges_count: number;
   updated_at: string;
 };
-
-function listParams({ page, pageSize, sortBy, sortDir, filters }: DataTableQueryArgs) {
-  return {
-    page,
-    page_size: pageSize,
-    ...(sortBy ? { sort_by: sortBy, sort_dir: sortDir } : {}),
-    ...filters,
-  };
-}
 
 export const usersApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({

@@ -305,6 +305,11 @@ func (s *Service) createTenant(ctx context.Context, req CompleteRequest, email, 
 			return err
 		}
 
+		grant := `INSERT INTO role_privileges (role_id, privilege_id) SELECT ?, id FROM privileges WHERE type = 'DASHBOARD' ON CONFLICT DO NOTHING`
+		if err := tx.Exec(grant, role.ID).Error; err != nil {
+			return err
+		}
+
 		user = db.DashboardUser{
 			CustomerID:   customer.ID,
 			RoleID:       &role.ID,

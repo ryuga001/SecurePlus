@@ -40,7 +40,7 @@ export const routes = {
         children: {
             configurations: {
                 label: "Configurations",
-                routePath: "/email/configurations",
+                routePath: "/admin/email/configurations",
                 icon: SlidersHorizontal,
                 privileges: [],
                 heading: "Email configurations",

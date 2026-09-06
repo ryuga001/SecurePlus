@@ -13,6 +13,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
+	"dpdp-backend/internal/admin/email"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/middleware"
@@ -48,6 +49,10 @@ func main() {
 	service := auth.NewService(database, store, notifier, cfg.Auth, cfg.App)
 	handler := auth.NewHandler(service, cfg.Auth)
 
+	emailRedis := email.NewRedisService(rdb)
+	emailService := email.NewService(database, emailRedis, cfg.Auth)
+	emailHandler := email.NewHandler(emailService)
+
 	if cfg.App.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -78,6 +83,10 @@ func main() {
 	)
 
 	handler.RegisterRoutes(public, refresh, protected)
+
+	emailHandler.RegisterRoutes(protected, func(name string) gin.HandlerFunc {
+		return middleware.RequirePrivilege(database, store, name)
+	})
 
 	server := &http.Server{
 		Addr:              ":" + cfg.App.Port,

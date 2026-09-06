@@ -60,3 +60,18 @@ type EmailTemplate struct {
 }
 
 func (EmailTemplate) TableName() string { return "email_templates" }
+
+type EmailProviderConfiguration struct {
+	ID                   int        `gorm:"column:id;primaryKey"`
+	CustomerID           int        `gorm:"column:customer_id"`
+	Name                 string     `gorm:"column:name"`
+	Domain               string     `gorm:"column:domain"`
+	Provider             string     `gorm:"column:provider"`
+	DKIMPublicKey        *string    `gorm:"column:dkim_public_key"`
+	AccessTokenHash      *string    `gorm:"column:access_token_hash" json:"-"`
+	AccessTokenExpiresAt *time.Time `gorm:"column:access_token_expires_at"`
+	CreatedAt            time.Time  `gorm:"column:created_at"`
+	UpdatedAt            time.Time  `gorm:"column:updated_at"`
+}
+
+func (EmailProviderConfiguration) TableName() string { return "email_provider_configurations" }

@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useAuth } from "@/components/auth-provider";
-import { Button } from "@/components/ui/button";
+import Sidebar from "@/components/dashboard/sidebar/sidebar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { identity, loading, signOut } = useAuth();
+  const { identity, loading } = useAuth();
 
   useEffect(() => {
     if (!loading && !identity) router.replace("/login");
@@ -22,28 +22,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  async function onSignOut() {
-    await signOut();
-    router.replace("/login");
-  }
-
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <header className="flex items-center justify-between border-b px-6 py-4">
-        <div>
-          <p className="text-sm font-medium">{identity.customer.org_name}</p>
-          <p className="text-xs text-muted-foreground">
-            {identity.user.email}
-            {identity.user.role ? ` · ${identity.user.role}` : ""}
-          </p>
-        </div>
+    <div className="flex h-svh overflow-hidden">
+      <Sidebar />
 
-        <Button variant="outline" size="sm" onClick={onSignOut}>
-          Sign out
-        </Button>
-      </header>
-
-      <main className="flex-1 p-6">{children}</main>
+      <main className="min-w-0 flex-1 overflow-y-auto p-6">{children}</main>
     </div>
   );
 }

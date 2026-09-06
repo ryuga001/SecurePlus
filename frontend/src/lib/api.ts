@@ -12,6 +12,8 @@ export type Identity = {
   csrf_token: string;
 };
 
+export type PrivilegesResponse = { privileges: string[] };
+
 export type MessageResponse = { message: string; expires_in?: number };
 
 export type VerifiedResponse = { registration_token: string; expires_in: number };
@@ -45,6 +47,12 @@ const NO_REFRESH = new Set([
 export function setCsrfToken(token: string | null) {
   csrfToken = token;
 }
+
+export function getCsrfToken() {
+  return csrfToken;
+}
+
+export const API_BASE_URL = BASE;
 
 async function ensureCsrfToken() {
   if (csrfToken) return;
@@ -162,6 +170,8 @@ export const api = {
     }),
 
   me: () => request<Identity>("/me"),
+
+  privileges: () => request<PrivilegesResponse>("/me/privileges"),
 
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 };

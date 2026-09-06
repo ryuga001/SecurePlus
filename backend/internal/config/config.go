@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	App      App
+	Auth     Auth
 	Postgres Postgres
 	Redis    Redis
 	Storage  Storage
@@ -26,6 +27,7 @@ func Load() *Config {
 
 	return &Config{
 		App:      loadApp(),
+		Auth:     loadAuth(),
 		Postgres: loadPostgres(),
 		Redis:    loadRedis(),
 		Storage:  loadStorage(),

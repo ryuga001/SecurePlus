@@ -1,24 +1,22 @@
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+import { useAuth } from "@/components/auth-provider";
 
 export default function Home() {
+  const router = useRouter();
+  const { identity, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading) return;
+    router.replace(identity ? "/dashboard" : "/login");
+  }, [loading, identity, router]);
+
   return (
-    <div className="flex flex-1 items-center justify-center p-8">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>DPDP</CardTitle>
-          <CardDescription>Frontend initial setup</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button>Get started</Button>
-        </CardContent>
-      </Card>
+    <div className="flex flex-1 items-center justify-center">
+      <p className="text-sm text-muted-foreground">Loading...</p>
     </div>
   );
 }

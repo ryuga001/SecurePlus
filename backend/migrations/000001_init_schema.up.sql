@@ -5,8 +5,6 @@ CREATE EXTENSION IF NOT EXISTS citext;
 CREATE TABLE customers (
     id         INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     org_name   VARCHAR(100) NOT NULL UNIQUE,
-    first_name VARCHAR(50)  NOT NULL,
-    last_name  VARCHAR(50)  NOT NULL,
     jwt_secret TEXT         NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
     created_at TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
@@ -35,6 +33,8 @@ CREATE TABLE dashboard_users (
     id            INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     customer_id   INT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     role_id       INT REFERENCES roles(id) ON DELETE SET NULL,
+    first_name VARCHAR(50)  NOT NULL,
+    last_name  VARCHAR(50)  NOT NULL,
     email         CITEXT       NOT NULL UNIQUE CHECK (char_length(email) <= 100),
     password_hash VARCHAR(255) NOT NULL,
     password_salt VARCHAR(255) NOT NULL DEFAULT gen_random_uuid()::text,
@@ -53,9 +53,9 @@ CREATE TABLE email_templates (
 );
 
 
-INSERT INTO customers (id, org_name, first_name, last_name)
+INSERT INTO customers (id, org_name)
 OVERRIDING SYSTEM VALUE
-VALUES (1, 'DPDP Platform', 'System', 'Admin')
+VALUES (1, 'DPDP Platform')
 ON CONFLICT (org_name) DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('customers', 'id'), (SELECT max(id) FROM customers));
@@ -66,12 +66,14 @@ INSERT INTO roles (name, type, customer_id) VALUES
 ('Admin',       'admin',       1)
 ON CONFLICT (customer_id, name) DO NOTHING;
 
-INSERT INTO dashboard_users (customer_id, role_id, email, password_hash)
+INSERT INTO dashboard_users (customer_id, role_id, email, password_hash, first_name, last_name)
 VALUES (
     1,
     (SELECT id FROM roles WHERE customer_id = 1 AND type = 'super_admin'),
     'superadmin@dpdp.local',
-    '!'
+    '!',
+    'System',
+    'Admin'
 )
 ON CONFLICT (email) DO NOTHING;
 

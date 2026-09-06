@@ -6,13 +6,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Postgres struct {
 	URL             string
-	MaxConns        int32
-	MinConns        int32
+	MaxConns        int
+	MinConns        int
 	MaxConnLifetime time.Duration
 	MaxConnIdleTime time.Duration
 }
@@ -25,28 +27,50 @@ func loadPostgres() Postgres {
 
 	return Postgres{
 		URL:             os.Getenv("DATABASE_URL"),
-		MaxConns:        int32(maxConns),
-		MinConns:        int32(minConns),
+		MaxConns:        maxConns,
+		MinConns:        minConns,
 		MaxConnLifetime: maxConnLifetime,
 		MaxConnIdleTime: maxConnIdleTime,
 	}
 }
 
-func (p Postgres) Connect(ctx context.Context) (*pgxpool.Pool, error) {
-	poolConfig, err := pgxpool.ParseConfig(p.URL)
+func (p Postgres) Connect(ctx context.Context, env string) (*gorm.DB, error) {
+	level := logger.Warn
+	if env != "production" {
+		level = logger.Info
+	}
+
+	db, err := gorm.Open(postgres.Open(p.URL), &gorm.Config{
+		Logger:                 logger.Default.LogMode(level),
+		TranslateError:         true,
+		SkipDefaultTransaction: true,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	pool, err := db.DB()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := pool.Ping(ctx); err != nil {
+	if p.MaxConns > 0 {
+		pool.SetMaxOpenConns(p.MaxConns)
+	}
+	if p.MinConns > 0 {
+		pool.SetMaxIdleConns(p.MinConns)
+	}
+	if p.MaxConnLifetime > 0 {
+		pool.SetConnMaxLifetime(p.MaxConnLifetime)
+	}
+	if p.MaxConnIdleTime > 0 {
+		pool.SetConnMaxIdleTime(p.MaxConnIdleTime)
+	}
+
+	if err := pool.PingContext(ctx); err != nil {
 		pool.Close()
 		return nil, err
 	}
 
-	return pool, nil
+	return db, nil
 }

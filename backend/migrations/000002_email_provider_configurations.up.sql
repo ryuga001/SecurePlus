@@ -5,6 +5,7 @@ CREATE TABLE email_provider_configurations (
     domain                  CITEXT NOT NULL UNIQUE CHECK (char_length(domain) BETWEEN 4 AND 253),
     provider                VARCHAR(20) NOT NULL CHECK (provider IN ('outlook365', 'gmail')),
     dkim_public_key         TEXT,
+    dkim_private_key        TEXT,
     access_token_hash       TEXT,
     access_token_expires_at TIMESTAMPTZ,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),

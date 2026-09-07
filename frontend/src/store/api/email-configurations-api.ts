@@ -28,6 +28,7 @@ export type DkimKeyResponse = {
   selector: string;
   record_name: string;
   dkim_public_key: string;
+  dkim_private_key: string;
 };
 
 export type AccessTokenResponse = {

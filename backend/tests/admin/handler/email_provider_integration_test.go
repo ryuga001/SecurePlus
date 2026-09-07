@@ -4,7 +4,10 @@ package handler_test
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"strconv"
@@ -237,16 +240,53 @@ func TestIntegrationConfigurationGenerateDKIM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dkim failed: %v", err)
 	}
-	if first.DKIMPublicKey == nil || !strings.HasPrefix(*first.DKIMPublicKey, "v=DKIM1;") {
-		t.Fatalf("dkim value = %v", first.DKIMPublicKey)
+	if first.DKIMPublicKey == nil || !strings.HasPrefix(*first.DKIMPublicKey, "v=DKIM1; k=rsa; p=") {
+		t.Fatalf("dkim record = %v", first.DKIMPublicKey)
+	}
+	if first.DKIMPrivateKey == nil || !strings.HasPrefix(*first.DKIMPrivateKey, "-----BEGIN PRIVATE KEY-----") {
+		t.Fatalf("dkim private key = %v", first.DKIMPrivateKey)
+	}
+
+	encoded := strings.TrimPrefix(*first.DKIMPublicKey, "v=DKIM1; k=rsa; p=")
+
+	der, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("public key is not base64: %v", err)
+	}
+	if _, err := x509.ParsePKIXPublicKey(der); err != nil {
+		t.Fatalf("public key does not parse: %v", err)
+	}
+
+	block, _ := pem.Decode([]byte(*first.DKIMPrivateKey))
+	if block == nil {
+		t.Fatal("private key is not valid pem")
+	}
+	if _, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
+		t.Fatalf("private key does not parse: %v", err)
+	}
+
+	var stored db.EmailProviderConfiguration
+	if err := h.database.Where("id = ?", row.ID).Take(&stored).Error; err != nil {
+		t.Fatalf("row lookup failed: %v", err)
+	}
+	if stored.DKIMPrivateKey == nil || *stored.DKIMPrivateKey != *first.DKIMPrivateKey {
+		t.Fatal("private key was not persisted")
+	}
+
+	fetched, err := h.providers.Get(context.Background(), h.tenant.ID, row.ID)
+	if err != nil {
+		t.Fatalf("get failed: %v", err)
+	}
+	if fetched.DKIMPrivateKey != nil {
+		t.Fatal("read paths must not select the dkim private key")
 	}
 
 	second, err := h.providers.GenerateDKIM(context.Background(), h.tenant.ID, row.ID)
 	if err != nil {
 		t.Fatalf("dkim regeneration failed: %v", err)
 	}
-	if *second.DKIMPublicKey == *first.DKIMPublicKey {
-		t.Fatal("regeneration must produce a new key")
+	if *second.DKIMPublicKey == *first.DKIMPublicKey || *second.DKIMPrivateKey == *first.DKIMPrivateKey {
+		t.Fatal("regeneration must produce a new key pair")
 	}
 }
 

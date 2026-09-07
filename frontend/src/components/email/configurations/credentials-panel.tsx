@@ -81,6 +81,7 @@ export function CredentialsPanel({
   onSecretRevealed?: () => void;
 }) {
   const [dkimPublicKey, setDkimPublicKey] = React.useState(initialDkimPublicKey ?? "");
+  const [dkimPrivateKey, setDkimPrivateKey] = React.useState("");
   const [recordName, setRecordName] = React.useState("");
   const [accessToken, setAccessToken] = React.useState("");
   const [expiresAt, setExpiresAt] = React.useState("");
@@ -96,8 +97,10 @@ export function CredentialsPanel({
     try {
       const result = await generateDkimKey(configurationId).unwrap();
       setDkimPublicKey(result.dkim_public_key);
+      setDkimPrivateKey(result.dkim_private_key);
       setRecordName(result.record_name);
-      toast.success("DKIM key generated");
+      onSecretRevealed?.();
+      toast.success("DKIM key pair generated");
     } catch (error) {
       toast.error(apiErrorMessage(error, "Could not generate a DKIM key"));
     }
@@ -159,6 +162,15 @@ export function CredentialsPanel({
               ? `Publish this as a TXT record on ${recordName}.`
               : "Publish this as a TXT record on your DNS."
           }
+        />
+      ) : null}
+
+      {dkimPrivateKey ? (
+        <SecretValue
+          label="DKIM private key"
+          value={dkimPrivateKey}
+          tone="warning"
+          hint="Stored with the configuration and shown once. It signs your outbound mail — never publish it."
         />
       ) : null}
 

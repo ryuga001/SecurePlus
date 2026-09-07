@@ -2,6 +2,11 @@ package emailprovider
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"regexp"
 	"strconv"
@@ -160,18 +165,23 @@ func (s *EmailProviderService) GenerateDKIM(ctx context.Context, customerID, id 
 		return db.EmailProviderConfiguration{}, configurationError(err, "")
 	}
 
-	key, err := placeholderDKIM()
+	pair, err := generateDKIMKeyPair()
 	if err != nil {
 		return db.EmailProviderConfiguration{}, err
 	}
 
-	updates := map[string]any{"dkim_public_key": key, "updated_at": time.Now()}
+	updates := map[string]any{
+		"dkim_public_key":  pair.PublicRecord,
+		"dkim_private_key": pair.PrivateKeyPEM,
+		"updated_at":       time.Now(),
+	}
 
 	if _, err := s.repo.Update(ctx, customerID, id, updates); err != nil {
 		return db.EmailProviderConfiguration{}, err
 	}
 
-	row.DKIMPublicKey = &key
+	row.DKIMPublicKey = &pair.PublicRecord
+	row.DKIMPrivateKey = &pair.PrivateKeyPEM
 
 	return row, nil
 }
@@ -212,13 +222,35 @@ func (s *EmailProviderService) cache(ctx context.Context, previous string, row d
 	})
 }
 
-func placeholderDKIM() (string, error) {
-	value, err := auth.NewToken()
+const dkimKeyBits = 2048
+
+type dkimKeyPair struct {
+	PublicRecord  string
+	PrivateKeyPEM string
+}
+
+func generateDKIMKeyPair() (dkimKeyPair, error) {
+	key, err := rsa.GenerateKey(rand.Reader, dkimKeyBits)
 	if err != nil {
-		return "", err
+		return dkimKeyPair{}, err
 	}
 
-	return "v=DKIM1; k=rsa; p=" + value, nil
+	private, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return dkimKeyPair{}, err
+	}
+
+	public, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		return dkimKeyPair{}, err
+	}
+
+	encoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: private})
+
+	return dkimKeyPair{
+		PublicRecord:  "v=DKIM1; k=rsa; p=" + base64.StdEncoding.EncodeToString(public),
+		PrivateKeyPEM: string(encoded),
+	}, nil
 }
 
 func configurationError(err error, domain string) error {

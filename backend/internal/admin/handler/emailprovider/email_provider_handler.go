@@ -159,15 +159,21 @@ func (h *EmailProviderHandler) dkim(c *gin.Context) {
 		return
 	}
 
-	key := ""
+	public := ""
 	if row.DKIMPublicKey != nil {
-		key = *row.DKIMPublicKey
+		public = *row.DKIMPublicKey
+	}
+
+	private := ""
+	if row.DKIMPrivateKey != nil {
+		private = *row.DKIMPrivateKey
 	}
 
 	c.JSON(http.StatusOK, dto.DKIMResponse{
-		Selector:      DKIMSelector,
-		RecordName:    DKIMSelector + "._domainkey." + row.Domain,
-		DKIMPublicKey: key,
+		Selector:       DKIMSelector,
+		RecordName:     DKIMSelector + "._domainkey." + row.Domain,
+		DKIMPublicKey:  public,
+		DKIMPrivateKey: private,
 	})
 }
 

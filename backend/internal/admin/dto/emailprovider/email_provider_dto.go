@@ -21,9 +21,10 @@ type ConfigurationResponse struct {
 }
 
 type DKIMResponse struct {
-	Selector      string `json:"selector"`
-	RecordName    string `json:"record_name"`
-	DKIMPublicKey string `json:"dkim_public_key"`
+	Selector       string `json:"selector"`
+	RecordName     string `json:"record_name"`
+	DKIMPublicKey  string `json:"dkim_public_key"`
+	DKIMPrivateKey string `json:"dkim_private_key"`
 }
 
 type AccessTokenResponse struct {

@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -264,13 +263,6 @@ func configurationError(err error, domain string) error {
 	return err
 }
 
-const (
-	minDomainLength = 4
-	maxDomainLength = 253
-)
-
-var domainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*\.[a-z]{2,63}$`)
-
 type ConfigurationInput struct {
 	Name     string
 	Domain   string
@@ -278,13 +270,7 @@ type ConfigurationInput struct {
 }
 
 func NormalizeDomain(domain string) string {
-	value := strings.ToLower(strings.TrimSpace(domain))
-	value = strings.TrimPrefix(value, "https://")
-	value = strings.TrimPrefix(value, "http://")
-	value = strings.TrimPrefix(value, "www.")
-	value = strings.TrimSuffix(value, ".")
-
-	return value
+	return utils.NormalizeDomain(domain)
 }
 
 func NormalizeProvider(provider string) string {
@@ -292,11 +278,7 @@ func NormalizeProvider(provider string) string {
 }
 
 func ValidDomain(domain string) bool {
-	if len(domain) < minDomainLength || len(domain) > maxDomainLength {
-		return false
-	}
-
-	return domainPattern.MatchString(domain)
+	return utils.ValidDomain(domain)
 }
 
 func ValidProvider(provider string) bool {

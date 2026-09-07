@@ -121,6 +121,33 @@ func (r *PolicyRepository) Delete(ctx context.Context, customerID, id int) (int6
 	return result.RowsAffected, result.Error
 }
 
+func (r *PolicyRepository) FileTypes(ctx context.Context) ([]db.FileType, error) {
+	rows := make([]db.FileType, 0)
+
+	err := r.db.WithContext(ctx).
+		Model(&db.FileType{}).
+		Where("active = ?", true).
+		Order("label ASC, extension ASC").
+		Find(&rows).Error
+
+	return rows, err
+}
+
+func (r *PolicyRepository) KnownExtensions(ctx context.Context, extensions []string) ([]string, error) {
+	found := make([]string, 0, len(extensions))
+
+	if len(extensions) == 0 {
+		return found, nil
+	}
+
+	err := r.db.WithContext(ctx).
+		Model(&db.FileType{}).
+		Where("extension IN ? AND active = ?", extensions, true).
+		Pluck("extension", &found).Error
+
+	return found, err
+}
+
 func (r *PolicyRepository) LockOwnedGroupIDs(ctx context.Context, customerID int, ids []int) ([]int, error) {
 	found := make([]int, 0, len(ids))
 

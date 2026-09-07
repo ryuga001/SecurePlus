@@ -10,13 +10,18 @@ import { CheckboxList } from "@/components/ui/checkbox-list";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { TagInput } from "@/components/ui/tag-input";
 import { apiErrorMessage, apiErrorCode } from "@/lib/api-error";
 import { useListEmailGroupsQuery, type EmailGroup } from "@/store/api/email-groups-api";
 import {
   useCreatePolicyMutation,
   useGetPolicyQuery,
+  useListFileTypesQuery,
   useUpdatePolicyMutation,
+  type FileType,
   type Policy,
+  type PolicyAction,
+  type RestrictionMode,
 } from "@/store/api/policies-api";
 import { useListRulesQuery, type Rule } from "@/store/api/rules-api";
 
@@ -27,6 +32,25 @@ const STATUS_OPTIONS = [
   { label: "Disabled", value: "false" },
 ];
 
+const ACTION_OPTIONS = [
+  { label: "Audit", value: "AUDIT" },
+  { label: "Block", value: "BLOCK" },
+  { label: "Quarantine", value: "QUARANTINE" },
+  { label: "Redact", value: "REDACT" },
+];
+
+const RESTRICTION_OPTIONS = [
+  { label: "No restriction", value: "NONE" },
+  { label: "Block list", value: "BLOCK" },
+  { label: "Allow list", value: "ALLOW" },
+];
+
+const RESTRICTION_HINT: Record<RestrictionMode, string> = {
+  NONE: "Everything passes straight to the rule checks.",
+  BLOCK: "Anything on this list is blocked outright. Everything else goes through the rule checks.",
+  ALLOW: "Only what is on this list goes through the rule checks. Everything else is blocked.",
+};
+
 function toggle(ids: number[], id: number, checked: boolean) {
   return checked ? [...ids, id] : ids.filter((value) => value !== id);
 }
@@ -35,11 +59,13 @@ function PolicyForm({
   policy,
   rules,
   groups,
+  fileTypes,
   onClose,
 }: {
   policy: Policy | null;
   rules: Rule[];
   groups: EmailGroup[];
+  fileTypes: FileType[];
   onClose: () => void;
 }) {
   const [createPolicy, { isLoading: creating }] = useCreatePolicyMutation();
@@ -48,12 +74,25 @@ function PolicyForm({
   const policyId = policy?.id ?? null;
 
   const [name, setName] = React.useState(policy?.policy_name ?? "");
+  const [action, setAction] = React.useState<PolicyAction>(policy?.action ?? "AUDIT");
   const [active, setActive] = React.useState(policy?.active ?? true);
   const [ruleIDs, setRuleIDs] = React.useState<number[]>(
     (policy?.rules ?? []).map((rule) => rule.id)
   );
   const [groupIDs, setGroupIDs] = React.useState<number[]>(
     (policy?.groups ?? []).map((group) => group.id)
+  );
+  const [domainMode, setDomainMode] = React.useState<RestrictionMode>(
+    policy?.domain_restriction.mode ?? "NONE"
+  );
+  const [domains, setDomains] = React.useState<string[]>(
+    policy?.domain_restriction.values ?? []
+  );
+  const [attachmentMode, setAttachmentMode] = React.useState<RestrictionMode>(
+    policy?.attachment_restriction.mode ?? "NONE"
+  );
+  const [extensions, setExtensions] = React.useState<string[]>(
+    policy?.attachment_restriction.values ?? []
   );
   const [error, setError] = React.useState("");
 
@@ -76,14 +115,31 @@ function PolicyForm({
       setError("Select at least one group.");
       return;
     }
+    if (domainMode !== "NONE" && domains.length === 0) {
+      setError("Add at least one domain, or set the domain restriction to none.");
+      return;
+    }
+    if (attachmentMode !== "NONE" && extensions.length === 0) {
+      setError("Select at least one file type, or set the attachment restriction to none.");
+      return;
+    }
 
     setError("");
 
     const input = {
       policy_name: trimmed,
+      action,
       active,
       group_ids: groupIDs,
       rule_ids: ruleIDs,
+      domain_restriction: {
+        mode: domainMode,
+        values: domainMode === "NONE" ? [] : domains,
+      },
+      attachment_restriction: {
+        mode: attachmentMode,
+        values: attachmentMode === "NONE" ? [] : extensions,
+      },
     };
 
     try {
@@ -146,6 +202,20 @@ function PolicyForm({
             </Field>
           </div>
 
+          <Field
+            id="policy-action"
+            label="Action"
+            hint="What happens to a message this policy matches."
+          >
+            <Select
+              id="policy-action"
+              value={action}
+              options={ACTION_OPTIONS}
+              disabled={pending}
+              onChange={(event) => setAction(event.target.value as PolicyAction)}
+            />
+          </Field>
+
           <Field id="policy-rules" label="Rules" hint="What this policy looks for.">
             <CheckboxList
               options={rules.map((rule) => ({
@@ -182,6 +252,85 @@ function PolicyForm({
             />
           </Field>
 
+          <div className="flex flex-col gap-3 border-t pt-5">
+            <Field
+              id="policy-domain-mode"
+              label="Recipient domain restriction"
+              hint={RESTRICTION_HINT[domainMode]}
+            >
+              <Select
+                id="policy-domain-mode"
+                value={domainMode}
+                options={RESTRICTION_OPTIONS}
+                disabled={pending}
+                onChange={(event) => {
+                  setDomainMode(event.target.value as RestrictionMode);
+                  setError("");
+                }}
+              />
+            </Field>
+
+            {domainMode === "NONE" ? null : (
+              <TagInput
+                values={domains}
+                onChange={(values) => {
+                  setDomains(values);
+                  setError("");
+                }}
+                disabled={pending}
+                placeholder="partner.com"
+                addLabel="Add domain"
+                emptyMessage="No domains added yet"
+              />
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 border-t pt-5">
+            <Field
+              id="policy-attachment-mode"
+              label="Attachment restriction"
+              hint={RESTRICTION_HINT[attachmentMode]}
+            >
+              <Select
+                id="policy-attachment-mode"
+                value={attachmentMode}
+                options={RESTRICTION_OPTIONS}
+                disabled={pending}
+                onChange={(event) => {
+                  setAttachmentMode(event.target.value as RestrictionMode);
+                  setError("");
+                }}
+              />
+            </Field>
+
+            {attachmentMode === "NONE" ? null : (
+              <CheckboxList
+                options={fileTypes.map((fileType) => ({
+                  id: fileType.id,
+                  label: `.${fileType.extension}`,
+                  hint: fileType.label,
+                }))}
+                selected={fileTypes
+                  .filter((fileType) => extensions.includes(fileType.extension))
+                  .map((fileType) => fileType.id)}
+                disabled={pending}
+                searchPlaceholder="Search file types"
+                emptyMessage="No file types configured"
+                onToggle={(id, checked) => {
+                  const match = fileTypes.find((fileType) => fileType.id === id);
+                  if (!match) return;
+
+                  setExtensions((current) =>
+                    checked
+                      ? [...current, match.extension]
+                      : current.filter((value) => value !== match.extension)
+                  );
+                  setError("");
+                }}
+              />
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
@@ -203,8 +352,9 @@ function PolicyLoader({ policyId, onClose }: { policyId: number | null; onClose:
   });
   const { data: rules, isLoading: loadingRules } = useListRulesQuery(ALL);
   const { data: groups, isLoading: loadingGroups } = useListEmailGroupsQuery(ALL);
+  const { data: fileTypes, isLoading: loadingFileTypes } = useListFileTypesQuery();
 
-  if (loadingPolicy || loadingRules || loadingGroups) {
+  if (loadingPolicy || loadingRules || loadingGroups || loadingFileTypes) {
     return (
       <>
         <DialogTitle>{policyId === null ? "Add policy" : "Edit policy"}</DialogTitle>
@@ -223,6 +373,7 @@ function PolicyLoader({ policyId, onClose }: { policyId: number | null; onClose:
       policy={policy ?? null}
       rules={rules?.items ?? []}
       groups={groups?.items ?? []}
+      fileTypes={fileTypes?.items ?? []}
       onClose={onClose}
     />
   );

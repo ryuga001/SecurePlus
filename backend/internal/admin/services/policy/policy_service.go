@@ -2,6 +2,8 @@ package policy
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -93,10 +95,13 @@ func (s *PolicyService) Create(ctx context.Context, customerID int, in PolicyInp
 	}
 
 	row := db.Policy{
-		CustomerID: customerID,
-		PolicyName: input.PolicyName,
-		Type:       db.PolicyTypeEmail,
-		Active:     input.Active,
+		CustomerID:            customerID,
+		PolicyName:            input.PolicyName,
+		Type:                  db.PolicyTypeEmail,
+		Action:                input.Action,
+		Active:                input.Active,
+		DomainRestriction:     input.DomainRestriction,
+		AttachmentRestriction: input.AttachmentRestriction,
 	}
 
 	var detail PolicyDetail
@@ -108,6 +113,9 @@ func (s *PolicyService) Create(ctx context.Context, customerID int, in PolicyInp
 			return err
 		}
 		if err := ensureRules(ctx, repo, customerID, input.RuleIDs); err != nil {
+			return err
+		}
+		if err := ensureFileTypes(ctx, repo, input.AttachmentRestriction); err != nil {
 			return err
 		}
 		if err := repo.Insert(ctx, &row); err != nil {
@@ -154,11 +162,17 @@ func (s *PolicyService) Update(ctx context.Context, customerID, id int, in Polic
 		if err := ensureRules(ctx, repo, customerID, input.RuleIDs); err != nil {
 			return err
 		}
+		if err := ensureFileTypes(ctx, repo, input.AttachmentRestriction); err != nil {
+			return err
+		}
 
 		updates := map[string]any{
-			"policy_name": input.PolicyName,
-			"active":      input.Active,
-			"updated_at":  time.Now(),
+			"policy_name":            input.PolicyName,
+			"action":                 input.Action,
+			"active":                 input.Active,
+			"domain_restriction":     input.DomainRestriction,
+			"attachment_restriction": input.AttachmentRestriction,
+			"updated_at":             time.Now(),
 		}
 
 		if _, err := repo.Update(ctx, customerID, id, updates); err != nil {
@@ -173,7 +187,10 @@ func (s *PolicyService) Update(ctx context.Context, customerID, id int, in Polic
 		}
 
 		current.PolicyName = input.PolicyName
+		current.Action = input.Action
 		current.Active = input.Active
+		current.DomainRestriction = input.DomainRestriction
+		current.AttachmentRestriction = input.AttachmentRestriction
 
 		detail, err = s.detail(ctx, repo, customerID, current)
 
@@ -251,6 +268,26 @@ func ensureRules(ctx context.Context, repo *repo.PolicyRepository, customerID in
 	return nil
 }
 
+func ensureFileTypes(ctx context.Context, repository *repo.PolicyRepository, restriction db.Restriction) error {
+	if len(restriction.Values) == 0 {
+		return nil
+	}
+
+	found, err := repository.KnownExtensions(ctx, restriction.Values)
+	if err != nil {
+		return err
+	}
+	if len(found) != len(restriction.Values) {
+		return utils.ErrInvalidRestrictionFileType
+	}
+
+	return nil
+}
+
+func (s *PolicyService) FileTypes(ctx context.Context) ([]db.FileType, error) {
+	return s.repo.FileTypes(ctx)
+}
+
 func countByPolicy(rows []repo.PolicyReference) map[int]int {
 	counts := make(map[int]int, len(rows))
 	for _, row := range rows {
@@ -274,16 +311,27 @@ func policyError(err error, name string) error {
 }
 
 type PolicyInput struct {
-	PolicyName string
-	Active     bool
-	GroupIDs   []int
-	RuleIDs    []int
+	PolicyName            string
+	Action                string
+	Active                bool
+	GroupIDs              []int
+	RuleIDs               []int
+	DomainRestriction     db.Restriction
+	AttachmentRestriction db.Restriction
 }
 
 func NormalizePolicyInput(in PolicyInput) (PolicyInput, error) {
 	name := utils.NormalizeName(in.PolicyName)
 	if name == "" {
 		return PolicyInput{}, utils.ErrPolicyNameNeeded
+	}
+
+	action := strings.ToUpper(strings.TrimSpace(in.Action))
+	if action == "" {
+		action = db.ActionAudit
+	}
+	if !validAction(action) {
+		return PolicyInput{}, utils.ErrInvalidAction
 	}
 
 	groupIDs := utils.NormalizeIDs(in.GroupIDs)
@@ -300,10 +348,98 @@ func NormalizePolicyInput(in PolicyInput) (PolicyInput, error) {
 		return PolicyInput{}, utils.ErrTooManyItems
 	}
 
+	domains, err := normalizeRestriction(in.DomainRestriction, normalizeDomainValue, utils.ErrInvalidRestrictionDomain)
+	if err != nil {
+		return PolicyInput{}, err
+	}
+
+	attachments, err := normalizeRestriction(in.AttachmentRestriction, normalizeExtensionValue, utils.ErrInvalidRestrictionFileType)
+	if err != nil {
+		return PolicyInput{}, err
+	}
+
 	return PolicyInput{
-		PolicyName: name,
-		Active:     in.Active,
-		GroupIDs:   groupIDs,
-		RuleIDs:    ruleIDs,
+		PolicyName:            name,
+		Action:                action,
+		Active:                in.Active,
+		GroupIDs:              groupIDs,
+		RuleIDs:               ruleIDs,
+		DomainRestriction:     domains,
+		AttachmentRestriction: attachments,
 	}, nil
+}
+
+func validAction(action string) bool {
+	switch action {
+	case db.ActionBlock, db.ActionAudit, db.ActionQuarantine, db.ActionRedact:
+		return true
+	}
+
+	return false
+}
+
+func normalizeRestriction(
+	in db.Restriction,
+	normalizeValue func(string) string,
+	invalid error,
+) (db.Restriction, error) {
+	mode := strings.ToUpper(strings.TrimSpace(in.Mode))
+	if mode == "" {
+		mode = db.RestrictionNone
+	}
+
+	if mode != db.RestrictionNone && mode != db.RestrictionBlock && mode != db.RestrictionAllow {
+		return db.Restriction{}, utils.ErrInvalidRestrictionMode
+	}
+
+	if mode == db.RestrictionNone {
+		return db.Restriction{Mode: db.RestrictionNone, Values: []string{}}, nil
+	}
+
+	seen := make(map[string]bool, len(in.Values))
+	values := make([]string, 0, len(in.Values))
+
+	for _, raw := range in.Values {
+		value := normalizeValue(raw)
+		if value == "" {
+			return db.Restriction{}, invalid
+		}
+		if seen[value] {
+			continue
+		}
+
+		seen[value] = true
+		values = append(values, value)
+	}
+
+	if len(values) == 0 {
+		return db.Restriction{}, utils.ErrRestrictionValuesNeeded
+	}
+	if len(values) > utils.MaxBatchIDs {
+		return db.Restriction{}, utils.ErrTooManyItems
+	}
+
+	slices.Sort(values)
+
+	return db.Restriction{Mode: mode, Values: values}, nil
+}
+
+func normalizeDomainValue(raw string) string {
+	domain := utils.NormalizeDomain(raw)
+	if !utils.ValidDomain(domain) {
+		return ""
+	}
+
+	return domain
+}
+
+func normalizeExtensionValue(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	value = strings.TrimPrefix(value, ".")
+
+	if value == "" || len(value) > 20 || strings.ContainsAny(value, " .\t/\\") {
+		return ""
+	}
+
+	return value
 }

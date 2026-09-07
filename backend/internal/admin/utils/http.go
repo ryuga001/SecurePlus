@@ -151,7 +151,12 @@ func statusFor(err error) (int, string) {
 	case errors.Is(err, ErrUnknownEmailUser):
 		return http.StatusBadRequest, CodeEmailUserNotFound
 
-	case errors.Is(err, ErrPolicyNameNeeded),
+	case errors.Is(err, ErrInvalidAction),
+		errors.Is(err, ErrInvalidRestrictionMode),
+		errors.Is(err, ErrRestrictionValuesNeeded),
+		errors.Is(err, ErrInvalidRestrictionDomain),
+		errors.Is(err, ErrInvalidRestrictionFileType),
+		errors.Is(err, ErrPolicyNameNeeded),
 		errors.Is(err, ErrRulesNeeded),
 		errors.Is(err, ErrGroupsNeeded),
 		errors.Is(err, ErrRuleNameNeeded),

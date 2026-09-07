@@ -36,6 +36,32 @@ func (h *PolicyHandler) RegisterRoutes(protected *gin.RouterGroup, guard func(pr
 	group.PUT("/:id", guard(PrivilegePolicyEdit), h.update)
 	group.PATCH("/:id/status", guard(PrivilegePolicyEdit), h.setStatus)
 	group.DELETE("/:id", guard(PrivilegePolicyDelete), h.remove)
+
+	protected.GET("/admin/file-types", guard(PrivilegePolicyView), h.fileTypes)
+}
+
+func (h *PolicyHandler) fileTypes(c *gin.Context) {
+	if _, ok := utils.Actor(c); !ok {
+		return
+	}
+
+	rows, err := h.svc.FileTypes(c.Request.Context())
+	if err != nil {
+		utils.Respond(c, err)
+		return
+	}
+
+	items := make([]dto.FileTypeResponse, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, dto.FileTypeResponse{ID: row.ID, Extension: row.Extension, Label: row.Label})
+	}
+
+	c.JSON(http.StatusOK, utils.ListResponse[dto.FileTypeResponse]{
+		Items:    items,
+		Page:     utils.DefaultPage,
+		PageSize: len(items),
+		Total:    int64(len(items)),
+	})
 }
 
 func (h *PolicyHandler) list(c *gin.Context) {
@@ -64,14 +90,17 @@ func (h *PolicyHandler) list(c *gin.Context) {
 	items := make([]dto.PolicyListItem, 0, len(listing.Items))
 	for _, item := range listing.Items {
 		items = append(items, dto.PolicyListItem{
-			ID:         item.Policy.ID,
-			PolicyName: item.Policy.PolicyName,
-			Type:       item.Policy.Type,
-			Active:     item.Policy.Active,
-			GroupCount: item.GroupCount,
-			RuleCount:  item.RuleCount,
-			CreatedAt:  item.Policy.CreatedAt,
-			UpdatedAt:  item.Policy.UpdatedAt,
+			ID:                     item.Policy.ID,
+			PolicyName:             item.Policy.PolicyName,
+			Type:                   item.Policy.Type,
+			Action:                 item.Policy.Action,
+			Active:                 item.Policy.Active,
+			DomainRestrictionMode:  item.Policy.DomainRestriction.Mode,
+			AttachmentRestrictMode: item.Policy.AttachmentRestriction.Mode,
+			GroupCount:             item.GroupCount,
+			RuleCount:              item.RuleCount,
+			CreatedAt:              item.Policy.CreatedAt,
+			UpdatedAt:              item.Policy.UpdatedAt,
 		})
 	}
 
@@ -182,23 +211,51 @@ func toPolicyInput(req dto.PolicyRequest) service.PolicyInput {
 	}
 
 	return service.PolicyInput{
-		PolicyName: req.PolicyName,
-		Active:     active,
-		GroupIDs:   req.GroupIDs,
-		RuleIDs:    req.RuleIDs,
+		PolicyName:            req.PolicyName,
+		Action:                req.Action,
+		Active:                active,
+		GroupIDs:              req.GroupIDs,
+		RuleIDs:               req.RuleIDs,
+		DomainRestriction:     toRestriction(req.DomainRestriction),
+		AttachmentRestriction: toRestriction(req.AttachmentRestriction),
 	}
+}
+
+func toRestriction(payload *dto.RestrictionPayload) db.Restriction {
+	if payload == nil {
+		return db.Restriction{Mode: db.RestrictionNone, Values: []string{}}
+	}
+
+	return db.Restriction{Mode: payload.Mode, Values: payload.Values}
+}
+
+func fromRestriction(restriction db.Restriction) dto.RestrictionPayload {
+	values := restriction.Values
+	if values == nil {
+		values = []string{}
+	}
+
+	mode := restriction.Mode
+	if mode == "" {
+		mode = db.RestrictionNone
+	}
+
+	return dto.RestrictionPayload{Mode: mode, Values: values}
 }
 
 func toPolicyResponse(detail service.PolicyDetail) dto.PolicyResponse {
 	return dto.PolicyResponse{
-		ID:         detail.Policy.ID,
-		PolicyName: detail.Policy.PolicyName,
-		Type:       db.PolicyTypeEmail,
-		Active:     detail.Policy.Active,
-		Groups:     toReferences(detail.Groups),
-		Rules:      toReferences(detail.Rules),
-		CreatedAt:  detail.Policy.CreatedAt,
-		UpdatedAt:  detail.Policy.UpdatedAt,
+		ID:                    detail.Policy.ID,
+		PolicyName:            detail.Policy.PolicyName,
+		Type:                  db.PolicyTypeEmail,
+		Action:                detail.Policy.Action,
+		Active:                detail.Policy.Active,
+		DomainRestriction:     fromRestriction(detail.Policy.DomainRestriction),
+		AttachmentRestriction: fromRestriction(detail.Policy.AttachmentRestriction),
+		Groups:                toReferences(detail.Groups),
+		Rules:                 toReferences(detail.Rules),
+		CreatedAt:             detail.Policy.CreatedAt,
+		UpdatedAt:             detail.Policy.UpdatedAt,
 	}
 }
 

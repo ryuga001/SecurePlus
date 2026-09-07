@@ -1,7 +1,9 @@
 package db
 
 import (
+	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -77,17 +79,75 @@ type EmailProviderConfiguration struct {
 
 func (EmailProviderConfiguration) TableName() string { return "email_provider_configurations" }
 
+type Restriction struct {
+	Mode   string   `json:"mode"`
+	Values []string `json:"values"`
+}
+
+func (r Restriction) Value() (driver.Value, error) {
+	if r.Mode == "" {
+		r.Mode = RestrictionNone
+	}
+	if r.Values == nil {
+		r.Values = []string{}
+	}
+
+	return json.Marshal(r)
+}
+
+func (r *Restriction) Scan(value any) error {
+	if value == nil {
+		*r = Restriction{Mode: RestrictionNone, Values: []string{}}
+		return nil
+	}
+
+	var raw []byte
+
+	switch typed := value.(type) {
+	case []byte:
+		raw = typed
+	case string:
+		raw = []byte(typed)
+	default:
+		return errors.New("restriction column must be jsonb")
+	}
+
+	if err := json.Unmarshal(raw, r); err != nil {
+		return err
+	}
+
+	if r.Values == nil {
+		r.Values = []string{}
+	}
+
+	return nil
+}
+
 type Policy struct {
-	ID         int       `gorm:"column:id;primaryKey"`
-	CustomerID int       `gorm:"column:customer_id"`
-	PolicyName string    `gorm:"column:policy_name"`
-	Type       string    `gorm:"column:type"`
-	Active     bool      `gorm:"column:active"`
-	CreatedAt  time.Time `gorm:"column:created_at"`
-	UpdatedAt  time.Time `gorm:"column:updated_at"`
+	ID                    int         `gorm:"column:id;primaryKey"`
+	CustomerID            int         `gorm:"column:customer_id"`
+	PolicyName            string      `gorm:"column:policy_name"`
+	Type                  string      `gorm:"column:type"`
+	Action                string      `gorm:"column:action"`
+	Active                bool        `gorm:"column:active"`
+	DomainRestriction     Restriction `gorm:"column:domain_restriction;type:jsonb"`
+	AttachmentRestriction Restriction `gorm:"column:attachment_restriction;type:jsonb"`
+	CreatedAt             time.Time   `gorm:"column:created_at"`
+	UpdatedAt             time.Time   `gorm:"column:updated_at"`
 }
 
 func (Policy) TableName() string { return "policies" }
+
+type FileType struct {
+	ID        int       `gorm:"column:id;primaryKey"`
+	Extension string    `gorm:"column:extension"`
+	Label     string    `gorm:"column:label"`
+	Active    bool      `gorm:"column:active"`
+	CreatedAt time.Time `gorm:"column:created_at"`
+	UpdatedAt time.Time `gorm:"column:updated_at"`
+}
+
+func (FileType) TableName() string { return "file_types" }
 
 type Rule struct {
 	ID         int       `gorm:"column:id;primaryKey"`

@@ -7,11 +7,29 @@ export type PolicyReference = {
   name: string;
 };
 
+export type PolicyAction = "BLOCK" | "AUDIT" | "QUARANTINE" | "REDACT";
+
+export type RestrictionMode = "NONE" | "BLOCK" | "ALLOW";
+
+export type Restriction = {
+  mode: RestrictionMode;
+  values: string[];
+};
+
+export type FileType = {
+  id: number;
+  extension: string;
+  label: string;
+};
+
 export type Policy = {
   id: number;
   policy_name: string;
   type: "EMAIL";
+  action: PolicyAction;
   active: boolean;
+  domain_restriction: Restriction;
+  attachment_restriction: Restriction;
   groups: PolicyReference[];
   rules: PolicyReference[];
   created_at: string;
@@ -22,7 +40,10 @@ export type PolicyListItem = {
   id: number;
   policy_name: string;
   type: "EMAIL";
+  action: PolicyAction;
   active: boolean;
+  domain_restriction_mode: RestrictionMode;
+  attachment_restriction_mode: RestrictionMode;
   group_count: number;
   rule_count: number;
   created_at: string;
@@ -31,9 +52,12 @@ export type PolicyListItem = {
 
 export type PolicyInput = {
   policy_name: string;
+  action: PolicyAction;
   active: boolean;
   group_ids: number[];
   rule_ids: number[];
+  domain_restriction: Restriction;
+  attachment_restriction: Restriction;
 };
 
 export type UpdatePolicyArgs = PolicyInput & { id: number };
@@ -55,6 +79,10 @@ export const policiesApi = baseApi.injectEndpoints({
     getPolicy: builder.query<Policy, number>({
       query: (id) => `${BASE_URL}/${id}`,
       providesTags: (result, error, id) => [{ type: "EmailPolicy", id }],
+    }),
+
+    listFileTypes: builder.query<PaginatedResponse<FileType>, void>({
+      query: () => "/admin/file-types",
     }),
 
     createPolicy: builder.mutation<Policy, PolicyInput>({
@@ -95,6 +123,7 @@ export const policiesApi = baseApi.injectEndpoints({
 export const {
   useListPoliciesQuery,
   useGetPolicyQuery,
+  useListFileTypesQuery,
   useCreatePolicyMutation,
   useUpdatePolicyMutation,
   useSetPolicyStatusMutation,

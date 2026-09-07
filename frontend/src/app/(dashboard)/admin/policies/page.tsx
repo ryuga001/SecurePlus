@@ -37,16 +37,39 @@ const filters: FilterConfig[] = [
   },
 ];
 
+const ACTION_LABELS: Record<string, string> = {
+  AUDIT: "Audit",
+  BLOCK: "Block",
+  QUARANTINE: "Quarantine",
+  REDACT: "Redact",
+};
+
+const RESTRICTION_LABELS: Record<string, string> = {
+  NONE: "None",
+  BLOCK: "Block list",
+  ALLOW: "Allow list",
+};
+
 const columns: ColumnConfig<PolicyListItem>[] = [
   { key: "policy_name", label: "Policy Name" },
+  { key: "action", label: "Action", render: (value) => ACTION_LABELS[String(value)] ?? value },
   {
     key: "active",
     label: "Status",
     render: (value) => <StatusBadge status={value ? "enabled" : "disabled"} />,
   },
+  {
+    key: "domain_restriction_mode",
+    label: "Domains",
+    render: (value) => RESTRICTION_LABELS[String(value)] ?? value,
+  },
+  {
+    key: "attachment_restriction_mode",
+    label: "Attachments",
+    render: (value) => RESTRICTION_LABELS[String(value)] ?? value,
+  },
   { key: "rule_count", label: "Rules", type: "number", align: "right" },
   { key: "group_count", label: "Groups", type: "number", align: "right" },
-  { key: "created_at", label: "Created At", type: "date" },
   { key: "updated_at", label: "Updated At", type: "date" },
 ];
 

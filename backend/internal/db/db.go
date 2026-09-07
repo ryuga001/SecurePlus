@@ -7,3 +7,9 @@ func TenantScope(customerID int) func(*gorm.DB) *gorm.DB {
 		return tx.Where("customer_id = ?", customerID)
 	}
 }
+
+func TenantScopeOn(table string, customerID int) func(*gorm.DB) *gorm.DB {
+	return func(tx *gorm.DB) *gorm.DB {
+		return tx.Where(table+".customer_id = ?", customerID)
+	}
+}

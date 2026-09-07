@@ -13,7 +13,21 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"dpdp-backend/internal/admin/email"
+	providerhandler "dpdp-backend/internal/admin/handler/emailprovider"
+	userhandler "dpdp-backend/internal/admin/handler/emailuser"
+	grouphandler "dpdp-backend/internal/admin/handler/group"
+	policyhandler "dpdp-backend/internal/admin/handler/policy"
+	rulehandler "dpdp-backend/internal/admin/handler/rule"
+	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
+	userrepo "dpdp-backend/internal/admin/repositories/emailuser"
+	grouprepo "dpdp-backend/internal/admin/repositories/group"
+	policyrepo "dpdp-backend/internal/admin/repositories/policy"
+	rulerepo "dpdp-backend/internal/admin/repositories/rule"
+	providersvc "dpdp-backend/internal/admin/services/emailprovider"
+	usersvc "dpdp-backend/internal/admin/services/emailuser"
+	groupsvc "dpdp-backend/internal/admin/services/group"
+	policysvc "dpdp-backend/internal/admin/services/policy"
+	rulesvc "dpdp-backend/internal/admin/services/rule"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/middleware"
@@ -47,11 +61,28 @@ func main() {
 	notifier := notification.NewService(database, cfg.SMTP)
 	store := auth.NewStore(rdb)
 	service := auth.NewService(database, store, notifier, cfg.Auth, cfg.App)
-	handler := auth.NewHandler(service, cfg.Auth)
+	authHandler := auth.NewHandler(service, cfg.Auth)
 
-	emailRedis := email.NewRedisService(rdb)
-	emailService := email.NewService(database, emailRedis, cfg.Auth)
-	emailHandler := email.NewHandler(emailService)
+	providerHandler := providerhandler.NewEmailProviderHandler(
+		providersvc.NewEmailProviderService(
+			database,
+			providerrepo.NewEmailProviderRepository(database),
+			providerrepo.NewRedisRepository(rdb),
+			cfg.Auth,
+		),
+	)
+	policyHandler := policyhandler.NewPolicyHandler(
+		policysvc.NewPolicyService(database, policyrepo.NewPolicyRepository(database)),
+	)
+	ruleHandler := rulehandler.NewRuleHandler(
+		rulesvc.NewRuleService(database, rulerepo.NewRuleRepository(database)),
+	)
+	emailUserHandler := userhandler.NewEmailUserHandler(
+		usersvc.NewEmailUserService(database, userrepo.NewEmailUserRepository(database)),
+	)
+	groupHandler := grouphandler.NewGroupHandler(
+		groupsvc.NewGroupService(database, grouprepo.NewGroupRepository(database)),
+	)
 
 	if cfg.App.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -82,11 +113,17 @@ func main() {
 		middleware.RequireCSRF(cfg.Auth),
 	)
 
-	handler.RegisterRoutes(public, refresh, protected)
+	authHandler.RegisterRoutes(public, refresh, protected)
 
-	emailHandler.RegisterRoutes(protected, func(name string) gin.HandlerFunc {
+	guard := func(name string) gin.HandlerFunc {
 		return middleware.RequirePrivilege(database, store, name)
-	})
+	}
+
+	providerHandler.RegisterRoutes(protected, guard)
+	policyHandler.RegisterRoutes(protected, guard)
+	ruleHandler.RegisterRoutes(protected, guard)
+	emailUserHandler.RegisterRoutes(protected, guard)
+	groupHandler.RegisterRoutes(protected, guard)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.App.Port,

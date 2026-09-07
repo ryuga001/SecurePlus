@@ -75,3 +75,74 @@ type EmailProviderConfiguration struct {
 }
 
 func (EmailProviderConfiguration) TableName() string { return "email_provider_configurations" }
+
+type Policy struct {
+	ID         int       `gorm:"column:id;primaryKey"`
+	CustomerID int       `gorm:"column:customer_id"`
+	PolicyName string    `gorm:"column:policy_name"`
+	Type       string    `gorm:"column:type"`
+	Active     bool      `gorm:"column:active"`
+	CreatedAt  time.Time `gorm:"column:created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at"`
+}
+
+func (Policy) TableName() string { return "policies" }
+
+type Rule struct {
+	ID         int       `gorm:"column:id;primaryKey"`
+	CustomerID int       `gorm:"column:customer_id"`
+	RuleName   string    `gorm:"column:rule_name"`
+	Type       string    `gorm:"column:type"`
+	Value      string    `gorm:"column:value"`
+	CreatedAt  time.Time `gorm:"column:created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at"`
+}
+
+func (Rule) TableName() string { return "rules" }
+
+type EmailUser struct {
+	ID         int       `gorm:"column:id;primaryKey"`
+	CustomerID int       `gorm:"column:customer_id"`
+	Email      string    `gorm:"column:email"`
+	FirstName  string    `gorm:"column:first_name"`
+	LastName   string    `gorm:"column:last_name"`
+	CreatedAt  time.Time `gorm:"column:created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at"`
+}
+
+func (EmailUser) TableName() string { return "email_users" }
+
+type Group struct {
+	ID         int       `gorm:"column:id;primaryKey"`
+	CustomerID int       `gorm:"column:customer_id"`
+	Name       string    `gorm:"column:name"`
+	Type       string    `gorm:"column:type"`
+	CreatedAt  time.Time `gorm:"column:created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at"`
+}
+
+func (Group) TableName() string { return "groups" }
+
+type EmailUserGroupMapping struct {
+	EmailUserID int `gorm:"column:email_user_id;primaryKey"`
+	GroupID     int `gorm:"column:group_id;primaryKey"`
+	CustomerID  int `gorm:"column:customer_id"`
+}
+
+func (EmailUserGroupMapping) TableName() string { return "email_user_group_mapping" }
+
+type PolicyGroupMapping struct {
+	PolicyID   int `gorm:"column:policy_id;primaryKey"`
+	GroupID    int `gorm:"column:group_id;primaryKey"`
+	CustomerID int `gorm:"column:customer_id"`
+}
+
+func (PolicyGroupMapping) TableName() string { return "policy_group_mapping" }
+
+type PolicyRuleMapping struct {
+	PolicyID   int `gorm:"column:policy_id;primaryKey"`
+	RuleID     int `gorm:"column:rule_id;primaryKey"`
+	CustomerID int `gorm:"column:customer_id"`
+}
+
+func (PolicyRuleMapping) TableName() string { return "policy_rule_mapping" }

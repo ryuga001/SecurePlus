@@ -147,16 +147,19 @@ export function DataTable<Row>({
   const { data, isLoading, isFetching, isError, error, refetch } = useTableQuery(args);
   const { items, total } = normalize<Row>(data);
 
-  React.useEffect(() => {
-    setPage(1);
-  }, [debouncedFilters, pageSize]);
-
   function updateFilter(key: string, value: FilterValue) {
     setFilterValues((current) => ({ ...current, [key]: value }));
+    setPage(1);
   }
 
   function clearFilters() {
     setFilterValues(initialFilterState(filters));
+    setPage(1);
+  }
+
+  function changePageSize(size: number) {
+    setPageSize(size);
+    setPage(1);
   }
 
   function toggleSort(column: ColumnConfig<Row>) {
@@ -371,7 +374,7 @@ export function DataTable<Row>({
         rowCount={items.length}
         total={total}
         onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onPageSizeChange={changePageSize}
       />
     </div>
   );

@@ -81,11 +81,11 @@ export const routes = {
                 subheading: "Collections of users that policies target together.",
             },
             reports: {
-                label: "Reports",
+                label: "Audits",
                 routePath: "/email/reports",
                 icon: FileText,
                 privileges: [],
-                heading: "Email reports",
+                heading: "Email audits",
                 subheading: "Exportable evidence for audits and reviews.",
             }
         },

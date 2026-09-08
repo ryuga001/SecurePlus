@@ -13,8 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"gorm.io/gorm"
 
+	"dpdp-backend/internal/audit/utils"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/db"
@@ -76,6 +78,45 @@ func Redis(t *testing.T) *redis.Client {
 	t.Cleanup(func() { client.Close() })
 
 	return client
+}
+
+func Mongo(t *testing.T) *mongo.Client {
+	t.Helper()
+
+	uri := os.Getenv("TEST_MONGO_URI")
+	if uri == "" {
+		t.Skip("TEST_MONGO_URI is not set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := config.Mongo{URI: uri, Database: MongoDatabase()}.Connect(ctx)
+	if err != nil {
+		t.Fatalf("test mongo connection failed: %v", err)
+	}
+
+	t.Cleanup(func() { client.Disconnect(context.Background()) })
+
+	return client
+}
+
+func MongoDatabase() string {
+	database := os.Getenv("TEST_MONGO_DATABASE")
+	if database == "" {
+		return "dpdp_test"
+	}
+
+	return database
+}
+
+func ResetMongo(t *testing.T, client *mongo.Client) {
+	t.Helper()
+
+	err := client.Database(MongoDatabase()).Collection(utils.DeliveryAuditCollection).Drop(context.Background())
+	if err != nil {
+		t.Fatalf("mongo reset failed: %v", err)
+	}
 }
 
 func Reset(t *testing.T, database *gorm.DB, rdb *redis.Client) {

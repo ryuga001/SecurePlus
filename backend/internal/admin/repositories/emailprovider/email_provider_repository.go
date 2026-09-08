@@ -118,6 +118,31 @@ func (r *EmailProviderRepository) Delete(ctx context.Context, customerID, id int
 	return result.RowsAffected, result.Error
 }
 
+func (r *EmailProviderRepository) FindByDomain(ctx context.Context, domain string) (db.EmailProviderConfiguration, error) {
+	var row db.EmailProviderConfiguration
+
+	err := r.db.WithContext(ctx).
+		Model(&db.EmailProviderConfiguration{}).
+		Select(configColumns).
+		Where("domain = ?", domain).
+		Take(&row).Error
+
+	return row, err
+}
+
+func (r *EmailProviderRepository) SigningConfig(ctx context.Context, customerID, id int) (db.EmailProviderConfiguration, error) {
+	var row db.EmailProviderConfiguration
+
+	err := r.db.WithContext(ctx).
+		Model(&db.EmailProviderConfiguration{}).
+		Select("id", "customer_id", "domain", "dkim_private_key").
+		Scopes(db.TenantScope(customerID)).
+		Where("id = ?", id).
+		Take(&row).Error
+
+	return row, err
+}
+
 func (r *EmailProviderRepository) TenantSecret(ctx context.Context, customerID int) (string, error) {
 	var customer db.Customer
 

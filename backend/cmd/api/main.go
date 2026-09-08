@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
+	"github.com/emersion/go-smtp"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
@@ -28,8 +30,14 @@ import (
 	groupsvc "dpdp-backend/internal/admin/services/group"
 	policysvc "dpdp-backend/internal/admin/services/policy"
 	rulesvc "dpdp-backend/internal/admin/services/rule"
+	auditrepo "dpdp-backend/internal/audit/repositories/deliveryaudit"
+	auditsvc "dpdp-backend/internal/audit/services/deliveryaudit"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
+	"dpdp-backend/internal/delivery"
+	"dpdp-backend/internal/delivery/engine"
+	"dpdp-backend/internal/delivery/receiver"
+	"dpdp-backend/internal/delivery/relay"
 	"dpdp-backend/internal/middleware"
 	"dpdp-backend/internal/notification"
 )
@@ -58,10 +66,49 @@ func main() {
 	}
 	defer rdb.Close()
 
+	mongoClient, err := cfg.Mongo.Connect(startupCtx)
+	if err != nil {
+		slog.Error("mongo connection failed", "error", err)
+		os.Exit(1)
+	}
+	defer mongoClient.Disconnect(context.Background())
+
+	recorder := auditsvc.NewDeliveryAuditService(auditrepo.NewDeliveryAuditRepository(mongoClient, cfg.Mongo.Database))
+	if err := recorder.EnsureIndexes(startupCtx); err != nil {
+		slog.Error("delivery audit index creation failed", "error", err)
+		os.Exit(1)
+	}
+
 	notifier := notification.NewService(database, cfg.SMTP)
 	store := auth.NewStore(rdb)
 	service := auth.NewService(database, store, notifier, cfg.Auth, cfg.App)
 	authHandler := auth.NewHandler(service, cfg.Auth)
+
+	providerRepository := providerrepo.NewEmailProviderRepository(database)
+	domainRegistry := providerrepo.NewRedisRepository(rdb)
+
+	configurations := delivery.NewConfigurationStore(providerRepository, receiver.ErrDomainUnknown)
+	authorizer := receiver.NewAuthorizer(delivery.NewDomainLookup(domainRegistry), configurations)
+
+	dispatcher := delivery.NewDispatcher(
+		ctx,
+		engine.NewEngine(engine.NewConfigCache(configurations, rdb)),
+		relay.NewRelay(cfg.Relay),
+		recorder,
+	)
+
+	smtpServer := receiver.NewServer(
+		cfg.SMTPServer,
+		receiver.NewBackend(
+			authorizer,
+			recorder,
+			dispatcher,
+			cfg.SMTPServer.MaxDeliveries,
+			cfg.SMTPServer.MaxSize,
+			cfg.SMTPServer.MaxRecipients,
+		),
+		cfg.Relay.HELOHost,
+	)
 
 	providerHandler := providerhandler.NewEmailProviderHandler(
 		providersvc.NewEmailProviderService(
@@ -131,11 +178,28 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	var servers sync.WaitGroup
+
+	servers.Add(2)
+
 	go func() {
-		slog.Info("server listening", "port", cfg.App.Port, "env", cfg.App.Env)
+		defer servers.Done()
+
+		slog.Info("api listening", "port", cfg.App.Port, "env", cfg.App.Env)
 
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("server failed", "error", err)
+			slog.Error("api server failed", "error", err)
+			stop()
+		}
+	}()
+
+	go func() {
+		defer servers.Done()
+
+		slog.Info("smtp listening", "addr", smtpServer.Addr())
+
+		if err := smtpServer.ListenAndServe(); err != nil && !errors.Is(err, smtp.ErrServerClosed) {
+			slog.Error("smtp server failed", "error", err)
 			stop()
 		}
 	}()
@@ -143,10 +207,30 @@ func main() {
 	<-ctx.Done()
 	slog.Info("shutting down")
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.SMTPServer.ShutdownTimeout)
 	defer shutdownCancel()
 
+	if err := smtpServer.Shutdown(shutdownCtx); err != nil {
+		slog.Error("smtp shutdown failed", "error", err)
+	}
+
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		slog.Error("graceful shutdown failed", "error", err)
+		slog.Error("api shutdown failed", "error", err)
+	}
+
+	servers.Wait()
+
+	drained := make(chan struct{})
+
+	go func() {
+		dispatcher.Wait()
+		close(drained)
+	}()
+
+	select {
+	case <-drained:
+		slog.Info("in-flight deliveries finished")
+	case <-shutdownCtx.Done():
+		slog.Warn("shutdown deadline reached with deliveries in flight")
 	}
 }

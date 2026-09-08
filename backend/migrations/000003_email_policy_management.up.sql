@@ -137,7 +137,8 @@ INSERT INTO privileges (name, type) VALUES
 ('admin.rule.view',          'DASHBOARD'),
 ('admin.rule.create',        'DASHBOARD'),
 ('admin.rule.edit',          'DASHBOARD'),
-('admin.rule.delete',        'DASHBOARD')
+('admin.rule.delete',        'DASHBOARD'),
+('admin.email.audit.view',   'DASHBOARD')
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO role_privileges (role_id, privilege_id)
@@ -150,5 +151,6 @@ WHERE r.type = 'admin'
       OR p.name LIKE 'admin.email.user.%'
       OR p.name LIKE 'admin.email.group.%'
       OR p.name LIKE 'admin.rule.%'
+      OR p.name LIKE 'admin.email.audit.%'
   )
 ON CONFLICT DO NOTHING;

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
@@ -107,7 +108,40 @@ func (s *Service) Login(ctx context.Context, email, password string) (db.Dashboa
 		return db.DashboardUser{}, TokenPair{}, err
 	}
 
+	s.syncPrivileges(ctx, user.Role)
+
 	return user, pair, nil
+}
+
+func (s *Service) syncPrivileges(ctx context.Context, role *db.Role) {
+	if role == nil || role.Type != db.RoleTypeAdmin {
+		return
+	}
+
+	grant := `INSERT INTO role_privileges (role_id, privilege_id)
+		SELECT ?, id FROM privileges WHERE type = ? ON CONFLICT DO NOTHING`
+
+	if err := s.db.WithContext(ctx).Exec(grant, role.ID, db.PrivilegeTypeDashboard).Error; err != nil {
+		slog.WarnContext(ctx, "role privilege grant failed", "role_id", role.ID, "error", err)
+		return
+	}
+
+	var names []string
+
+	query := s.db.WithContext(ctx).
+		Model(&db.Privilege{}).
+		Select("privileges.name").
+		Joins("JOIN role_privileges rp ON rp.privilege_id = privileges.id").
+		Where("rp.role_id = ?", role.ID)
+
+	if err := query.Scan(&names).Error; err != nil {
+		slog.WarnContext(ctx, "role privilege lookup failed", "role_id", role.ID, "error", err)
+		return
+	}
+
+	if err := s.store.CachePrivileges(ctx, role.ID, names, config.PrivCacheTTL); err != nil {
+		slog.WarnContext(ctx, "role privilege cache refresh failed", "role_id", role.ID, "error", err)
+	}
 }
 
 func (s *Service) issue(ctx context.Context, user db.DashboardUser) (TokenPair, error) {
@@ -277,6 +311,8 @@ func (s *Service) CompleteRegistration(ctx context.Context, req CompleteRequest)
 		return db.DashboardUser{}, TokenPair{}, err
 	}
 
+	s.syncPrivileges(ctx, user.Role)
+
 	s.notify(ctx, notification.Email{
 		CustomerID: user.CustomerID,
 		Template:   notification.TemplateWelcome,
@@ -300,13 +336,14 @@ func (s *Service) createTenant(ctx context.Context, req CompleteRequest, email, 
 			return err
 		}
 
-		role := db.Role{Name: "Admin", Type: "admin", CustomerID: customer.ID}
-		if err := tx.Omit("Privileges").Create(&role).Error; err != nil {
-			return err
-		}
+		var role db.Role
 
-		grant := `INSERT INTO role_privileges (role_id, privilege_id) SELECT ?, id FROM privileges WHERE type = 'DASHBOARD' ON CONFLICT DO NOTHING`
-		if err := tx.Exec(grant, role.ID).Error; err != nil {
+		err := tx.Where("customer_id = ? AND type = ?", db.SystemCustomerID, db.RoleTypeAdmin).
+			Take(&role).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("shared %s role is missing for customer %d", db.RoleTypeAdmin, db.SystemCustomerID)
+		}
+		if err != nil {
 			return err
 		}
 

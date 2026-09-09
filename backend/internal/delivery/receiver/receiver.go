@@ -15,6 +15,7 @@ import (
 	auditdto "dpdp-backend/internal/audit/dto/deliveryaudit"
 	auditutils "dpdp-backend/internal/audit/utils"
 	"dpdp-backend/internal/delivery"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
 var (
@@ -112,7 +113,7 @@ func (s *session) Mail(from string, opts *smtp.MailOptions) error {
 
 	authorization, err := s.backend.authorizer.Authorize(s.ctx, domain)
 	if err != nil {
-		if errors.Is(err, ErrDomainUnknown) {
+		if errors.Is(err, deliveryutils.ErrDomainUnknown) {
 			return errNotAuthorized
 		}
 

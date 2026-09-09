@@ -12,11 +12,10 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"dpdp-backend/internal/delivery"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
 const configCacheTTL = 10 * time.Minute
-
-var ErrSigningConfigMissing = errors.New("signing configuration is not available")
 
 type SigningLoader interface {
 	SigningConfig(ctx context.Context, customerID, configID int) (delivery.TenantConfig, error)
@@ -48,7 +47,7 @@ func (c *ConfigCache) Resolve(ctx context.Context, customerID, configID int) (de
 		}
 
 		if cfg.DKIMSelector == "" {
-			cfg.DKIMSelector = delivery.DefaultDKIMSelector
+			cfg.DKIMSelector = deliveryutils.DefaultDKIMSelector
 		}
 
 		c.write(ctx, cfg)
@@ -62,7 +61,7 @@ func (c *ConfigCache) Resolve(ctx context.Context, customerID, configID int) (de
 
 	cfg, ok := value.(delivery.TenantConfig)
 	if !ok {
-		return delivery.TenantConfig{}, ErrSigningConfigMissing
+		return delivery.TenantConfig{}, deliveryutils.ErrSigningConfigMissing
 	}
 
 	return cfg, nil

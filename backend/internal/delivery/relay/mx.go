@@ -2,14 +2,13 @@ package relay
 
 import (
 	"context"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"errors"
 	"net"
 	"sort"
 	"strings"
 	"time"
 )
-
-var ErrNoDestination = errors.New("no mail exchanger or address record for domain")
 
 type Destination struct {
 	Host string
@@ -56,7 +55,7 @@ func (r *Resolver) Destinations(ctx context.Context, domain string) ([]Destinati
 	}
 
 	if len(destinations) == 0 {
-		return nil, ErrNoDestination
+		return nil, deliveryutils.ErrNoDestination
 	}
 
 	return destinations, nil
@@ -77,7 +76,7 @@ func (r *Resolver) hosts(ctx context.Context, domain string) ([]string, error) {
 
 	if err != nil && !temporary(err) {
 		if _, lookupErr := r.resolver.LookupHost(ctx, domain); lookupErr != nil {
-			return nil, ErrNoDestination
+			return nil, deliveryutils.ErrNoDestination
 		}
 	}
 
@@ -101,7 +100,7 @@ func (r *Resolver) addresses(ctx context.Context, host string) ([]string, error)
 	}
 
 	if len(addresses) == 0 {
-		return nil, ErrNoDestination
+		return nil, deliveryutils.ErrNoDestination
 	}
 
 	return addresses, nil

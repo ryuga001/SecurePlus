@@ -6,16 +6,11 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 
 	"github.com/emersion/go-msgauth/dkim"
 
 	"dpdp-backend/internal/delivery"
-)
-
-var (
-	ErrPrivateKeyMissing = errors.New("dkim private key is not configured")
-	ErrPrivateKeyInvalid = errors.New("dkim private key could not be parsed")
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
 var signedHeaders = []string{
@@ -38,7 +33,7 @@ func Sign(raw []byte, cfg delivery.TenantConfig) ([]byte, error) {
 
 	selector := cfg.DKIMSelector
 	if selector == "" {
-		selector = delivery.DefaultDKIMSelector
+		selector = deliveryutils.DefaultDKIMSelector
 	}
 
 	options := &dkim.SignOptions{
@@ -62,18 +57,18 @@ func Sign(raw []byte, cfg delivery.TenantConfig) ([]byte, error) {
 
 func parsePrivateKey(encoded string) (crypto.Signer, error) {
 	if encoded == "" {
-		return nil, ErrPrivateKeyMissing
+		return nil, deliveryutils.ErrPrivateKeyMissing
 	}
 
 	block, _ := pem.Decode([]byte(encoded))
 	if block == nil {
-		return nil, ErrPrivateKeyInvalid
+		return nil, deliveryutils.ErrPrivateKeyInvalid
 	}
 
 	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
 		signer, ok := key.(crypto.Signer)
 		if !ok {
-			return nil, ErrPrivateKeyInvalid
+			return nil, deliveryutils.ErrPrivateKeyInvalid
 		}
 
 		return signer, nil
@@ -81,7 +76,7 @@ func parsePrivateKey(encoded string) (crypto.Signer, error) {
 
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, ErrPrivateKeyInvalid
+		return nil, deliveryutils.ErrPrivateKeyInvalid
 	}
 
 	return (*rsa.PrivateKey)(key), nil

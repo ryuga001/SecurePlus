@@ -2,6 +2,7 @@ package receiver_test
 
 import (
 	"context"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"errors"
 	"testing"
 
@@ -107,10 +108,10 @@ func TestAuthorizeFallsBackToStore(t *testing.T) {
 
 func TestAuthorizeRejectsUnknownDomain(t *testing.T) {
 	cache := &fakeCache{err: errors.New("miss")}
-	store := &fakeStore{err: receiver.ErrDomainUnknown}
+	store := &fakeStore{err: deliveryutils.ErrDomainUnknown}
 
 	_, err := receiver.NewAuthorizer(cache, store).Authorize(context.Background(), "stranger.test")
-	if !errors.Is(err, receiver.ErrDomainUnknown) {
+	if !errors.Is(err, deliveryutils.ErrDomainUnknown) {
 		t.Fatalf("error = %v, want ErrDomainUnknown", err)
 	}
 }
@@ -124,7 +125,7 @@ func TestAuthorizeSurfacesStoreFailure(t *testing.T) {
 	if !errors.Is(err, failure) {
 		t.Fatalf("error = %v, want the store failure", err)
 	}
-	if errors.Is(err, receiver.ErrDomainUnknown) {
+	if errors.Is(err, deliveryutils.ErrDomainUnknown) {
 		t.Fatal("an outage must not be reported as an unknown domain")
 	}
 }

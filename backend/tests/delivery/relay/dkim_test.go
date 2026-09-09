@@ -11,6 +11,7 @@ import (
 
 	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/relay"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
 const rawMessage = "From: alice@example.com\r\n" +
@@ -38,7 +39,7 @@ func testConfig(t *testing.T) delivery.TenantConfig {
 		CustomerID:     1,
 		ConfigID:       2,
 		Domain:         "example.com",
-		DKIMSelector:   delivery.DefaultDKIMSelector,
+		DKIMSelector:   deliveryutils.DefaultDKIMSelector,
 		DKIMPrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: encoded})),
 	}
 }
@@ -97,7 +98,7 @@ func TestSignRejectsMissingKey(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.DKIMPrivateKey = ""
 
-	if _, err := relay.Sign([]byte(rawMessage), cfg); !errors.Is(err, relay.ErrPrivateKeyMissing) {
+	if _, err := relay.Sign([]byte(rawMessage), cfg); !errors.Is(err, deliveryutils.ErrPrivateKeyMissing) {
 		t.Fatalf("error = %v, want ErrPrivateKeyMissing", err)
 	}
 }
@@ -106,7 +107,7 @@ func TestSignRejectsInvalidKey(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.DKIMPrivateKey = "-----BEGIN PRIVATE KEY-----\nbm90IGEga2V5\n-----END PRIVATE KEY-----\n"
 
-	if _, err := relay.Sign([]byte(rawMessage), cfg); !errors.Is(err, relay.ErrPrivateKeyInvalid) {
+	if _, err := relay.Sign([]byte(rawMessage), cfg); !errors.Is(err, deliveryutils.ErrPrivateKeyInvalid) {
 		t.Fatalf("error = %v, want ErrPrivateKeyInvalid", err)
 	}
 }

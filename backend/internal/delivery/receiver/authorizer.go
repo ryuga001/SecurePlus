@@ -2,11 +2,10 @@ package receiver
 
 import (
 	"context"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"errors"
 	"log/slog"
 )
-
-var ErrDomainUnknown = errors.New("sender domain is not configured")
 
 type DomainCache interface {
 	Domain(ctx context.Context, domain string) (int, int, error)
@@ -34,8 +33,8 @@ func (a *Authorizer) Authorize(ctx context.Context, domain string) (Authorizatio
 
 	customerID, configID, storeErr := a.store.FindByDomain(ctx, domain)
 	if storeErr != nil {
-		if errors.Is(storeErr, ErrDomainUnknown) {
-			return Authorization{}, ErrDomainUnknown
+		if errors.Is(storeErr, deliveryutils.ErrDomainUnknown) {
+			return Authorization{}, deliveryutils.ErrDomainUnknown
 		}
 
 		return Authorization{}, storeErr

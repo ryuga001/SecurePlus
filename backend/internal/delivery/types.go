@@ -5,28 +5,6 @@ import (
 	"time"
 )
 
-const DefaultDKIMSelector = "dpdp"
-
-const (
-	StatusProcessing = "PROCESSING"
-	StatusSuccess    = "SUCCESS"
-	StatusFailed     = "FAILED"
-)
-
-const (
-	FailureRule       = "RULE"
-	FailureProcessing = "PROCESSING"
-	FailureDKIM       = "DKIM"
-	FailureRelay      = "RELAY"
-	FailureUnknown    = "UNKNOWN"
-)
-
-const (
-	TLSNone       = "none"
-	TLSVerified   = "verified"
-	TLSUnverified = "unverified"
-)
-
 type EmailMessage struct {
 	CorrelationID string
 	MessageID     string
@@ -46,6 +24,12 @@ type TenantConfig struct {
 	Domain         string
 	DKIMSelector   string
 	DKIMPrivateKey string
+}
+
+type ProcessResult struct {
+	Message  EmailMessage
+	Config   TenantConfig
+	Withheld []RecipientResult
 }
 
 type RecipientResult struct {

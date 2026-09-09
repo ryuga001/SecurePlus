@@ -32,13 +32,26 @@ import (
 	rulesvc "dpdp-backend/internal/admin/services/rule"
 	audithandler "dpdp-backend/internal/audit/handler/deliveryaudit"
 	auditrepo "dpdp-backend/internal/audit/repositories/deliveryaudit"
+	incidentrepo "dpdp-backend/internal/audit/repositories/emailincident"
 	auditsvc "dpdp-backend/internal/audit/services/deliveryaudit"
+	incidentsvc "dpdp-backend/internal/audit/services/emailincident"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/engine"
+	"dpdp-backend/internal/delivery/engine/actiontrigger"
+	"dpdp-backend/internal/delivery/engine/contentengine"
+	engineeval "dpdp-backend/internal/delivery/engine/evaluation"
+	"dpdp-backend/internal/delivery/engine/incidentgenerator"
+	"dpdp-backend/internal/delivery/engine/parser"
+	policysetrepo "dpdp-backend/internal/delivery/engine/policy/repositories/policyset"
+	"dpdp-backend/internal/delivery/engine/policy/services/aggregator"
+	policycache "dpdp-backend/internal/delivery/engine/policy/services/cache"
+	"dpdp-backend/internal/delivery/engine/restrictionevalutor"
+	"dpdp-backend/internal/delivery/engine/rulematcher"
 	"dpdp-backend/internal/delivery/receiver"
 	"dpdp-backend/internal/delivery/relay"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"dpdp-backend/internal/middleware"
 	"dpdp-backend/internal/notification"
 )
@@ -80,6 +93,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	incidents := incidentsvc.NewEmailIncidentService(incidentrepo.NewEmailIncidentRepository(mongoClient, cfg.Mongo.Database))
+	if err := incidents.EnsureIndexes(startupCtx); err != nil {
+		slog.Error("email incident index creation failed", "error", err)
+		os.Exit(1)
+	}
+
 	notifier := notification.NewService(database, cfg.SMTP)
 	store := auth.NewStore(rdb)
 	service := auth.NewService(database, store, notifier, cfg.Auth, cfg.App)
@@ -88,12 +107,31 @@ func main() {
 	providerRepository := providerrepo.NewEmailProviderRepository(database)
 	domainRegistry := providerrepo.NewRedisRepository(rdb)
 
-	configurations := delivery.NewConfigurationStore(providerRepository, receiver.ErrDomainUnknown)
+	configurations := delivery.NewConfigurationStore(providerRepository)
 	authorizer := receiver.NewAuthorizer(delivery.NewDomainLookup(domainRegistry), configurations)
+
+	policyCache := policycache.NewPolicyCacheService(
+		policysetrepo.NewPolicySetRepository(database),
+		rulematcher.NewCompiler(aggregator.NewAggregator(), deliveryutils.MaxRules),
+		rdb,
+		deliveryutils.CacheTTL,
+	)
+
+	enforcer := engineeval.NewEvaluationService(engineeval.Components{
+		Parser:      parser.NewMessageParser(),
+		Cache:       policyCache,
+		Domain:      restrictionevalutor.NewDomainEvaluator(),
+		Attachment:  restrictionevalutor.NewAttachmentEvaluator(),
+		Content:     contentengine.NewContentEngine(rulematcher.DefaultMatcherFactory()),
+		Resolver:    actiontrigger.NewActionResolver(),
+		Actions:     actiontrigger.DefaultActionFactory(),
+		Incidents:   incidentgenerator.NewIncidentGenerator(incidents),
+		FailsClosed: deliveryutils.FailClosed,
+	})
 
 	dispatcher := delivery.NewDispatcher(
 		ctx,
-		engine.NewEngine(engine.NewConfigCache(configurations, rdb)),
+		engine.NewEngine(engine.NewConfigCache(configurations, rdb), enforcer),
 		relay.NewRelay(cfg.Relay),
 		recorder,
 	)

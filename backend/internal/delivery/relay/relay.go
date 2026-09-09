@@ -14,6 +14,7 @@ import (
 
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/delivery"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
 type Relay struct {
@@ -42,7 +43,7 @@ func (r *Relay) Deliver(
 		results[recipient] = delivery.RecipientResult{
 			Email:  recipient,
 			Domain: delivery.DomainOf(recipient),
-			Status: delivery.StatusProcessing,
+			Status: deliveryutils.StatusProcessing,
 		}
 	}
 
@@ -116,12 +117,12 @@ func (r *Relay) deliverDomain(
 	recipients []string,
 	signed []byte,
 ) domainOutcome {
-	outcome := domainOutcome{tls: delivery.TLSNone, recipients: map[string]delivery.RecipientResult{}}
+	outcome := domainOutcome{tls: deliveryutils.TLSNone, recipients: map[string]delivery.RecipientResult{}}
 
 	destinations, err := r.resolver.Destinations(ctx, domain)
 	if err != nil {
 		outcome.errorText = err.Error()
-		permanent := errors.Is(err, ErrNoDestination)
+		permanent := errors.Is(err, deliveryutils.ErrNoDestination)
 		markDomain(outcome.recipients, recipients, domain, 0, err.Error(), permanent)
 
 		return outcome
@@ -176,7 +177,7 @@ func (r *Relay) send(
 	recipients []string,
 	signed []byte,
 ) (sendResult, error) {
-	result := sendResult{tls: delivery.TLSNone, recipients: map[string]delivery.RecipientResult{}}
+	result := sendResult{tls: deliveryutils.TLSNone, recipients: map[string]delivery.RecipientResult{}}
 
 	client, tlsState, err := r.connect(ctx, destination, false)
 	if err != nil {
@@ -199,7 +200,7 @@ func (r *Relay) send(
 			result.recipients[recipient] = delivery.RecipientResult{
 				Email:     recipient,
 				Domain:    delivery.DomainOf(recipient),
-				Status:    delivery.StatusFailed,
+				Status:    deliveryutils.StatusFailed,
 				SMTPCode:  code,
 				Error:     err.Error(),
 				Permanent: permanent,
@@ -235,7 +236,7 @@ func (r *Relay) send(
 		result.recipients[recipient] = delivery.RecipientResult{
 			Email:    recipient,
 			Domain:   delivery.DomainOf(recipient),
-			Status:   delivery.StatusSuccess,
+			Status:   deliveryutils.StatusSuccess,
 			SMTPCode: 250,
 		}
 	}
@@ -250,7 +251,7 @@ func (r *Relay) connect(ctx context.Context, destination Destination, skipVerify
 
 	conn, err := dialer.DialContext(ctx, "tcp", destination.Addr)
 	if err != nil {
-		return nil, delivery.TLSNone, err
+		return nil, deliveryutils.TLSNone, err
 	}
 
 	if deadline, ok := ctx.Deadline(); ok {
@@ -260,21 +261,21 @@ func (r *Relay) connect(ctx context.Context, destination Destination, skipVerify
 	client, err := smtp.NewClient(conn, destination.Host)
 	if err != nil {
 		conn.Close()
-		return nil, delivery.TLSNone, err
+		return nil, deliveryutils.TLSNone, err
 	}
 
 	if err := client.Hello(r.cfg.HELOHost); err != nil {
 		client.Close()
-		return nil, delivery.TLSNone, err
+		return nil, deliveryutils.TLSNone, err
 	}
 
 	if ok, _ := client.Extension("STARTTLS"); !ok {
 		if r.cfg.TLSRequired {
 			client.Close()
-			return nil, delivery.TLSNone, &permanentError{message: "starttls required but not advertised"}
+			return nil, deliveryutils.TLSNone, &permanentError{message: "starttls required but not advertised"}
 		}
 
-		return client, delivery.TLSNone, nil
+		return client, deliveryutils.TLSNone, nil
 	}
 
 	tlsConfig := &tls.Config{ServerName: destination.Host, InsecureSkipVerify: skipVerify}
@@ -286,14 +287,14 @@ func (r *Relay) connect(ctx context.Context, destination Destination, skipVerify
 			return r.connect(ctx, destination, true)
 		}
 
-		return nil, delivery.TLSNone, err
+		return nil, deliveryutils.TLSNone, err
 	}
 
 	if skipVerify {
-		return client, delivery.TLSUnverified, nil
+		return client, deliveryutils.TLSUnverified, nil
 	}
 
-	return client, delivery.TLSVerified, nil
+	return client, deliveryutils.TLSVerified, nil
 }
 
 type permanentError struct {
@@ -364,7 +365,7 @@ func pendingRecipients(results map[string]delivery.RecipientResult) []string {
 	pending := make([]string, 0, len(results))
 
 	for recipient, result := range results {
-		if result.Status == delivery.StatusSuccess || result.Permanent {
+		if result.Status == deliveryutils.StatusSuccess || result.Permanent {
 			continue
 		}
 
@@ -386,7 +387,7 @@ func markDomain(
 		target[recipient] = delivery.RecipientResult{
 			Email:     recipient,
 			Domain:    domain,
-			Status:    delivery.StatusFailed,
+			Status:    deliveryutils.StatusFailed,
 			SMTPCode:  code,
 			Error:     message,
 			Permanent: permanent,
@@ -396,11 +397,11 @@ func markDomain(
 
 func markInterrupted(results map[string]delivery.RecipientResult) {
 	for recipient, result := range results {
-		if result.Status == delivery.StatusSuccess {
+		if result.Status == deliveryutils.StatusSuccess {
 			continue
 		}
 
-		result.Status = delivery.StatusFailed
+		result.Status = deliveryutils.StatusFailed
 		if result.Error == "" {
 			result.Error = "interrupted by shutdown"
 		}
@@ -413,8 +414,8 @@ func finalize(results map[string]delivery.RecipientResult) []delivery.RecipientR
 	final := make([]delivery.RecipientResult, 0, len(results))
 
 	for _, result := range results {
-		if result.Status == delivery.StatusProcessing {
-			result.Status = delivery.StatusFailed
+		if result.Status == deliveryutils.StatusProcessing {
+			result.Status = deliveryutils.StatusFailed
 			if result.Error == "" {
 				result.Error = "delivery did not complete"
 			}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"dpdp-backend/internal/delivery"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
 func TestDomainOf(t *testing.T) {
@@ -43,7 +44,7 @@ func TestGroupByDomain(t *testing.T) {
 }
 
 func TestDefaultSelector(t *testing.T) {
-	if delivery.DefaultDKIMSelector != "dpdp" {
-		t.Fatalf("selector = %q, want dpdp", delivery.DefaultDKIMSelector)
+	if deliveryutils.DefaultDKIMSelector != "dpdp" {
+		t.Fatalf("selector = %q, want dpdp", deliveryutils.DefaultDKIMSelector)
 	}
 }

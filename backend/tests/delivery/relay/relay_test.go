@@ -2,6 +2,7 @@ package relay_test
 
 import (
 	"context"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"errors"
 	"net"
 	"net/textproto"
@@ -23,7 +24,7 @@ func TestClassify(t *testing.T) {
 		{"permanent smtp", &textproto.Error{Code: 550, Msg: "no such user"}, 550, true},
 		{"mailbox full", &textproto.Error{Code: 452, Msg: "over quota"}, 452, false},
 		{"dial timeout", errors.New("dial tcp: i/o timeout"), 0, false},
-		{"no destination", relay.ErrNoDestination, 0, false},
+		{"no destination", deliveryutils.ErrNoDestination, 0, false},
 	}
 
 	for _, tc := range cases {

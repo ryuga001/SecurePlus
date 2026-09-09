@@ -20,14 +20,27 @@ import (
 	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
 	providersvc "dpdp-backend/internal/admin/services/emailprovider"
 	auditrepo "dpdp-backend/internal/audit/repositories/deliveryaudit"
+	incidentrepo "dpdp-backend/internal/audit/repositories/emailincident"
 	auditsvc "dpdp-backend/internal/audit/services/deliveryaudit"
+	incidentsvc "dpdp-backend/internal/audit/services/emailincident"
 	auditutils "dpdp-backend/internal/audit/utils"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/db"
 	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/engine"
+	"dpdp-backend/internal/delivery/engine/actiontrigger"
+	"dpdp-backend/internal/delivery/engine/contentengine"
+	engineeval "dpdp-backend/internal/delivery/engine/evaluation"
+	"dpdp-backend/internal/delivery/engine/incidentgenerator"
+	"dpdp-backend/internal/delivery/engine/parser"
+	policysetrepo "dpdp-backend/internal/delivery/engine/policy/repositories/policyset"
+	"dpdp-backend/internal/delivery/engine/policy/services/aggregator"
+	policycache "dpdp-backend/internal/delivery/engine/policy/services/cache"
+	"dpdp-backend/internal/delivery/engine/restrictionevalutor"
+	"dpdp-backend/internal/delivery/engine/rulematcher"
 	"dpdp-backend/internal/delivery/receiver"
 	"dpdp-backend/internal/delivery/relay"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"dpdp-backend/tests/testsupport"
 )
 
@@ -63,7 +76,10 @@ func setup(t *testing.T, mxOverride string) harness {
 	t.Cleanup(func() {
 		testsupport.Reset(t, database, rdb)
 		testsupport.ResetMongo(t, client)
+		testsupport.ResetIncidents(t, client)
 	})
+
+	testsupport.ResetIncidents(t, client)
 
 	recorder := auditsvc.NewDeliveryAuditService(auditrepo.NewDeliveryAuditRepository(client, testsupport.MongoDatabase()))
 	if err := recorder.EnsureIndexes(context.Background()); err != nil {
@@ -73,7 +89,7 @@ func setup(t *testing.T, mxOverride string) harness {
 	repository := providerrepo.NewEmailProviderRepository(database)
 	registry := providerrepo.NewRedisRepository(rdb)
 
-	configurations := delivery.NewConfigurationStore(repository, receiver.ErrDomainUnknown)
+	configurations := delivery.NewConfigurationStore(repository)
 	authorizer := receiver.NewAuthorizer(delivery.NewDomainLookup(registry), configurations)
 
 	relayCfg := config.Relay{
@@ -90,9 +106,25 @@ func setup(t *testing.T, mxOverride string) harness {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
+	incidents := incidentsvc.NewEmailIncidentService(incidentrepo.NewEmailIncidentRepository(client, testsupport.MongoDatabase()))
+	if err := incidents.EnsureIndexes(context.Background()); err != nil {
+		t.Fatalf("incident index creation failed: %v", err)
+	}
+
+	enforcer := engineeval.NewEvaluationService(engineeval.Components{
+		Parser:     parser.NewMessageParser(),
+		Cache:      policycache.NewPolicyCacheService(policysetrepo.NewPolicySetRepository(database), rulematcher.NewCompiler(aggregator.NewAggregator(), deliveryutils.MaxRules), rdb, time.Second),
+		Domain:     restrictionevalutor.NewDomainEvaluator(),
+		Attachment: restrictionevalutor.NewAttachmentEvaluator(),
+		Content:    contentengine.NewContentEngine(rulematcher.DefaultMatcherFactory()),
+		Resolver:   actiontrigger.NewActionResolver(),
+		Actions:    actiontrigger.DefaultActionFactory(),
+		Incidents:  incidentgenerator.NewIncidentGenerator(incidents),
+	})
+
 	dispatcher := delivery.NewDispatcher(
 		ctx,
-		engine.NewEngine(engine.NewConfigCache(configurations, rdb)),
+		engine.NewEngine(engine.NewConfigCache(configurations, rdb), enforcer),
 		relay.NewRelay(relayCfg),
 		recorder,
 	)
@@ -277,7 +309,7 @@ func TestIntegrationDeliversAndRecordsSuccess(t *testing.T) {
 		t.Fatalf("send failed: %v", err)
 	}
 
-	record := h.audit(t, delivery.StatusSuccess)
+	record := h.audit(t, deliveryutils.StatusSuccess)
 
 	if record["from"] != from {
 		t.Fatalf("from = %v", record["from"])
@@ -290,7 +322,7 @@ func TestIntegrationDeliversAndRecordsSuccess(t *testing.T) {
 	}
 
 	dkim, ok := record["dkim"].(bson.M)
-	if !ok || dkim["selector"] != delivery.DefaultDKIMSelector || dkim["signed"] != true {
+	if !ok || dkim["selector"] != deliveryutils.DefaultDKIMSelector || dkim["signed"] != true {
 		t.Fatalf("dkim = %v", record["dkim"])
 	}
 
@@ -300,7 +332,7 @@ func TestIntegrationDeliversAndRecordsSuccess(t *testing.T) {
 	}
 
 	first := recipients[0].(bson.M)
-	if first["status"] != delivery.StatusSuccess || first["smtp_code"].(int32) != 250 {
+	if first["status"] != deliveryutils.StatusSuccess || first["smtp_code"].(int32) != 250 {
 		t.Fatalf("recipient = %v", first)
 	}
 }
@@ -334,14 +366,14 @@ func TestIntegrationDKIMFailurePreventsRelay(t *testing.T) {
 		t.Fatalf("send failed: %v", err)
 	}
 
-	record := h.audit(t, delivery.StatusFailed)
+	record := h.audit(t, deliveryutils.StatusFailed)
 
 	failure, ok := record["failure"].(bson.M)
 	if !ok {
 		t.Fatalf("failure = %v", record["failure"])
 	}
 
-	if failure["type"] != delivery.FailureProcessing && failure["type"] != delivery.FailureDKIM {
+	if failure["type"] != deliveryutils.FailureProcessing && failure["type"] != deliveryutils.FailureDKIM {
 		t.Fatalf("failure type = %v", failure["type"])
 	}
 
@@ -362,10 +394,10 @@ func TestIntegrationRelayFailureRecordsAttempts(t *testing.T) {
 		t.Fatalf("send failed: %v", err)
 	}
 
-	record := h.audit(t, delivery.StatusFailed)
+	record := h.audit(t, deliveryutils.StatusFailed)
 
 	failure, ok := record["failure"].(bson.M)
-	if !ok || failure["type"] != delivery.FailureRelay {
+	if !ok || failure["type"] != deliveryutils.FailureRelay {
 		t.Fatalf("failure = %v", record["failure"])
 	}
 
@@ -393,5 +425,255 @@ func TestIntegrationSameMessageIDProducesTwoAudits(t *testing.T) {
 
 	if total := h.auditCount(t); total != 2 {
 		t.Fatalf("audit records = %d, want 2 (no deduplication by Message-ID)", total)
+	}
+}
+
+func (h harness) incident(t *testing.T, wantTrigger string) bson.M {
+	t.Helper()
+
+	collection := h.mongo.Database(testsupport.MongoDatabase()).Collection(auditutils.EmailIncidentCollection)
+
+	for range 100 {
+		var record bson.M
+
+		err := collection.FindOne(context.Background(), bson.D{}).Decode(&record)
+		if err == nil {
+			if wantTrigger == "" || record["trigger"] == wantTrigger {
+				return record
+			}
+		} else if !errors.Is(err, mongodriver.ErrNoDocuments) {
+			t.Fatalf("incident lookup failed: %v", err)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	t.Fatalf("no incident reached trigger %q", wantTrigger)
+
+	return nil
+}
+
+func (h harness) incidentCount(t *testing.T) int64 {
+	t.Helper()
+
+	total, err := h.mongo.Database(testsupport.MongoDatabase()).
+		Collection(auditutils.EmailIncidentCollection).
+		CountDocuments(context.Background(), bson.D{})
+	if err != nil {
+		t.Fatalf("incident count failed: %v", err)
+	}
+
+	return total
+}
+
+func (h harness) policy(t *testing.T, sender, name, action string, domain db.Restriction, ruleIDs ...int) {
+	t.Helper()
+
+	user := testsupport.EmailUser(t, h.database, h.customer.ID, sender)
+	group := testsupport.Group(t, h.database, h.customer.ID, name+" Group")
+	row := testsupport.Policy(t, h.database, h.customer.ID, name, action, domain)
+
+	testsupport.AddMember(t, h.database, h.customer.ID, group.ID, user.ID)
+	testsupport.BindPolicy(t, h.database, h.customer.ID, row.ID, group.ID, ruleIDs...)
+}
+
+func TestIntegrationWithholdsOnlyTheRestrictedRecipient(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "alice@example.com"
+	survivor := "keep@allowed.test"
+	blocked := "drop@blocked.test"
+
+	h.policy(t, from, "No Competitors", db.ActionBlock,
+		db.Restriction{Mode: db.RestrictionBlock, Values: []string{"blocked.test"}})
+
+	body := message(from, survivor, "partially restricted")
+
+	if err := h.send(t, from, []string{survivor, blocked}, body); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	record := h.audit(t, deliveryutils.StatusSuccess)
+
+	recipients, ok := record["recipients"].(bson.A)
+	if !ok || len(recipients) != 2 {
+		t.Fatalf("recipients = %v, both must remain in the audit", record["recipients"])
+	}
+
+	statuses := map[string]string{}
+	for _, entry := range recipients {
+		row := entry.(bson.M)
+		statuses[row["email"].(string)] = row["status"].(string)
+	}
+
+	if statuses[survivor] != deliveryutils.StatusSuccess {
+		t.Fatalf("%s = %q, want SUCCESS", survivor, statuses[survivor])
+	}
+	if statuses[blocked] != deliveryutils.StatusBlocked {
+		t.Fatalf("%s = %q, want BLOCKED", blocked, statuses[blocked])
+	}
+
+	incident := h.incident(t, "RESTRICTION")
+
+	if incident["effective_action"] != db.ActionBlock {
+		t.Fatalf("effective action = %v", incident["effective_action"])
+	}
+
+	withheld, ok := incident["withheld_recipients"].(bson.A)
+	if !ok || len(withheld) != 1 {
+		t.Fatalf("withheld = %v, want exactly one", incident["withheld_recipients"])
+	}
+	if withheld[0].(bson.M)["email"] != blocked {
+		t.Fatalf("withheld = %v", withheld[0])
+	}
+
+	matches, ok := incident["matches"].(bson.A)
+	if ok && len(matches) != 0 {
+		t.Fatalf("matches = %v, a restriction violation must skip content rules", matches)
+	}
+}
+
+func TestIntegrationAllRecipientsRestrictedStopsDelivery(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "alice@example.com"
+	to := "drop@blocked.test"
+
+	h.policy(t, from, "No Competitors", db.ActionBlock,
+		db.Restriction{Mode: db.RestrictionBlock, Values: []string{"blocked.test"}})
+
+	if err := h.send(t, from, []string{to}, message(from, to, "fully restricted")); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	record := h.audit(t, deliveryutils.StatusFailed)
+
+	failure, ok := record["failure"].(bson.M)
+	if !ok || failure["type"] != auditutils.FailureRule {
+		t.Fatalf("failure = %v, want RULE", record["failure"])
+	}
+
+	if attempts, ok := record["attempts"].(bson.A); ok && len(attempts) != 0 {
+		t.Fatalf("attempts = %v, nothing should have been relayed", attempts)
+	}
+
+	h.incident(t, "RESTRICTION")
+}
+
+func TestIntegrationKeywordMatchRecordsIncidentAndStillDelivers(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "alice@example.com"
+	to := "bob@recipient.test"
+
+	rule := testsupport.Rule(t, h.database, h.customer.ID, "Secrets", db.RuleTypeKeyword, "confidential")
+	h.policy(t, from, "Data Loss", db.ActionQuarantine,
+		db.Restriction{Mode: db.RestrictionNone, Values: []string{}}, rule.ID)
+
+	body := "From: " + from + "\r\nTo: " + to + "\r\nSubject: notice\r\n" +
+		"Message-ID: <content@sender.test>\r\n\r\nthis is CONFIDENTIAL material\r\n"
+
+	if err := h.send(t, from, []string{to}, body); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	record := h.audit(t, deliveryutils.StatusSuccess)
+	if record["status"] != deliveryutils.StatusSuccess {
+		t.Fatalf("status = %v, content matches do not withhold this phase", record["status"])
+	}
+
+	incident := h.incident(t, "CONTENT")
+
+	if incident["effective_action"] != db.ActionQuarantine {
+		t.Fatalf("effective action = %v, want QUARANTINE", incident["effective_action"])
+	}
+	if incident["action_status"] != auditutils.ActionInvoked {
+		t.Fatalf("action status = %v, want INVOKED", incident["action_status"])
+	}
+
+	matches, ok := incident["matches"].(bson.A)
+	if !ok || len(matches) != 1 {
+		t.Fatalf("matches = %v", incident["matches"])
+	}
+
+	match := matches[0].(bson.M)
+
+	if match["rule_type"] != db.RuleTypeKeyword || match["configured_value"] != "confidential" {
+		t.Fatalf("match = %v", match)
+	}
+	if match["occurrences"].(int32) != 1 {
+		t.Fatalf("occurrences = %v, want 1", match["occurrences"])
+	}
+	if _, present := match["matched_value"]; present {
+		t.Fatal("the incident must never persist matched message content")
+	}
+}
+
+func TestIntegrationCleanMessageProducesNoIncident(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "alice@example.com"
+	to := "bob@recipient.test"
+
+	rule := testsupport.Rule(t, h.database, h.customer.ID, "Secrets", db.RuleTypeKeyword, "confidential")
+	h.policy(t, from, "Data Loss", db.ActionQuarantine,
+		db.Restriction{Mode: db.RestrictionNone, Values: []string{}}, rule.ID)
+
+	if err := h.send(t, from, []string{to}, message(from, to, "nothing sensitive")); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	h.audit(t, deliveryutils.StatusSuccess)
+
+	if total := h.incidentCount(t); total != 0 {
+		t.Fatalf("incidents = %d, a passing message must produce none", total)
+	}
+}
+
+func TestIntegrationRestrictionOnlyPolicyStillEnforces(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "alice@example.com"
+	to := "drop@blocked.test"
+
+	h.policy(t, from, "No Competitors", db.ActionBlock,
+		db.Restriction{Mode: db.RestrictionBlock, Values: []string{"blocked.test"}})
+
+	if err := h.send(t, from, []string{to}, message(from, to, "ruleless policy")); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	h.audit(t, deliveryutils.StatusFailed)
+
+	incident := h.incident(t, "RESTRICTION")
+
+	if incident["effective_action"] != db.ActionBlock {
+		t.Fatalf("a policy with no rules must still enforce its restrictions: %v", incident)
+	}
+}
+
+func TestIntegrationUnregisteredSenderBypassesPolicies(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "stranger@example.com"
+	to := "drop@blocked.test"
+
+	h.policy(t, "alice@example.com", "No Competitors", db.ActionBlock,
+		db.Restriction{Mode: db.RestrictionBlock, Values: []string{"blocked.test"}})
+
+	if err := h.send(t, from, []string{to}, message(from, to, "no policies apply")); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	h.audit(t, deliveryutils.StatusSuccess)
+
+	if total := h.incidentCount(t); total != 0 {
+		t.Fatalf("incidents = %d, an unregistered sender resolves to no policies", total)
 	}
 }

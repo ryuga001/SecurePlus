@@ -2,15 +2,17 @@ package delivery
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 
 	auditdto "dpdp-backend/internal/audit/dto/deliveryaudit"
 	auditutils "dpdp-backend/internal/audit/utils"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
 type Processor interface {
-	Process(ctx context.Context, msg EmailMessage) (EmailMessage, TenantConfig, error)
+	Process(ctx context.Context, msg EmailMessage) (ProcessResult, error)
 }
 
 type Sender interface {
@@ -63,22 +65,34 @@ func (d *Dispatcher) Wait() {
 }
 
 func (d *Dispatcher) run(msg EmailMessage) {
-	processed, cfg, err := d.engine.Process(d.ctx, msg)
+	outcome, err := d.engine.Process(d.ctx, msg)
 	if err != nil {
+		failureType := auditutils.FailureProcessing
+		recipients := toAuditRecipients(failAll(msg.Recipients, err.Error()))
+
+		if errors.Is(err, deliveryutils.ErrAllRecipientsRestricted) {
+			failureType = auditutils.FailureRule
+			recipients = toAuditRecipients(outcome.Withheld)
+		}
+
 		slog.ErrorContext(d.ctx, "processing failed",
 			"correlation_id", msg.CorrelationID,
 			"customer_id", msg.CustomerID,
+			"failure", failureType,
 			"error", err,
 		)
 
 		d.complete(msg, auditdto.Result{
 			Status:     auditutils.StatusFailed,
-			Recipients: toAuditRecipients(failAll(msg.Recipients, err.Error())),
-			Failure:    &auditdto.Failure{Type: auditutils.FailureProcessing, Reason: err.Error()},
+			Recipients: recipients,
+			Failure:    &auditdto.Failure{Type: failureType, Reason: err.Error()},
 		})
 
 		return
 	}
+
+	processed := outcome.Message
+	cfg := outcome.Config
 
 	dkim := auditdto.DKIM{Domain: cfg.Domain, Selector: cfg.DKIMSelector}
 
@@ -101,7 +115,7 @@ func (d *Dispatcher) run(msg EmailMessage) {
 
 		d.complete(msg, auditdto.Result{
 			Status:     auditutils.StatusFailed,
-			Recipients: toAuditRecipients(failAll(msg.Recipients, err.Error())),
+			Recipients: toAuditRecipients(append(failAll(processed.Recipients, err.Error()), outcome.Withheld...)),
 			Failure:    &auditdto.Failure{Type: auditutils.FailureDKIM, Reason: err.Error()},
 			DKIM:       dkim,
 		})
@@ -111,11 +125,17 @@ func (d *Dispatcher) run(msg EmailMessage) {
 
 	dkim.Signed = true
 
+	results = append(results, outcome.Withheld...)
+
 	status := auditutils.StatusSuccess
 	var failure *auditdto.Failure
 
 	for _, result := range results {
-		if result.Status != StatusSuccess {
+		if result.Status == deliveryutils.StatusBlocked {
+			continue
+		}
+
+		if result.Status != deliveryutils.StatusSuccess {
 			status = auditutils.StatusFailed
 			failure = &auditdto.Failure{
 				Type:     auditutils.FailureRelay,
@@ -158,7 +178,7 @@ func failAll(recipients []string, reason string) []RecipientResult {
 		results = append(results, RecipientResult{
 			Email:  recipient,
 			Domain: DomainOf(recipient),
-			Status: StatusFailed,
+			Status: deliveryutils.StatusFailed,
 			Error:  reason,
 		})
 	}

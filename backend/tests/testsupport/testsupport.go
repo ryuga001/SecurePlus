@@ -119,6 +119,15 @@ func ResetMongo(t *testing.T, client *mongo.Client) {
 	}
 }
 
+func ResetIncidents(t *testing.T, client *mongo.Client) {
+	t.Helper()
+
+	err := client.Database(MongoDatabase()).Collection(utils.EmailIncidentCollection).Drop(context.Background())
+	if err != nil {
+		t.Fatalf("incident reset failed: %v", err)
+	}
+}
+
 func Reset(t *testing.T, database *gorm.DB, rdb *redis.Client) {
 	t.Helper()
 
@@ -232,4 +241,50 @@ func redisIndex(raw string) int {
 	}
 
 	return index
+}
+
+func Policy(t *testing.T, database *gorm.DB, customerID int, name, action string, domain db.Restriction) db.Policy {
+	t.Helper()
+
+	row := db.Policy{
+		CustomerID:            customerID,
+		PolicyName:            name,
+		Type:                  db.PolicyTypeEmail,
+		Action:                action,
+		Active:                true,
+		DomainRestriction:     domain,
+		AttachmentRestriction: db.Restriction{Mode: db.RestrictionNone, Values: []string{}},
+	}
+
+	if err := database.Omit("CreatedAt", "UpdatedAt").Create(&row).Error; err != nil {
+		t.Fatalf("policy insert failed: %v", err)
+	}
+
+	return row
+}
+
+func BindPolicy(t *testing.T, database *gorm.DB, customerID, policyID, groupID int, ruleIDs ...int) {
+	t.Helper()
+
+	mapping := db.PolicyGroupMapping{PolicyID: policyID, GroupID: groupID, CustomerID: customerID}
+	if err := database.Create(&mapping).Error; err != nil {
+		t.Fatalf("policy group mapping failed: %v", err)
+	}
+
+	for _, ruleID := range ruleIDs {
+		row := db.PolicyRuleMapping{PolicyID: policyID, RuleID: ruleID, CustomerID: customerID}
+		if err := database.Create(&row).Error; err != nil {
+			t.Fatalf("policy rule mapping failed: %v", err)
+		}
+	}
+}
+
+func AddMember(t *testing.T, database *gorm.DB, customerID, groupID, emailUserID int) {
+	t.Helper()
+
+	row := db.EmailUserGroupMapping{EmailUserID: emailUserID, GroupID: groupID, CustomerID: customerID}
+
+	if err := database.Create(&row).Error; err != nil {
+		t.Fatalf("group membership failed: %v", err)
+	}
 }

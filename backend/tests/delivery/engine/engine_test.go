@@ -9,6 +9,7 @@ import (
 
 	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/engine"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
 type fakeLoader struct {
@@ -51,7 +52,7 @@ func TestResolveAppliesDefaultSelector(t *testing.T) {
 		t.Fatalf("Resolve returned %v", err)
 	}
 
-	if cfg.DKIMSelector != delivery.DefaultDKIMSelector {
+	if cfg.DKIMSelector != deliveryutils.DefaultDKIMSelector {
 		t.Fatalf("selector = %q", cfg.DKIMSelector)
 	}
 	if cfg.CustomerID != 1 || cfg.ConfigID != 2 {
@@ -106,7 +107,7 @@ func TestResolveCollapsesConcurrentMisses(t *testing.T) {
 
 func TestProcessIsPassThrough(t *testing.T) {
 	loader := &fakeLoader{cfg: delivery.TenantConfig{Domain: "example.com", DKIMPrivateKey: "key"}}
-	processor := engine.NewEngine(engine.NewConfigCache(loader, nil))
+	processor := engine.NewEngine(engine.NewConfigCache(loader, nil), nil)
 
 	original := delivery.EmailMessage{
 		CorrelationID: "abc",
@@ -117,10 +118,12 @@ func TestProcessIsPassThrough(t *testing.T) {
 		Raw:           []byte("From: alice@example.com\r\n\r\nbody\r\n"),
 	}
 
-	processed, cfg, err := processor.Process(context.Background(), original)
+	outcome, err := processor.Process(context.Background(), original)
 	if err != nil {
 		t.Fatalf("Process returned %v", err)
 	}
+
+	processed := outcome.Message
 
 	if string(processed.Raw) != string(original.Raw) {
 		t.Fatal("the message body was modified")
@@ -128,7 +131,10 @@ func TestProcessIsPassThrough(t *testing.T) {
 	if processed.CorrelationID != original.CorrelationID || processed.From != original.From {
 		t.Fatalf("message = %+v", processed)
 	}
-	if cfg.Domain != "example.com" {
-		t.Fatalf("config = %+v", cfg)
+	if outcome.Config.Domain != "example.com" {
+		t.Fatalf("config = %+v", outcome.Config)
+	}
+	if len(outcome.Withheld) != 0 {
+		t.Fatalf("withheld = %+v, want none without an enforcer", outcome.Withheld)
 	}
 }

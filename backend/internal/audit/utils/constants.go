@@ -6,6 +6,7 @@ const (
 	StatusProcessing = "PROCESSING"
 	StatusSuccess    = "SUCCESS"
 	StatusFailed     = "FAILED"
+	StatusBlocked    = "BLOCKED"
 )
 
 const (
@@ -14,4 +15,17 @@ const (
 	FailureDKIM       = "DKIM"
 	FailureRelay      = "RELAY"
 	FailureUnknown    = "UNKNOWN"
+)
+
+const EmailIncidentCollection = "email_incidents"
+
+const (
+	DecisionPass    = "PASS"
+	DecisionFlagged = "FLAGGED"
+)
+
+const (
+	ActionPending = "PENDING"
+	ActionInvoked = "INVOKED"
+	ActionFailed  = "FAILED"
 )

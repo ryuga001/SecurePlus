@@ -2,12 +2,14 @@ package emailincident
 
 import (
 	"context"
+	"regexp"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	adminutils "dpdp-backend/internal/admin/utils"
 	dto "dpdp-backend/internal/audit/dto/emailincident"
 	"dpdp-backend/internal/audit/utils"
 )
@@ -220,4 +222,175 @@ func toMatchDocuments(matches []dto.Match) []matchDocument {
 	}
 
 	return documents
+}
+
+func (r *EmailIncidentRepository) Search(ctx context.Context, customerID int, params dto.ListParams) ([]dto.Incident, error) {
+	direction := 1
+	if params.SortDesc {
+		direction = -1
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: params.SortBy, Value: direction}}).
+		SetSkip(int64(adminutils.Offset(params.Page, params.PageSize))).
+		SetLimit(int64(params.PageSize))
+
+	cursor, err := r.collection.Find(ctx, searchFilter(customerID, params), opts)
+	if err != nil {
+		return nil, err
+	}
+
+	defer cursor.Close(ctx)
+
+	var documents []document
+	if err := cursor.All(ctx, &documents); err != nil {
+		return nil, err
+	}
+
+	incidents := make([]dto.Incident, 0, len(documents))
+	for _, doc := range documents {
+		incidents = append(incidents, fromDocument(doc))
+	}
+
+	return incidents, nil
+}
+
+func (r *EmailIncidentRepository) Count(ctx context.Context, customerID int, params dto.ListParams) (int64, error) {
+	return r.collection.CountDocuments(ctx, searchFilter(customerID, params))
+}
+
+func (r *EmailIncidentRepository) FindByCorrelationID(ctx context.Context, customerID int, correlationID string) (dto.Incident, error) {
+	filter := bson.D{
+		{Key: "correlation_id", Value: correlationID},
+		{Key: "customer_id", Value: customerID},
+	}
+
+	var doc document
+	if err := r.collection.FindOne(ctx, filter).Decode(&doc); err != nil {
+		return dto.Incident{}, err
+	}
+
+	return fromDocument(doc), nil
+}
+
+func searchFilter(customerID int, params dto.ListParams) bson.D {
+	filter := bson.D{{Key: "customer_id", Value: customerID}}
+
+	if params.Trigger != "" {
+		filter = append(filter, bson.E{Key: "trigger", Value: params.Trigger})
+	}
+
+	if params.Action != "" {
+		filter = append(filter, bson.E{Key: "effective_action", Value: params.Action})
+	}
+
+	if params.Decision != "" {
+		filter = append(filter, bson.E{Key: "decision", Value: params.Decision})
+	}
+
+	window := bson.D{}
+
+	if !params.From.IsZero() {
+		window = append(window, bson.E{Key: "$gte", Value: params.From})
+	}
+
+	if !params.To.IsZero() {
+		window = append(window, bson.E{Key: "$lte", Value: params.To})
+	}
+
+	if len(window) > 0 {
+		filter = append(filter, bson.E{Key: "created_at", Value: window})
+	}
+
+	if params.Search != "" {
+		pattern := bson.Regex{Pattern: regexp.QuoteMeta(params.Search), Options: "i"}
+
+		filter = append(filter, bson.E{Key: "$or", Value: bson.A{
+			bson.D{{Key: "correlation_id", Value: pattern}},
+			bson.D{{Key: "message_id", Value: pattern}},
+			bson.D{{Key: "from", Value: pattern}},
+			bson.D{{Key: "sender_domain", Value: pattern}},
+			bson.D{{Key: "recipients.email", Value: pattern}},
+			bson.D{{Key: "matches.rule_name", Value: pattern}},
+			bson.D{{Key: "restriction_violations.policy_name", Value: pattern}},
+		}})
+	}
+
+	return filter
+}
+
+func fromDocument(doc document) dto.Incident {
+	incident := dto.Incident{
+		Record: dto.Record{
+			CorrelationID:         doc.CorrelationID,
+			MessageID:             doc.MessageID,
+			CustomerID:            doc.CustomerID,
+			ConfigID:              doc.ConfigID,
+			From:                  doc.From,
+			SenderDomain:          doc.SenderDomain,
+			Recipients:            make([]dto.Recipient, 0, len(doc.Recipients)),
+			EmailUserID:           doc.EmailUserID,
+			EvaluatedPolicyCount:  doc.EvaluatedPolicyCount,
+			TriggeredPolicyIDs:    identifiers(doc.TriggeredPolicyIDs),
+			Decision:              doc.Decision,
+			Trigger:               doc.Trigger,
+			EffectiveAction:       doc.EffectiveAction,
+			ActionInvoked:         doc.ActionInvoked,
+			ActionStatus:          doc.ActionStatus,
+			WithheldRecipients:    make([]dto.WithheldRecipient, 0, len(doc.WithheldRecipients)),
+			RestrictionViolations: make([]dto.RestrictionViolation, 0, len(doc.RestrictionViolations)),
+			Matches:               make([]dto.Match, 0, len(doc.Matches)),
+		},
+		ActionError: doc.ActionError,
+		CreatedAt:   doc.CreatedAt,
+		UpdatedAt:   doc.UpdatedAt,
+	}
+
+	for _, recipient := range doc.Recipients {
+		incident.Recipients = append(incident.Recipients, dto.Recipient{
+			Email:  recipient.Email,
+			Domain: recipient.Domain,
+		})
+	}
+
+	for _, recipient := range doc.WithheldRecipients {
+		incident.WithheldRecipients = append(incident.WithheldRecipients, dto.WithheldRecipient{
+			Email:      recipient.Email,
+			Domain:     recipient.Domain,
+			PolicyID:   recipient.PolicyID,
+			PolicyName: recipient.PolicyName,
+		})
+	}
+
+	for _, violation := range doc.RestrictionViolations {
+		incident.RestrictionViolations = append(incident.RestrictionViolations, dto.RestrictionViolation{
+			Kind:        violation.Kind,
+			Mode:        violation.Mode,
+			Value:       violation.Value,
+			Filename:    violation.Filename,
+			ContentType: violation.ContentType,
+			PolicyID:    violation.PolicyID,
+			PolicyName:  violation.PolicyName,
+		})
+	}
+
+	for _, match := range doc.Matches {
+		locations := match.Locations
+		if locations == nil {
+			locations = []string{}
+		}
+
+		incident.Matches = append(incident.Matches, dto.Match{
+			PolicyID:        match.PolicyID,
+			PolicyName:      match.PolicyName,
+			RuleID:          match.RuleID,
+			RuleName:        match.RuleName,
+			RuleType:        match.RuleType,
+			ConfiguredValue: match.ConfiguredValue,
+			Occurrences:     match.Occurrences,
+			Locations:       locations,
+		})
+	}
+
+	return incident
 }

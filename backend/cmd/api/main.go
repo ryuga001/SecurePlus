@@ -31,6 +31,7 @@ import (
 	policysvc "dpdp-backend/internal/admin/services/policy"
 	rulesvc "dpdp-backend/internal/admin/services/rule"
 	audithandler "dpdp-backend/internal/audit/handler/deliveryaudit"
+	incidenthandler "dpdp-backend/internal/audit/handler/emailincident"
 	auditrepo "dpdp-backend/internal/audit/repositories/deliveryaudit"
 	incidentrepo "dpdp-backend/internal/audit/repositories/emailincident"
 	auditsvc "dpdp-backend/internal/audit/services/deliveryaudit"
@@ -170,6 +171,7 @@ func main() {
 		groupsvc.NewGroupService(database, grouprepo.NewGroupRepository(database)),
 	)
 	auditHandler := audithandler.NewDeliveryAuditHandler(recorder)
+	incidentHandler := incidenthandler.NewEmailIncidentHandler(incidents)
 
 	if cfg.App.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -212,6 +214,7 @@ func main() {
 	emailUserHandler.RegisterRoutes(protected, guard)
 	groupHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
+	incidentHandler.RegisterRoutes(protected, guard)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.App.Port,

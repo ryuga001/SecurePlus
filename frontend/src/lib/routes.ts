@@ -94,7 +94,7 @@ export const routes = {
                         label: "Incidents",
                         routePath: "/admin/email/audits/incidents",
                         icon: ShieldAlert,
-                        privileges: ["admin.email.audit.view"],
+                        privileges: ["admin.email.incident.view"],
                         heading: "Email audits",
                         subheading: "Policy violations raised against outbound mail.",
                     },

@@ -22,6 +22,7 @@ export const baseApi = createApi({
     "EmailPolicy",
     "EmailConfiguration",
     "AuditLog",
+    "EmailIncident",
   ],
   endpoints: () => ({}),
 });

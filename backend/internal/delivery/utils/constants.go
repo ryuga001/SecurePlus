@@ -29,8 +29,9 @@ const (
 	EvaluationEnabled = true
 	FailClosed        = false
 
-	CacheTTL = time.Minute
-	MaxRules = 2000
+	CacheTTL          = time.Minute
+	MaxRules          = 2000
+	MaxMatchesPerRule = 1000
 )
 
 const (

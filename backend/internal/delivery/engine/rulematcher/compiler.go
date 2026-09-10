@@ -1,6 +1,7 @@
 package rulematcher
 
 import (
+	"log/slog"
 	"regexp"
 	"slices"
 	"strings"
@@ -58,6 +59,13 @@ func (c *Compiler) Build(set dto.PolicySet) (*dto.CompiledSet, error) {
 		case utils.MatcherRegex:
 			pattern, err := regexp.Compile(rule.RuleValue)
 			if err != nil {
+				slog.Warn("regex rule skipped, pattern does not compile",
+					"policy_id", rule.PolicyID,
+					"rule_id", rule.RuleID,
+					"rule_name", rule.RuleName,
+					"error", err,
+				)
+
 				continue
 			}
 

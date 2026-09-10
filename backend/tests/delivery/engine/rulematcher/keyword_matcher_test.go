@@ -125,26 +125,3 @@ func TestKeywordMatcherHandlesEmptyCompiledSet(t *testing.T) {
 		t.Fatalf("matches = %+v, want nil", matches)
 	}
 }
-
-func TestRegexMatcherIsInvokedAndReturnsNothing(t *testing.T) {
-	set := compiled(t, dto.RuleRecord{
-		PolicyID:  1,
-		Action:    utils.ActionBlock,
-		RuleID:    9,
-		RuleName:  "Card Pattern",
-		RuleType:  utils.MatcherRegex,
-		RuleValue: `\d{16}`,
-	})
-
-	if len(set.Rules.Regexes) != 1 {
-		t.Fatalf("regexes = %v, want the rule compiled and available", set.Rules.Regexes)
-	}
-
-	matches := rulematcher.NewRegexMatcher().Match(dto.MatchInput{
-		Parts: []dto.ContentPart{{Location: utils.LocationBody, Text: "4111111111111111"}},
-	}, set.Rules)
-
-	if len(matches) != 0 {
-		t.Fatalf("matches = %+v, regex evaluation is out of scope this phase", matches)
-	}
-}

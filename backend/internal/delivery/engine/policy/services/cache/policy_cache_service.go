@@ -32,6 +32,11 @@ type entry struct {
 	expiresAt time.Time
 }
 
+type ruleKey struct {
+	policyID int
+	ruleID   int
+}
+
 type PolicyCacheService struct {
 	store   PolicySetStore
 	builder Builder
@@ -174,7 +179,7 @@ func (c *PolicyCacheService) writeRedis(ctx context.Context, key string, rows []
 func assemble(customerID int, rows []rowdto.PolicyRuleRow) dto.PolicySet {
 	set := dto.PolicySet{CustomerID: customerID}
 	seen := map[int]bool{}
-	rules := map[int]bool{}
+	rules := map[ruleKey]bool{}
 
 	for _, row := range rows {
 		if set.EmailUserID == 0 {
@@ -193,11 +198,16 @@ func assemble(customerID int, rows []rowdto.PolicyRuleRow) dto.PolicySet {
 			})
 		}
 
-		if row.RuleID == nil || rules[*row.RuleID] {
+		if row.RuleID == nil {
 			continue
 		}
 
-		rules[*row.RuleID] = true
+		key := ruleKey{policyID: row.PolicyID, ruleID: *row.RuleID}
+		if rules[key] {
+			continue
+		}
+
+		rules[key] = true
 
 		set.Rules = append(set.Rules, dto.RuleRecord{
 			PolicyID:   row.PolicyID,

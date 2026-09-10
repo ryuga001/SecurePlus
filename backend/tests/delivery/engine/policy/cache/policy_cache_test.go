@@ -226,3 +226,90 @@ func TestSetKeyIsCaseInsensitiveOnSender(t *testing.T) {
 		t.Fatal("cache key must be scoped per customer")
 	}
 }
+
+type capturingBuilder struct {
+	set dto.PolicySet
+}
+
+func (b *capturingBuilder) Build(set dto.PolicySet) (*dto.CompiledSet, error) {
+	b.set = set
+
+	return &dto.CompiledSet{CustomerID: set.CustomerID, EmailUserID: set.EmailUserID}, nil
+}
+
+func sharedRuleRows() []rowdto.PolicyRuleRow {
+	ruleID := 5
+	ruleName := "Cards"
+	ruleType := utils.MatcherKeyword
+	ruleValue := "card"
+	none := []byte(`{"mode":"NONE","values":[]}`)
+
+	row := func(policyID int, policyName, action string) rowdto.PolicyRuleRow {
+		return rowdto.PolicyRuleRow{
+			PolicyID:                 policyID,
+			PolicyName:               policyName,
+			Action:                   action,
+			DomainRestrictionRaw:     none,
+			AttachmentRestrictionRaw: none,
+			EmailUserID:              42,
+			RuleID:                   &ruleID,
+			RuleName:                 &ruleName,
+			RuleType:                 &ruleType,
+			RuleValue:                &ruleValue,
+		}
+	}
+
+	return []rowdto.PolicyRuleRow{
+		row(1, "Audit Only", utils.ActionAudit),
+		row(2, "Hard Block", utils.ActionBlock),
+	}
+}
+
+func assembled(t *testing.T, rows []rowdto.PolicyRuleRow) dto.PolicySet {
+	t.Helper()
+
+	builder := &capturingBuilder{}
+
+	service := cache.NewPolicyCacheService(&countingStore{rows: rows}, builder, nil, time.Minute)
+
+	if _, err := service.Load(context.Background(), 1, "alice@example.com"); err != nil {
+		t.Fatalf("Load returned %v", err)
+	}
+
+	return builder.set
+}
+
+func TestOneRuleSharedByTwoPoliciesIsKeptForBoth(t *testing.T) {
+	set := assembled(t, sharedRuleRows())
+
+	if len(set.Policies) != 2 {
+		t.Fatalf("policies = %+v, want both", set.Policies)
+	}
+
+	if len(set.Rules) != 2 {
+		t.Fatalf("rules = %+v, one rule shared by two policies must appear once per policy", set.Rules)
+	}
+
+	actions := map[string]bool{}
+	for _, rule := range set.Rules {
+		if rule.RuleID != 5 {
+			t.Fatalf("rule = %+v", rule)
+		}
+
+		actions[rule.Action] = true
+	}
+
+	if !actions[utils.ActionAudit] || !actions[utils.ActionBlock] {
+		t.Fatalf("actions = %v, the blocking policy's action was dropped", actions)
+	}
+}
+
+func TestDuplicateRowsForOnePolicyAndRuleCollapse(t *testing.T) {
+	duplicated := append(sharedRuleRows()[:1], sharedRuleRows()[0])
+
+	set := assembled(t, duplicated)
+
+	if len(set.Policies) != 1 || len(set.Rules) != 1 {
+		t.Fatalf("policies = %d rules = %d, want one of each", len(set.Policies), len(set.Rules))
+	}
+}

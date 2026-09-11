@@ -40,6 +40,17 @@ const (
 )
 
 const (
+	TemplatePolicyBlockNotice = "policy_block_notice"
+
+	NoticeMailbox    = "no-reply"
+	NoticeLineLength = 76
+	NoticeNoSubject  = "(no subject)"
+
+	NoticeReasonRestriction = "a recipient or attachment restriction"
+	NoticeReasonContent     = "a content rule"
+)
+
+const (
 	ActionNone       = "NONE"
 	ActionAudit      = "AUDIT"
 	ActionRedact     = "REDACT"

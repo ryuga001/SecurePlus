@@ -69,7 +69,7 @@ func TestUnknownActionRanksBelowEverything(t *testing.T) {
 }
 
 func TestFactoryResolvesEveryAction(t *testing.T) {
-	factory := actiontrigger.DefaultActionFactory()
+	factory := actiontrigger.DefaultActionFactory(nil)
 
 	for _, action := range []string{utils.ActionBlock, utils.ActionQuarantine, utils.ActionRedact, utils.ActionAudit} {
 		executor, ok := factory.For(action)
@@ -83,19 +83,19 @@ func TestFactoryResolvesEveryAction(t *testing.T) {
 }
 
 func TestFactoryHasNoExecutorForNone(t *testing.T) {
-	if executor, ok := actiontrigger.DefaultActionFactory().For(utils.ActionNone); ok || executor != nil {
+	if executor, ok := actiontrigger.DefaultActionFactory(nil).For(utils.ActionNone); ok || executor != nil {
 		t.Fatalf("For(NONE) = (%v, %v), want (nil, false)", executor, ok)
 	}
 }
 
 func TestFactoryReportsUnknownAction(t *testing.T) {
-	if executor, ok := actiontrigger.DefaultActionFactory().For("SHRED"); ok || executor != nil {
+	if executor, ok := actiontrigger.DefaultActionFactory(nil).For("SHRED"); ok || executor != nil {
 		t.Fatalf("For(SHRED) = (%v, %v), want (nil, false)", executor, ok)
 	}
 }
 
 func TestStubExecutorsReportInvokedWithoutActing(t *testing.T) {
-	factory := actiontrigger.DefaultActionFactory()
+	factory := actiontrigger.DefaultActionFactory(nil)
 
 	for _, action := range []string{utils.ActionBlock, utils.ActionQuarantine, utils.ActionRedact, utils.ActionAudit} {
 		executor, _ := factory.For(action)

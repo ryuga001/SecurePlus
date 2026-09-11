@@ -8,10 +8,12 @@ import (
 	"dpdp-backend/internal/delivery/utils"
 )
 
-type BlockExecutor struct{}
+type BlockExecutor struct {
+	notifier dto.BlockNotifier
+}
 
-func NewBlockExecutor() *BlockExecutor {
-	return &BlockExecutor{}
+func NewBlockExecutor(notifier dto.BlockNotifier) *BlockExecutor {
+	return &BlockExecutor{notifier: notifier}
 }
 
 func (e *BlockExecutor) Action() string {
@@ -19,7 +21,30 @@ func (e *BlockExecutor) Action() string {
 }
 
 func (e *BlockExecutor) Execute(ctx context.Context, request dto.ActionRequest) (dto.ActionResult, error) {
-	return invoked(ctx, request, utils.ActionBlock)
+	result, err := invoked(ctx, request, utils.ActionBlock)
+	if err != nil {
+		return result, err
+	}
+
+	if e.notifier == nil {
+		return result, nil
+	}
+
+	if err := e.notifier.Notify(context.WithoutCancel(ctx), request); err != nil {
+		slog.ErrorContext(ctx, "block notice not sent",
+			"correlation_id", request.CorrelationID,
+			"customer_id", request.CustomerID,
+			"error", err,
+		)
+
+		return dto.ActionResult{
+			Action: utils.ActionBlock,
+			Status: utils.ActionFailed,
+			Error:  err.Error(),
+		}, nil
+	}
+
+	return result, nil
 }
 
 type QuarantineExecutor struct{}

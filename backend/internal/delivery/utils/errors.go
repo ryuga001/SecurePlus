@@ -38,6 +38,26 @@ var (
 	ErrMessageUnreadable = errors.New(MsgMessageUnreadable)
 )
 
+const (
+	MsgNoticeTemplateMissing = "policy block notice template is not configured"
+	MsgNoticeSenderMissing   = "policy block notice has no sender to reply to"
+	MsgNoticeNotDelivered    = "policy block notice was not delivered"
+)
+
+var (
+	ErrNoticeTemplateMissing = errors.New(MsgNoticeTemplateMissing)
+	ErrNoticeSenderMissing   = errors.New(MsgNoticeSenderMissing)
+	ErrNoticeNotDelivered    = errors.New(MsgNoticeNotDelivered)
+)
+
+func NoticeNotDelivered(recipient string, code int, reason string) error {
+	if reason == "" {
+		reason = "no reason reported"
+	}
+
+	return fmt.Errorf("%w to %s (%d: %s)", ErrNoticeNotDelivered, recipient, code, reason)
+}
+
 func TooManyRules(count, limit int) error {
 	return fmt.Errorf("%w (%d rules, limit %d)", ErrTooManyRules, count, limit)
 }

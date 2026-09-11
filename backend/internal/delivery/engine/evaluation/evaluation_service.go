@@ -81,7 +81,7 @@ func (s *EvaluationService) Enforce(ctx context.Context, message dto.MessageCont
 
 		delivered := survivors(message.Recipients, result.Withheld)
 
-		if err := s.report(ctx, message, result); err != nil {
+		if err := s.report(ctx, message, result, parsed.Subject); err != nil {
 			return dto.Outcome{}, err
 		}
 
@@ -103,14 +103,14 @@ func (s *EvaluationService) Enforce(ctx context.Context, message dto.MessageCont
 	result.Matches = matches
 	result.TriggeredPolicyIDs = policyIDs(nil, matches)
 
-	if err := s.report(ctx, message, result); err != nil {
+	if err := s.report(ctx, message, result, parsed.Subject); err != nil {
 		return dto.Outcome{}, err
 	}
 
 	return dto.Outcome{Result: result, Delivered: message.Recipients}, nil
 }
 
-func (s *EvaluationService) report(ctx context.Context, message dto.MessageContext, result dto.EvaluationResult) error {
+func (s *EvaluationService) report(ctx context.Context, message dto.MessageContext, result dto.EvaluationResult, subject string) error {
 	if err := s.components.Incidents.Record(ctx, result, message); err != nil {
 		slog.ErrorContext(ctx, "incident not recorded, action not invoked",
 			"correlation_id", message.CorrelationID,
@@ -138,9 +138,16 @@ func (s *EvaluationService) report(ctx context.Context, message dto.MessageConte
 	outcome, err := executor.Execute(ctx, dto.ActionRequest{
 		CorrelationID:   message.CorrelationID,
 		CustomerID:      message.CustomerID,
+		ConfigID:        message.ConfigID,
 		Action:          result.EffectiveAction,
 		Trigger:         result.Trigger,
+		Sender:          message.From,
+		SenderDomain:    message.SenderDomain,
+		MessageID:       message.MessageID,
+		Subject:         subject,
 		Recipients:      result.Recipients,
+		Blocked:         blockedAddresses(result),
+		PolicyNames:     policyNames(result),
 		TriggeredPolicy: result.TriggeredPolicyIDs,
 	})
 	if err != nil {
@@ -218,6 +225,40 @@ func survivors(recipients []string, blocked []dto.WithheldRecipient) []string {
 	}
 
 	return kept
+}
+
+func blockedAddresses(result dto.EvaluationResult) []string {
+	addresses := make([]string, 0, len(result.Withheld))
+
+	for _, recipient := range result.Withheld {
+		addresses = append(addresses, recipient.Email)
+	}
+
+	return addresses
+}
+
+func policyNames(result dto.EvaluationResult) []string {
+	seen := map[string]bool{}
+	names := make([]string, 0)
+
+	add := func(name string) {
+		if name == "" || seen[name] {
+			return
+		}
+
+		seen[name] = true
+		names = append(names, name)
+	}
+
+	for _, violation := range result.RestrictionViolations {
+		add(violation.PolicyName)
+	}
+
+	for _, match := range result.Matches {
+		add(match.PolicyName)
+	}
+
+	return names
 }
 
 func policyIDs(violations []dto.RestrictionViolation, matches []dto.RuleMatch) []int {

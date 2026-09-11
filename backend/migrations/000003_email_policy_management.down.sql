@@ -14,3 +14,5 @@ WHERE name LIKE 'admin.policy.%'
    OR name LIKE 'admin.email.audit.%'
    OR name LIKE 'admin.email.incident.%'
    OR name LIKE 'admin.rule.%';
+
+DELETE FROM email_templates WHERE name = 'policy_block_notice';

@@ -41,6 +41,8 @@ import (
 	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/engine"
 	"dpdp-backend/internal/delivery/engine/actiontrigger"
+	templaterepo "dpdp-backend/internal/delivery/engine/actiontrigger/repositories/emailtemplate"
+	"dpdp-backend/internal/delivery/engine/actiontrigger/services/blocknotice"
 	"dpdp-backend/internal/delivery/engine/contentengine"
 	engineeval "dpdp-backend/internal/delivery/engine/evaluation"
 	"dpdp-backend/internal/delivery/engine/incidentgenerator"
@@ -111,6 +113,15 @@ func main() {
 	configurations := delivery.NewConfigurationStore(providerRepository)
 	authorizer := receiver.NewAuthorizer(delivery.NewDomainLookup(domainRegistry), configurations)
 
+	signingConfigs := engine.NewConfigCache(configurations, rdb)
+	mailRelay := relay.NewRelay(cfg.Relay)
+
+	blockNotice := blocknotice.NewBlockNoticeService(
+		templaterepo.NewEmailTemplateRepository(database),
+		signingConfigs,
+		mailRelay,
+	)
+
 	policyCache := policycache.NewPolicyCacheService(
 		policysetrepo.NewPolicySetRepository(database),
 		rulematcher.NewCompiler(aggregator.NewAggregator(), deliveryutils.MaxRules),
@@ -125,15 +136,15 @@ func main() {
 		Attachment:  restrictionevalutor.NewAttachmentEvaluator(),
 		Content:     contentengine.NewContentEngine(rulematcher.DefaultMatcherFactory()),
 		Resolver:    actiontrigger.NewActionResolver(),
-		Actions:     actiontrigger.DefaultActionFactory(),
+		Actions:     actiontrigger.DefaultActionFactory(blockNotice),
 		Incidents:   incidentgenerator.NewIncidentGenerator(incidents),
 		FailsClosed: deliveryutils.FailClosed,
 	})
 
 	dispatcher := delivery.NewDispatcher(
 		ctx,
-		engine.NewEngine(engine.NewConfigCache(configurations, rdb), enforcer),
-		relay.NewRelay(cfg.Relay),
+		engine.NewEngine(signingConfigs, enforcer),
+		mailRelay,
 		recorder,
 	)
 

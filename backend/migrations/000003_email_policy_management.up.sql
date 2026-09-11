@@ -156,3 +156,73 @@ WHERE r.type = 'admin'
       OR p.name LIKE 'admin.email.incident.%'
   )
 ON CONFLICT DO NOTHING;
+
+INSERT INTO email_templates (customer_id, name, subject, variables, body) VALUES
+(
+    1,
+    'policy_block_notice',
+    'Your message was not delivered - {{org_name}}',
+    '{"org_name": "Organisation name", "policy_name": "Policies that were triggered", "policy_count": "How many policies were triggered", "reason": "Why the message was blocked", "subject": "Subject of the blocked message", "recipients": "Recipients the message was not delivered to", "message_id": "Message-ID of the blocked message", "correlation_id": "Processing correlation id", "blocked_at": "When the message was blocked"}'::jsonb,
+    '<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e4e7ec;">
+          <tr>
+            <td style="background-color:#1d4ed8;padding:20px 32px;">
+              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:bold;">{{org_name}}</p>
+              <p style="margin:4px 0 0;color:#c7d7fe;font-size:13px;">Email protection</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px;color:#101828;font-size:20px;font-weight:bold;">Your message was not delivered</p>
+              <p style="margin:0 0 20px;color:#475467;font-size:14px;line-height:22px;">
+                A message you sent was stopped by {{org_name}} because it triggered {{reason}}.
+                It was not delivered to the recipients listed below.
+              </p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e4e7ec;font-size:13px;color:#101828;">
+                <tr>
+                  <td style="padding:10px 14px;background-color:#f9fafb;width:150px;color:#475467;">Subject</td>
+                  <td style="padding:10px 14px;">{{subject}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 14px;background-color:#f9fafb;color:#475467;border-top:1px solid #e4e7ec;">Not delivered to</td>
+                  <td style="padding:10px 14px;border-top:1px solid #e4e7ec;">{{recipients}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 14px;background-color:#f9fafb;color:#475467;border-top:1px solid #e4e7ec;">Policy</td>
+                  <td style="padding:10px 14px;border-top:1px solid #e4e7ec;">{{policy_name}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 14px;background-color:#f9fafb;color:#475467;border-top:1px solid #e4e7ec;">Blocked at</td>
+                  <td style="padding:10px 14px;border-top:1px solid #e4e7ec;">{{blocked_at}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 14px;background-color:#f9fafb;color:#475467;border-top:1px solid #e4e7ec;">Reference</td>
+                  <td style="padding:10px 14px;border-top:1px solid #e4e7ec;font-family:monospace;font-size:12px;">{{correlation_id}}</td>
+                </tr>
+              </table>
+              <p style="margin:20px 0 0;color:#475467;font-size:14px;line-height:22px;">
+                If you believe this message should have been allowed, contact your IT or security team
+                and quote the reference above.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px;background-color:#f9fafb;border-top:1px solid #e4e7ec;">
+              <p style="margin:0;color:#98a2b3;font-size:12px;">
+                This is an automated message from {{org_name}}. Do not reply to it.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>'
+)
+ON CONFLICT (customer_id, name) DO NOTHING;

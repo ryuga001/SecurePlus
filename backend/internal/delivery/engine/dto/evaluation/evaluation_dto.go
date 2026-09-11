@@ -166,9 +166,16 @@ type EvaluationResult struct {
 type ActionRequest struct {
 	CorrelationID   string
 	CustomerID      int
+	ConfigID        int
 	Action          string
 	Trigger         string
+	Sender          string
+	SenderDomain    string
+	MessageID       string
+	Subject         string
 	Recipients      []string
+	Blocked         []string
+	PolicyNames     []string
 	TriggeredPolicy []int
 }
 
@@ -182,6 +189,10 @@ type Outcome struct {
 	Result    EvaluationResult
 	Withheld  []WithheldRecipient
 	Delivered []string
+}
+
+type BlockNotifier interface {
+	Notify(ctx context.Context, request ActionRequest) error
 }
 
 type MessageParser interface {

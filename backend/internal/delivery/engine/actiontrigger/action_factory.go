@@ -19,9 +19,9 @@ func NewActionFactory(executors ...dto.ActionExecutor) *ActionFactory {
 	return &ActionFactory{executors: registry}
 }
 
-func DefaultActionFactory() *ActionFactory {
+func DefaultActionFactory(notifier dto.BlockNotifier) *ActionFactory {
 	return NewActionFactory(
-		NewBlockExecutor(),
+		NewBlockExecutor(notifier),
 		NewQuarantineExecutor(),
 		NewRedactExecutor(),
 		NewAuditExecutor(),

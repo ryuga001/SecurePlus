@@ -118,7 +118,7 @@ func setup(t *testing.T, mxOverride string) harness {
 		Attachment: restrictionevalutor.NewAttachmentEvaluator(),
 		Content:    contentengine.NewContentEngine(rulematcher.DefaultMatcherFactory()),
 		Resolver:   actiontrigger.NewActionResolver(),
-		Actions:    actiontrigger.DefaultActionFactory(),
+		Actions:    actiontrigger.DefaultActionFactory(nil),
 		Incidents:  incidentgenerator.NewIncidentGenerator(incidents),
 	})
 

@@ -52,8 +52,8 @@ func loadAuth() Auth {
 	secure, _ := strconv.ParseBool(os.Getenv("COOKIE_SECURE"))
 
 	auth := Auth{
-		Pepper:       os.Getenv("PASSWORD_PEPPER"),
-		CSRFSecret:   os.Getenv("CSRF_SECRET"),
+		Pepper:       os.Getenv("PASSWORD_PEPPER","PasswordPepper"),
+		CSRFSecret:   os.Getenv("CSRF_SECRET","CSRFSecret"),
 		Issuer:       issuer,
 		BcryptCost:   cost,
 		AccessTTL:    accessTTL,

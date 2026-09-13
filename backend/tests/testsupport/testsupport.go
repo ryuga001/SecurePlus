@@ -53,24 +53,28 @@ func Postgres(t *testing.T) *gorm.DB {
 func Redis(t *testing.T) *redis.Client {
 	t.Helper()
 
-	addr := os.Getenv("TEST_REDIS_ADDR")
-	if addr == "" {
-		t.Skip("TEST_REDIS_ADDR is not set")
+	url := os.Getenv("TEST_REDIS_URL")
+	if url == "" {
+		t.Skip("TEST_REDIS_URL is not set")
 	}
 
-	index, err := strconv.Atoi(os.Getenv("TEST_REDIS_DB"))
-	if err != nil || index == 0 {
-		t.Fatal("TEST_REDIS_DB must be set to a non-zero logical database, the suite flushes it")
+	options, err := redis.ParseURL(url)
+	if err != nil {
+		t.Fatalf("TEST_REDIS_URL is not a valid redis url: %v", err)
 	}
 
-	if index == redisIndex(os.Getenv("REDIS_DB")) {
-		t.Fatal("TEST_REDIS_DB must differ from REDIS_DB, the suite flushes it")
+	if options.DB == 0 {
+		t.Fatal("TEST_REDIS_URL must select a non-zero logical database, the suite flushes it")
+	}
+
+	if options.DB == redisDatabase(os.Getenv("REDIS_URL")) {
+		t.Fatal("TEST_REDIS_URL must select a different database than REDIS_URL, the suite flushes it")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	client, err := config.Redis{Addr: addr, Password: os.Getenv("REDIS_PASSWORD"), DB: index}.Connect(ctx)
+	client, err := config.Redis{URL: url}.Connect(ctx)
 	if err != nil {
 		t.Fatalf("test redis connection failed: %v", err)
 	}
@@ -234,13 +238,13 @@ func Router(t *testing.T, customerID int, roleID *int) (*gin.Engine, *gin.Router
 	return router, group
 }
 
-func redisIndex(raw string) int {
-	index, err := strconv.Atoi(raw)
+func redisDatabase(url string) int {
+	options, err := redis.ParseURL(url)
 	if err != nil {
 		return 0
 	}
 
-	return index
+	return options.DB
 }
 
 func Policy(t *testing.T, database *gorm.DB, customerID int, name, action string, domain db.Restriction) db.Policy {

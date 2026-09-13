@@ -3,33 +3,25 @@ package config
 import (
 	"context"
 	"os"
-	"strconv"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type Redis struct {
-	Addr     string
-	Password string
-	DB       int
+	URL string
 }
 
 func loadRedis() Redis {
-	db, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
-
-	return Redis{
-		Addr:     os.Getenv("REDIS_ADDR"),
-		Password: os.Getenv("REDIS_PASSWORD"),
-		DB:       db,
-	}
+	return Redis{URL: os.Getenv("REDIS_URL")}
 }
 
 func (r Redis) Connect(ctx context.Context) (*redis.Client, error) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     r.Addr,
-		Password: r.Password,
-		DB:       r.DB,
-	})
+	options, err := redis.ParseURL(r.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	client := redis.NewClient(options)
 
 	if err := client.Ping(ctx).Err(); err != nil {
 		client.Close()

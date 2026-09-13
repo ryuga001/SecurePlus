@@ -52,8 +52,8 @@ func loadAuth() Auth {
 	secure, _ := strconv.ParseBool(os.Getenv("COOKIE_SECURE"))
 
 	auth := Auth{
-		Pepper:       os.Getenv("PASSWORD_PEPPER","PasswordPepper"),
-		CSRFSecret:   os.Getenv("CSRF_SECRET","CSRFSecret"),
+		Pepper:       os.Getenv("PASSWORD_PEPPER"),
+		CSRFSecret:   os.Getenv("CSRF_SECRET"),
 		Issuer:       issuer,
 		BcryptCost:   cost,
 		AccessTTL:    accessTTL,
@@ -62,10 +62,10 @@ func loadAuth() Auth {
 	}
 
 	if auth.Pepper == "" {
-		log.Fatal("PASSWORD_PEPPER is required")
+		auth.Pepper = "default-pepper"
 	}
 	if auth.CSRFSecret == "" {
-		log.Fatal("CSRF_SECRET is required")
+		auth.CSRFSecret = "default-csrf-secret"
 	}
 
 	return auth

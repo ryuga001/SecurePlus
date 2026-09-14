@@ -1,6 +1,9 @@
 .env
 .env.*
-!.env.example
+.env.example
+
+docker-compose.yml
+docker-compose.*.yml
 
 # frontend (Next.js)
 frontend/node_modules/
@@ -17,6 +20,7 @@ frontend/.vercel
 # backend (Go)
 backend/bin/
 backend/tmp/
+backend/scripts/
 
 # editor / os
 .vscode/

@@ -132,20 +132,28 @@ func (h *Handler) setCookie(c *gin.Context, name, value, path string, ttl time.D
 	http.SetCookie(c.Writer, cookie)
 }
 
+func (h *Handler) refreshSameSite() http.SameSite {
+	if h.cfg.CookieSameSite == http.SameSiteNoneMode {
+		return http.SameSiteNoneMode
+	}
+
+	return http.SameSiteStrictMode
+}
+
 func (h *Handler) applyPair(c *gin.Context, pair TokenPair) string {
 	token := CSRFToken(h.cfg.CSRFSecret, pair.Access.ID)
 
-	h.setCookie(c, CookieAccess, pair.Access.Token, "/", time.Until(pair.Access.ExpiresAt), true, http.SameSiteLaxMode)
-	h.setCookie(c, CookieRefresh, pair.Refresh.Token, RefreshPath, time.Until(pair.Refresh.ExpiresAt), true, http.SameSiteStrictMode)
-	h.setCookie(c, CookieCSRF, token, "/", csrfTTL, false, http.SameSiteLaxMode)
+	h.setCookie(c, CookieAccess, pair.Access.Token, "/", time.Until(pair.Access.ExpiresAt), true, h.cfg.CookieSameSite)
+	h.setCookie(c, CookieRefresh, pair.Refresh.Token, RefreshPath, time.Until(pair.Refresh.ExpiresAt), true, h.refreshSameSite())
+	h.setCookie(c, CookieCSRF, token, "/", csrfTTL, false, h.cfg.CookieSameSite)
 
 	return token
 }
 
 func (h *Handler) clearCookies(c *gin.Context) {
-	h.setCookie(c, CookieAccess, "", "/", -time.Hour, true, http.SameSiteLaxMode)
-	h.setCookie(c, CookieRefresh, "", RefreshPath, -time.Hour, true, http.SameSiteStrictMode)
-	h.setCookie(c, CookieCSRF, "", "/", -time.Hour, false, http.SameSiteLaxMode)
+	h.setCookie(c, CookieAccess, "", "/", -time.Hour, true, h.cfg.CookieSameSite)
+	h.setCookie(c, CookieRefresh, "", RefreshPath, -time.Hour, true, h.refreshSameSite())
+	h.setCookie(c, CookieCSRF, "", "/", -time.Hour, false, h.cfg.CookieSameSite)
 }
 
 func (h *Handler) csrf(c *gin.Context) {
@@ -156,7 +164,7 @@ func (h *Handler) csrf(c *gin.Context) {
 	}
 
 	token := CSRFToken(h.cfg.CSRFSecret, id)
-	h.setCookie(c, CookieCSRF, token, "/", csrfTTL, false, http.SameSiteLaxMode)
+	h.setCookie(c, CookieCSRF, token, "/", csrfTTL, false, h.cfg.CookieSameSite)
 
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }

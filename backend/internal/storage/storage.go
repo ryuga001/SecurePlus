@@ -3,38 +3,53 @@ package storage
 import (
 	"context"
 	"io"
-	"net/url"
 	"time"
 
-	"github.com/minio/minio-go/v7"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type Storage struct {
-	client *minio.Client
+	client *s3.Client
 	bucket string
 }
 
-func New(client *minio.Client, bucket string) *Storage {
+func New(client *s3.Client, bucket string) *Storage {
 	return &Storage{client: client, bucket: bucket}
 }
 
 func (s *Storage) Put(ctx context.Context, key string, reader io.Reader, size int64, contentType string) error {
-	_, err := s.client.PutObject(ctx, s.bucket, key, reader, size, minio.PutObjectOptions{
-		ContentType: contentType,
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(key),
+		Body:          reader,
+		ContentLength: aws.Int64(size),
+		ContentType:   aws.String(contentType),
 	})
 
 	return err
 }
 
 func (s *Storage) Remove(ctx context.Context, key string) error {
-	return s.client.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{})
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+
+	return err
 }
 
 func (s *Storage) PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error) {
-	signed, err := s.client.PresignedGetObject(ctx, s.bucket, key, ttl, url.Values{})
+	presigned, err := s3.NewPresignClient(s.client).PresignGetObject(ctx,
+		&s3.GetObjectInput{
+			Bucket: aws.String(s.bucket),
+			Key:    aws.String(key),
+		},
+		s3.WithPresignExpires(ttl),
+	)
 	if err != nil {
 		return "", err
 	}
 
-	return signed.String(), nil
+	return presigned.URL, nil
 }

@@ -106,13 +106,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	minioClient, err := cfg.Storage.Connect(startupCtx)
+	s3Client, err := cfg.Storage.Connect(startupCtx)
 	if err != nil {
 		slog.Error("object storage connection failed", "error", err)
 		os.Exit(1)
 	}
 
-	objectStore := storage.New(minioClient, cfg.Storage.Bucket)
+	objectStore := storage.New(s3Client, cfg.Storage.Bucket)
 
 	notifier := notification.NewService(database, cfg.SMTP)
 	store := auth.NewStore(rdb)

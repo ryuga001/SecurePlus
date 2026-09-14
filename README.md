@@ -167,6 +167,8 @@ customers/{customer_id}/branding/logo/logo.{png|jpg|webp}
 
 Uploads must be 1 MB or less and PNG, JPEG or WebP. The type is decided by sniffing the first 512 bytes and then decoding the image, never by the filename or the client's `Content-Type`. The route is additionally wrapped in `http.MaxBytesReader`, since `MaxMultipartMemory` caps buffering rather than request size.
 
+Object storage goes through `aws-sdk-go-v2` with `UsePathStyle`, not `minio-go`. That is deliberate: `minio-go` rejects any endpoint carrying a path (`Endpoint url cannot have fully qualified paths`), and it signs before its `Transport` runs, so a path-rewriting `RoundTripper` would produce `SignatureDoesNotMatch`. Supabase Storage's S3 endpoint always includes `/storage/v1/s3`, so a path-capable client is required. AWS S3, Cloudflare R2, Wasabi and local MinIO all work through the same client.
+
 The database stores `logo_key`; the presigned GET URL is minted when the branding snapshot is built and cached for an hour with it. Nothing that expires is ever persisted — the invariant is `S3_LOGO_PRESIGN_TTL > IdentityTTL`, so a served URL always outlives the cache entry carrying it.
 
 Replacement order is upload → update `logo_key` → commit → invalidate cache → delete the old object. A failure at any step leaves the old logo working; the worst case is an orphaned object.
@@ -225,13 +227,14 @@ Everything is environment-driven. The ones without defaults:
 | `MONGO_URI`, `MONGO_DATABASE` | the process exits if Mongo is unreachable |
 | `PASSWORD_PEPPER`, `CSRF_SECRET` | mixed into every password hash and CSRF token |
 | `CORS_ALLOWED_ORIGIN` | exact origin, no trailing slash; credentials forbid wildcards |
-| `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` | object storage for customer logos; the process exits if it is unreachable |
+| `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` | object storage for customer logos; the process exits if it is unreachable. The endpoint may include a scheme and a path — `https://<ref>.storage.supabase.co/storage/v1/s3` works, as does a bare `localhost:9000` |
 
 Notable defaults:
 
 | Variable | Default | Notes |
 |---|---|---|
-| `S3_USE_SSL` | `false` | **must be `false` for local MinIO**, which serves plain HTTP — otherwise startup fails with `server gave HTTP response to HTTPS client`. `S3_ENDPOINT` is a bare `host:port`, no scheme |
+| `S3_USE_SSL` | `false` | only consulted when `S3_ENDPOINT` has no scheme; **must be `false` for local MinIO**, which serves plain HTTP |
+| `S3_REGION` | `us-east-1` | required by SigV4 even on providers that ignore it |
 | `S3_LOGO_PRESIGN_TTL` | `24h` | must exceed the 1 h identity cache TTL, or a cached logo URL can outlive its signature; values below that are ignored |
 | `APP_PORT` | — | no default; an unset value binds a random port |
 | `APP_ENV` | — | anything but `production` logs every SQL statement |
@@ -243,24 +246,3 @@ Notable defaults:
 
 The remaining `SMTP_*` and `RELAY_*` knobs are in `internal/config/smtpserver.go` and `internal/config/relay.go`.
 
-## Deployment
-
-The frontend deploys anywhere. **The backend cannot run on an HTTP-only platform** — Render, Vercel, Heroku and Railway publish a single HTTPS entrypoint and no raw TCP port, so the SMTP receiver binds successfully inside the container and is unreachable from outside. Mail senders find you by MX record, which implies port 25, and an Exchange Online outbound connector has no port field at all.
-
-What works:
-
-- **A VM with a public IP** — the whole compose stack, port 25 both directions, and a PTR record, which is what large providers actually check. Note most cloud providers block *outbound* 25 by default; inbound is generally open.
-- **A platform with raw TCP support**, with a dedicated IPv4 address.
-- **Split hosting** — the dashboard and API on a PaaS, the SMTP receiver on a small VM, both pointed at the same databases. No code change; both listeners already start in one binary.
-
-If the API and dashboard are on different registrable domains, set `COOKIE_SAMESITE=none` and `COOKIE_SECURE=true` or the browser will discard the auth cookies after login.
-
-## Current limitations
-
-- **`QUARANTINE` and `REDACT` are not implemented.** Both resolve an action, write an incident and invoke a stub executor; the message still relays. `BLOCK` sends the sender a notice from `no-reply@<their domain>` using a database template.
-- **Only recipient removal is enforced.** A recipient whose domain violates a restriction is dropped from the envelope and recorded as `BLOCKED`; the message goes to everyone else.
-- **No bounces.** A `250` is a promise of custody, and a delivery that ultimately fails is recorded in the audit and nowhere else.
-- **The receiver authenticates nothing.** Authorization is by envelope sender domain, which is forgeable, so the port must not be publicly reachable without an IP allowlist in front of it.
-- **In-process retries do not survive a restart.** A message in retry backoff when the process stops is left `PROCESSING` with no sweeper to reconcile it.
-- **DKIM private keys are stored unencrypted** in Postgres and read on every policy-cache miss.
-- Sender and recipient addresses persist in MongoDB indefinitely. Matched content is deliberately never stored — incidents record the configured rule and an occurrence count, never the text that matched.

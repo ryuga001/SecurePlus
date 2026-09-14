@@ -49,6 +49,7 @@
 }
 
 :root {
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.21 0.04 264);
   --card: oklch(1 0 0);
@@ -85,6 +86,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.19 0.03 265);
   --foreground: oklch(0.97 0.008 250);
   --card: oklch(0.24 0.035 265);
@@ -127,5 +129,12 @@
   }
   html {
     @apply font-sans;
+  }
+
+  select option,
+  select optgroup,
+  datalist option {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
   }
 }

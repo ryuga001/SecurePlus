@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useAuth } from "@/components/auth-provider";
 import {
   Card,
@@ -11,6 +13,8 @@ import {
 
 export default function DashboardPage() {
   const { identity } = useAuth();
+  const t = useTranslations("dashboard");
+  const common = useTranslations("common");
 
   if (!identity) return null;
 
@@ -18,29 +22,29 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">
-          Welcome, {identity.user.first_name}
+          {t("welcome", { name: identity.user.first_name })}
         </h1>
         <p className="text-sm text-muted-foreground">
-          You are signed in to {identity.customer.org_name}
+          {t("signedInTo", { org: identity.customer.org_name })}
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Organization</CardTitle>
-            <CardDescription>Tenant details</CardDescription>
+            <CardTitle className="text-base">{t("organization")}</CardTitle>
+            <CardDescription>{t("tenantDetails")}</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
             <p className="font-medium">{identity.customer.org_name}</p>
-            <p className="text-muted-foreground">ID {identity.customer.id}</p>
+            <p className="text-muted-foreground">{t("id", { id: identity.customer.id })}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Account</CardTitle>
-            <CardDescription>Your dashboard user</CardDescription>
+            <CardTitle className="text-base">{t("account")}</CardTitle>
+            <CardDescription>{t("yourDashboardUser")}</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
             <p className="font-medium">
@@ -52,11 +56,11 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Role</CardTitle>
-            <CardDescription>Access level</CardDescription>
+            <CardTitle className="text-base">{t("role")}</CardTitle>
+            <CardDescription>{t("accessLevel")}</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
-            <p className="font-medium">{identity.user.role ?? "None"}</p>
+            <p className="font-medium">{identity.user.role ?? common("none")}</p>
           </CardContent>
         </Card>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -21,54 +22,57 @@ import {
   type EmailUser,
 } from "@/store/api/email-users-api";
 
-const filters: FilterConfig[] = [
-  {
-    key: "search",
-    label: "Search",
-    type: "text",
-    placeholder: "Email or name",
-    width: "w-72",
-  },
-];
-
-const columns: ColumnConfig<EmailUser>[] = [
-  {
-    key: "name",
-    label: "Name",
-    accessor: (row) => `${row.first_name} ${row.last_name}`.trim(),
-  },
-  {
-    key: "email",
-    label: "Email",
-    render: (value) => <span className="font-mono text-[0.8rem]">{String(value)}</span>,
-  },
-  { key: "created_at", label: "Created At", type: "date" },
-  { key: "updated_at", label: "Updated At", type: "date" },
-];
-
 export default function EmailUsersPage() {
+  const t = useTranslations("emailUsers");
+  const common = useTranslations("common");
+
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<EmailUser | null>(null);
   const [deleting, setDeleting] = React.useState<EmailUser | null>(null);
 
   const [deleteUser, { isLoading: deletePending }] = useDeleteEmailUserMutation();
 
+  const filters: FilterConfig[] = [
+    {
+      key: "search",
+      label: common("search"),
+      type: "text",
+      placeholder: t("searchPlaceholder"),
+      width: "w-72",
+    },
+  ];
+
+  const columns: ColumnConfig<EmailUser>[] = [
+    {
+      key: "name",
+      label: t("columns.name"),
+      accessor: (row) => `${row.first_name} ${row.last_name}`.trim(),
+    },
+    {
+      key: "email",
+      label: t("columns.email"),
+      render: (value) => <span className="font-mono text-[0.8rem]">{String(value)}</span>,
+    },
+    { key: "created_at", label: t("columns.createdAt"), type: "date" },
+    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
+  ];
+
   async function confirmDelete() {
     if (!deleting) return;
 
     try {
       await deleteUser(deleting.id).unwrap();
-      toast.success(`${deleting.email} deleted`);
+      toast.success(t("deleted", { email: deleting.email }));
       setDeleting(null);
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not delete this user"));
+      toast.error(apiErrorMessage(error, t("deleteFailed")));
     }
   }
 
   const actions: TableAction[] = [
     {
       key: "add",
-      label: "Add User",
+      label: t("add"),
       icon: Plus,
       variant: "default",
       onClick: () => {
@@ -81,7 +85,7 @@ export default function EmailUsersPage() {
   const rowActions: RowAction<EmailUser>[] = [
     {
       key: "edit",
-      label: "Edit",
+      label: common("edit"),
       icon: Pencil,
       variant: "ghost",
       onClick: (row) => {
@@ -91,7 +95,7 @@ export default function EmailUsersPage() {
     },
     {
       key: "delete",
-      label: "Delete",
+      label: common("delete"),
       icon: Trash2,
       variant: "destructive",
       onClick: (row) => setDeleting(row),
@@ -100,8 +104,8 @@ export default function EmailUsersPage() {
 
   return (
     <Consolepage
-      heading="Email users"
-      subheading="The mailboxes this workspace protects."
+      heading={t("heading")}
+      subheading={t("subheading")}
       data={
         <>
           <DataTable
@@ -111,7 +115,7 @@ export default function EmailUsersPage() {
             actions={actions}
             rowActions={rowActions}
             getRowId={(row) => row.id}
-            emptyMessage="No email users yet"
+            emptyMessage={t("empty")}
           />
 
           <EmailUserDialog
@@ -126,13 +130,11 @@ export default function EmailUsersPage() {
             onOpenChange={(open) => {
               if (!open) setDeleting(null);
             }}
-            title="Delete user"
+            title={t("deleteTitle")}
             description={
-              deleting
-                ? `${deleting.email} will be removed from every group they belong to. This cannot be undone.`
-                : undefined
+              deleting ? t("deleteDescription", { email: deleting.email }) : undefined
             }
-            confirmLabel="Delete"
+            confirmLabel={common("delete")}
             destructive
             pending={deletePending}
             onConfirm={confirmDelete}

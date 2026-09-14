@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ArrowUpDown, CircleAlert, Inbox, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -86,17 +87,17 @@ function formatValue(
   }
 }
 
-function errorMessage(error: unknown) {
-  if (!error) return "Something went wrong while loading this table.";
+function errorMessage(error: unknown, t: ReturnType<typeof useTranslations<"table">>) {
+  if (!error) return t("loadError");
 
   if (typeof error === "object" && error !== null) {
     const shape = error as { data?: { message?: string }; error?: string; status?: number };
     if (shape.data?.message) return shape.data.message;
     if (shape.error) return shape.error;
-    if (shape.status) return `Request failed with status ${shape.status}`;
+    if (shape.status) return t("requestFailed", { status: shape.status });
   }
 
-  return "Something went wrong while loading this table.";
+  return t("loadError");
 }
 
 function normalize<Row>(data: PaginatedResponse<Row> | Row[] | undefined) {
@@ -129,9 +130,10 @@ export function DataTable<Row>({
   onRowClick,
   defaultPageSize = 25,
   defaultSort,
-  emptyMessage = "No records found",
+  emptyMessage,
   className,
 }: DataTableProps<Row>) {
+  const t = useTranslations("table");
   const { identity } = useAuth();
   const timezone = identity?.branding?.timezone ?? "UTC";
   const language = identity?.branding?.language ?? "ENGLISH";
@@ -292,10 +294,12 @@ export function DataTable<Row>({
                 <td colSpan={columnCount} className="px-4 py-16">
                   <div className="flex flex-col items-center gap-3 text-center">
                     <CircleAlert className="size-6 text-destructive" />
-                    <p className="text-sm font-medium">Could not load data</p>
-                    <p className="max-w-md text-sm text-muted-foreground">{errorMessage(error)}</p>
+                    <p className="text-sm font-medium">{t("couldNotLoad")}</p>
+                    <p className="max-w-md text-sm text-muted-foreground">
+                      {errorMessage(error, t)}
+                    </p>
                     <Button type="button" variant="outline" size="sm" onClick={() => refetch()}>
-                      Try again
+                      {t("tryAgain")}
                     </Button>
                   </div>
                 </td>
@@ -307,7 +311,7 @@ export function DataTable<Row>({
                 <td colSpan={columnCount} className="px-4 py-16">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Inbox className="size-6" />
-                    <p className="text-sm">{emptyMessage}</p>
+                    <p className="text-sm">{emptyMessage ?? t("noRecords")}</p>
                   </div>
                 </td>
               </tr>

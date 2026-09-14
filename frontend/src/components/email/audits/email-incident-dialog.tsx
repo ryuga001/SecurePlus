@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { CircleAlert, Loader2 } from "lucide-react";
 
 import { StatusBadge } from "@/components/data-table/status-badge";
@@ -37,33 +38,34 @@ function Th({ children }: { children: React.ReactNode }) {
 }
 
 function Details({ incident }: { incident: EmailIncident }) {
+  const t = useTranslations("audits.incidents.dialog");
   const restriction = incident.trigger === "RESTRICTION";
 
   return (
     <div className="mt-5 flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Field label="Decision" value={<StatusBadge status={incident.decision} />} />
-        <Field label="Trigger" value={<StatusBadge status={incident.trigger} />} />
-        <Field label="Action" value={<StatusBadge status={incident.effective_action} />} />
-        <Field label="Action status" value={<StatusBadge status={incident.action_status} />} />
-        <Field label="Raised" value={new Date(incident.created_at).toLocaleString()} />
-        <Field label="Policies evaluated" value={incident.evaluated_policy_count} />
-        <Field label="From" value={incident.from} />
-        <Field label="Sender domain" value={incident.sender_domain} />
+        <Field label={t("decision")} value={<StatusBadge status={incident.decision} />} />
+        <Field label={t("trigger")} value={<StatusBadge status={incident.trigger} />} />
+        <Field label={t("action")} value={<StatusBadge status={incident.effective_action} />} />
+        <Field label={t("actionStatus")} value={<StatusBadge status={incident.action_status} />} />
+        <Field label={t("raised")} value={new Date(incident.created_at).toLocaleString()} />
+        <Field label={t("policiesEvaluated")} value={incident.evaluated_policy_count} />
+        <Field label={t("from")} value={incident.from} />
+        <Field label={t("senderDomain")} value={incident.sender_domain} />
         <Field
-          label="Recipients"
+          label={t("recipients")}
           value={incident.recipients.map((recipient) => recipient.email).join(", ")}
         />
         <Field
-          label="Correlation ID"
+          label={t("correlationId")}
           value={<span className="font-mono text-xs">{incident.correlation_id}</span>}
         />
         <Field
-          label="Message ID"
+          label={t("messageId")}
           value={<span className="font-mono text-xs">{incident.message_id}</span>}
         />
         <Field
-          label="Triggered policies"
+          label={t("triggeredPolicies")}
           value={incident.triggered_policy_ids.join(", ")}
         />
       </div>
@@ -71,23 +73,23 @@ function Details({ incident }: { incident: EmailIncident }) {
       {incident.action_status === "FAILED" ? (
         <div className="border border-destructive/30 bg-destructive/8 p-4">
           <p className="text-sm font-semibold text-destructive">
-            {incident.action_invoked} executor failed
+            {t("executorFailed", { action: incident.action_invoked })}
           </p>
           <p className="mt-1 text-sm break-words text-destructive/90">
-            {incident.action_error || "No reason recorded."}
+            {incident.action_error || t("noReason")}
           </p>
         </div>
       ) : null}
 
       {incident.withheld_recipients.length > 0 ? (
-        <Section title={`Withheld recipients (${incident.withheld_recipients.length})`}>
+        <Section title={t("withheldTitle", { count: incident.withheld_recipients.length })}>
           <div className="overflow-x-auto border">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b bg-muted/60">
-                  <Th>Address</Th>
-                  <Th>Domain</Th>
-                  <Th>Policy</Th>
+                  <Th>{t("address")}</Th>
+                  <Th>{t("domain")}</Th>
+                  <Th>{t("policy")}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -109,7 +111,7 @@ function Details({ incident }: { incident: EmailIncident }) {
       ) : null}
 
       {restriction ? (
-        <Section title={`Restriction violations (${incident.restriction_violations.length})`}>
+        <Section title={t("violationsTitle", { count: incident.restriction_violations.length })}>
           {incident.restriction_violations.length === 0 ? (
             <p className="text-sm text-muted-foreground">No violations recorded.</p>
           ) : (
@@ -117,11 +119,11 @@ function Details({ incident }: { incident: EmailIncident }) {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b bg-muted/60">
-                    <Th>Kind</Th>
-                    <Th>Mode</Th>
-                    <Th>Value</Th>
-                    <Th>File</Th>
-                    <Th>Policy</Th>
+                    <Th>{t("kind")}</Th>
+                    <Th>{t("mode")}</Th>
+                    <Th>{t("value")}</Th>
+                    <Th>{t("file")}</Th>
+                    <Th>{t("policy")}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -140,7 +142,7 @@ function Details({ incident }: { incident: EmailIncident }) {
           )}
         </Section>
       ) : (
-        <Section title={`Matched rules (${incident.matches.length})`}>
+        <Section title={t("matchesTitle", { count: incident.matches.length })}>
           {incident.matches.length === 0 ? (
             <p className="text-sm text-muted-foreground">No rules matched.</p>
           ) : (
@@ -148,12 +150,12 @@ function Details({ incident }: { incident: EmailIncident }) {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b bg-muted/60">
-                    <Th>Rule</Th>
-                    <Th>Type</Th>
-                    <Th>Configured</Th>
-                    <Th>Hits</Th>
-                    <Th>Where</Th>
-                    <Th>Policy</Th>
+                    <Th>{t("rule")}</Th>
+                    <Th>{t("type")}</Th>
+                    <Th>{t("configured")}</Th>
+                    <Th>{t("hits")}</Th>
+                    <Th>{t("where")}</Th>
+                    <Th>{t("policy")}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -190,6 +192,9 @@ export function EmailIncidentDialog({
   correlationId: string | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useTranslations("audits.incidents.dialog");
+  const common = useTranslations("common");
+
   const { data, isLoading, isError, error } = useGetEmailIncidentQuery(correlationId as string, {
     skip: !correlationId,
   });
@@ -197,15 +202,13 @@ export function EmailIncidentDialog({
   return (
     <Dialog open={correlationId !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100vh-4rem)] max-w-3xl overflow-y-auto">
-        <DialogTitle>Incident</DialogTitle>
-        <DialogDescription>
-          Which policy was triggered, why it matched, and what action was invoked.
-        </DialogDescription>
+        <DialogTitle>{t("title")}</DialogTitle>
+        <DialogDescription>{t("description")}</DialogDescription>
 
         {isLoading ? (
           <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
             <Loader2 className="size-6 animate-spin text-primary" />
-            <p className="text-sm">Loading incident...</p>
+            <p className="text-sm">{t("loading")}</p>
           </div>
         ) : null}
 
@@ -213,7 +216,7 @@ export function EmailIncidentDialog({
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <CircleAlert className="size-6 text-destructive" />
             <p className="max-w-md text-sm text-muted-foreground">
-              {apiErrorMessage(error, "Could not load this incident")}
+              {apiErrorMessage(error, t("loadFailed"))}
             </p>
           </div>
         ) : null}
@@ -222,7 +225,7 @@ export function EmailIncidentDialog({
 
         <div className="mt-6 flex justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {common("close")}
           </Button>
         </div>
       </DialogContent>

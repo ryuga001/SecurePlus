@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Copy, KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -24,6 +25,7 @@ function SecretValue({
   hint?: string;
   tone?: "default" | "warning";
 }) {
+  const t = useTranslations("configurations");
   const [copied, setCopied] = React.useState(false);
 
   React.useEffect(() => {
@@ -43,7 +45,7 @@ function SecretValue({
       return;
     }
 
-    toast.error("Could not copy — select the value and copy manually");
+    toast.error(t("dialog.copyFailed"));
   }
 
   return (
@@ -80,6 +82,7 @@ export function CredentialsPanel({
   initialDkimPublicKey?: string | null;
   onSecretRevealed?: () => void;
 }) {
+  const t = useTranslations("configurations");
   const [dkimPublicKey, setDkimPublicKey] = React.useState(initialDkimPublicKey ?? "");
   const [dkimPrivateKey, setDkimPrivateKey] = React.useState("");
   const [recordName, setRecordName] = React.useState("");
@@ -100,7 +103,7 @@ export function CredentialsPanel({
       setDkimPrivateKey(result.dkim_private_key);
       setRecordName(result.record_name);
       onSecretRevealed?.();
-      toast.success("DKIM key pair generated");
+      toast.success(t("dialog.dkimGenerated"));
     } catch (error) {
       toast.error(apiErrorMessage(error, "Could not generate a DKIM key"));
     }
@@ -114,7 +117,7 @@ export function CredentialsPanel({
       setAccessToken(result.access_token);
       setExpiresAt(result.expires_at);
       onSecretRevealed?.();
-      toast.success("Access token generated");
+      toast.success(t("dialog.tokenGenerated"));
     } catch (error) {
       toast.error(apiErrorMessage(error, "Could not generate an access token"));
     }
@@ -155,7 +158,7 @@ export function CredentialsPanel({
 
       {dkimPublicKey ? (
         <SecretValue
-          label="DKIM public key"
+          label={t("dialog.dkimPublicKey")}
           value={dkimPublicKey}
           hint={
             recordName
@@ -167,7 +170,7 @@ export function CredentialsPanel({
 
       {dkimPrivateKey ? (
         <SecretValue
-          label="DKIM private key"
+          label={t("dialog.dkimPrivateKey")}
           value={dkimPrivateKey}
           tone="warning"
           hint="Stored with the configuration and shown once. It signs your outbound mail — never publish it."
@@ -176,7 +179,7 @@ export function CredentialsPanel({
 
       {accessToken ? (
         <SecretValue
-          label="Access token"
+          label={t("dialog.accessToken")}
           value={accessToken}
           tone="warning"
           hint={

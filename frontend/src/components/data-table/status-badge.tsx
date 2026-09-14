@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 import { cn } from "@/lib/utils";
 
 const tones: Record<string, string> = {
@@ -25,7 +29,9 @@ const tones: Record<string, string> = {
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const tone = tones[status?.toLowerCase?.()] ?? "border-border bg-muted text-muted-foreground";
+  const t = useTranslations("status");
+  const key = status?.toLowerCase?.() ?? "";
+  const tone = tones[key] ?? "border-border bg-muted text-muted-foreground";
 
   return (
     <span
@@ -34,7 +40,7 @@ export function StatusBadge({ status }: { status: string }) {
         tone
       )}
     >
-      {status}
+      {t.has(key) ? t(key) : status}
     </span>
   );
 }

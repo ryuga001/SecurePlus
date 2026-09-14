@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +22,7 @@ export function TablePagination({
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }) {
+  const t = useTranslations("table");
   const knownTotal = typeof total === "number";
   const lastPage = knownTotal ? Math.max(1, Math.ceil(total / pageSize)) : undefined;
   const first = rowCount === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -33,7 +35,7 @@ export function TablePagination({
     <div className="flex flex-wrap items-center justify-between gap-4 border-t px-4 py-3">
       <div className="flex items-center gap-2.5">
         <label htmlFor="page-size" className="text-sm text-muted-foreground">
-          Rows per page
+          {t("rowsPerPage")}
         </label>
         <select
           id="page-size"
@@ -50,17 +52,9 @@ export function TablePagination({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        {knownTotal ? (
-          <>
-            Showing <span className="font-medium text-foreground">{first}</span>–
-            <span className="font-medium text-foreground">{last}</span> of{" "}
-            <span className="font-medium text-foreground">{total}</span>
-          </>
-        ) : (
-          <>
-            Page <span className="font-medium text-foreground">{page}</span>
-          </>
-        )}
+        {knownTotal
+          ? t("showing", { first, last, total: total as number })
+          : t("page", { page })}
       </p>
 
       <div className="flex items-center gap-2">
@@ -72,7 +66,7 @@ export function TablePagination({
           onClick={() => onPageChange(page - 1)}
         >
           <ChevronLeft />
-          Previous
+          {t("previous")}
         </Button>
 
         <span className="px-1 text-sm text-muted-foreground">
@@ -86,7 +80,7 @@ export function TablePagination({
           disabled={!canNext}
           onClick={() => onPageChange(page + 1)}
         >
-          Next
+          {t("next")}
           <ChevronRight />
         </Button>
       </div>

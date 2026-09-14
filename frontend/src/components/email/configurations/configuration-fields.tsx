@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Field } from "@/components/auth/auth-form";
 import { Input } from "@/components/ui/input";
 
@@ -22,14 +23,16 @@ export function ConfigurationFields({
   domainInvalid?: boolean;
   disabled?: boolean;
 }) {
+  const t = useTranslations("configurations");
+
   return (
     <div className="flex flex-col gap-4">
-      <Field id="configuration-name" label="Configuration name">
+      <Field id="configuration-name" label={t("dialog.name")}>
         <Input
           id="configuration-name"
           required
           autoFocus
-          placeholder="Corporate outbound"
+          placeholder={t("dialog.namePlaceholder")}
           value={values.name}
           disabled={disabled}
           onChange={(event) => onChange("name", event.target.value)}
@@ -38,8 +41,8 @@ export function ConfigurationFields({
 
       <Field
         id="configuration-domain"
-        label="Domain"
-        hint="The sending domain this configuration signs and monitors."
+        label={t("dialog.domain")}
+        hint={t("dialog.domainHint")}
       >
         <Input
           id="configuration-domain"

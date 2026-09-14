@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -23,57 +24,68 @@ import {
   type PolicyListItem,
 } from "@/store/api/policies-api";
 
-const filters: FilterConfig[] = [
-  { key: "search", label: "Search", type: "text", placeholder: "Policy name", width: "w-72" },
-  {
-    key: "active",
-    label: "Status",
-    type: "select",
-    placeholder: "All",
-    options: [
-      { label: "Enabled", value: "true" },
-      { label: "Disabled", value: "false" },
-    ],
-  },
-];
-
-const ACTION_LABELS: Record<string, string> = {
-  AUDIT: "Audit",
-  BLOCK: "Block",
-  QUARANTINE: "Quarantine",
-  REDACT: "Redact",
-};
-
-const RESTRICTION_LABELS: Record<string, string> = {
-  NONE: "None",
-  BLOCK: "Block list",
-  ALLOW: "Allow list",
-};
-
-const columns: ColumnConfig<PolicyListItem>[] = [
-  { key: "policy_name", label: "Policy Name" },
-  { key: "action", label: "Action", render: (value) => ACTION_LABELS[String(value)] ?? value },
-  {
-    key: "active",
-    label: "Status",
-    render: (value) => <StatusBadge status={value ? "enabled" : "disabled"} />,
-  },
-  {
-    key: "domain_restriction_mode",
-    label: "Domains",
-    render: (value) => RESTRICTION_LABELS[String(value)] ?? value,
-  },
-  {
-    key: "attachment_restriction_mode",
-    label: "Attachments",
-    render: (value) => RESTRICTION_LABELS[String(value)] ?? value,
-  },
-  { key: "rule_count", label: "Rules", type: "number", align: "right" },
-  { key: "group_count", label: "Groups", type: "number", align: "right" },
-  { key: "updated_at", label: "Updated At", type: "date" },
-];
-
 export default function PoliciesPage() {
+  const t = useTranslations("policies");
+  const status = useTranslations("status");
+  const common = useTranslations("common");
+
+  const restrictionLabel = (value: unknown) => {
+    const key = String(value).toLowerCase();
+
+    return t.has(`restriction.${key}`) ? t(`restriction.${key}`) : String(value);
+  };
+
+  const filters: FilterConfig[] = [
+    {
+      key: "search",
+      label: common("search"),
+      type: "text",
+      placeholder: t("searchPlaceholder"),
+      width: "w-72",
+    },
+    {
+      key: "active",
+      label: t("statusFilter"),
+      type: "select",
+      placeholder: common("none"),
+      options: [
+        { label: status("enabled"), value: "true" },
+        { label: status("disabled"), value: "false" },
+      ],
+    },
+  ];
+
+  const columns: ColumnConfig<PolicyListItem>[] = [
+    { key: "policy_name", label: t("columns.name") },
+    {
+      key: "action",
+      label: t("columns.action"),
+      render: (value) => {
+        const key = String(value).toLowerCase();
+
+        return status.has(key) ? status(key) : String(value);
+      },
+    },
+    {
+      key: "active",
+      label: t("columns.status"),
+      render: (value) => <StatusBadge status={value ? "enabled" : "disabled"} />,
+    },
+    {
+      key: "domain_restriction_mode",
+      label: t("columns.domains"),
+      render: restrictionLabel,
+    },
+    {
+      key: "attachment_restriction_mode",
+      label: t("columns.attachments"),
+      render: restrictionLabel,
+    },
+    { key: "rule_count", label: t("columns.rules"), type: "number", align: "right" },
+    { key: "group_count", label: t("columns.groups"), type: "number", align: "right" },
+    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
+  ];
+
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingId, setEditingId] = React.useState<number | null>(null);
   const [deleting, setDeleting] = React.useState<PolicyListItem | null>(null);
@@ -84,9 +96,13 @@ export default function PoliciesPage() {
   async function toggleStatus(row: PolicyListItem) {
     try {
       await setStatus({ id: row.id, active: !row.active }).unwrap();
-      toast.success(`${row.policy_name} ${row.active ? "disabled" : "enabled"}`);
+      toast.success(
+        row.active
+          ? t("disabled", { name: row.policy_name })
+          : t("enabled", { name: row.policy_name })
+      );
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not change the policy status"));
+      toast.error(apiErrorMessage(error, t("statusFailed")));
     }
   }
 
@@ -95,17 +111,17 @@ export default function PoliciesPage() {
 
     try {
       await deletePolicy(deleting.id).unwrap();
-      toast.success(`${deleting.policy_name} deleted`);
+      toast.success(t("deleted", { name: deleting.policy_name }));
       setDeleting(null);
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not delete this policy"));
+      toast.error(apiErrorMessage(error, t("deleteFailed")));
     }
   }
 
   const actions: TableAction[] = [
     {
       key: "add",
-      label: "Add Policy",
+      label: t("add"),
       icon: Plus,
       variant: "default",
       onClick: () => {
@@ -118,14 +134,14 @@ export default function PoliciesPage() {
   const rowActions: RowAction<PolicyListItem>[] = [
     {
       key: "status",
-      label: "Toggle",
+      label: common("toggle"),
       icon: Power,
       variant: "ghost",
       onClick: toggleStatus,
     },
     {
       key: "edit",
-      label: "Edit",
+      label: common("edit"),
       icon: Pencil,
       variant: "ghost",
       onClick: (row) => {
@@ -135,7 +151,7 @@ export default function PoliciesPage() {
     },
     {
       key: "delete",
-      label: "Delete",
+      label: common("delete"),
       icon: Trash2,
       variant: "destructive",
       onClick: (row) => setDeleting(row),
@@ -144,8 +160,8 @@ export default function PoliciesPage() {
 
   return (
     <Consolepage
-      heading="Email policies"
-      subheading="Which rules apply to which groups of users."
+      heading={t("heading")}
+      subheading={t("subheading")}
       data={
         <>
           <DataTable
@@ -155,7 +171,7 @@ export default function PoliciesPage() {
             actions={actions}
             rowActions={rowActions}
             getRowId={(row) => row.id}
-            emptyMessage="No policies yet"
+            emptyMessage={t("empty")}
           />
 
           <PolicyDialog
@@ -170,13 +186,11 @@ export default function PoliciesPage() {
             onOpenChange={(open) => {
               if (!open) setDeleting(null);
             }}
-            title="Delete policy"
+            title={t("deleteTitle")}
             description={
-              deleting
-                ? `${deleting.policy_name} and its rule and group assignments will be removed. This cannot be undone.`
-                : undefined
+              deleting ? t("deleteDescription", { name: deleting.policy_name }) : undefined
             }
-            confirmLabel="Delete"
+            confirmLabel={common("delete")}
             destructive
             pending={deletePending}
             onConfirm={confirmDelete}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -16,6 +17,8 @@ import {
 } from "@/store/api/email-users-api";
 
 function EmailUserForm({ user, onClose }: { user: EmailUser | null; onClose: () => void }) {
+  const t = useTranslations("emailUsers");
+  const common = useTranslations("common");
   const [email, setEmail] = React.useState(user?.email ?? "");
   const [firstName, setFirstName] = React.useState(user?.first_name ?? "");
   const [lastName, setLastName] = React.useState(user?.last_name ?? "");
@@ -38,11 +41,11 @@ function EmailUserForm({ user, onClose }: { user: EmailUser | null; onClose: () 
 
     if (!input.email.includes("@")) {
       setEmailInvalid(true);
-      setError("Enter a valid email address.");
+      setError(t("dialog.emailRequired"));
       return;
     }
     if (!input.first_name || !input.last_name) {
-      setError("Enter both a first and a last name.");
+      setError(t("dialog.nameRequired"));
       return;
     }
 
@@ -52,22 +55,22 @@ function EmailUserForm({ user, onClose }: { user: EmailUser | null; onClose: () 
     try {
       if (user) {
         await updateUser({ id: user.id, ...input }).unwrap();
-        toast.success("User updated");
+        toast.success(t("dialog.updated"));
       } else {
         await createUser(input).unwrap();
-        toast.success("User added");
+        toast.success(t("dialog.created"));
       }
 
       onClose();
     } catch (caught) {
       setEmailInvalid(apiErrorStatus(caught) === 409 || apiErrorStatus(caught) === 400);
-      setError(apiErrorMessage(caught, "Could not save this user"));
+      setError(apiErrorMessage(caught, t("dialog.saveFailed")));
     }
   }
 
   return (
     <>
-      <DialogTitle>{user ? "Edit user" : "Add user"}</DialogTitle>
+      <DialogTitle>{user ? t("dialog.editTitle") : t("dialog.addTitle")}</DialogTitle>
       <DialogDescription>
         People whose mail this workspace protects. Email addresses are unique across the platform.
       </DialogDescription>
@@ -75,14 +78,14 @@ function EmailUserForm({ user, onClose }: { user: EmailUser | null; onClose: () 
       <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-4">
         <FormError message={error} />
 
-        <Field id="user-email" label="Email">
+        <Field id="user-email" label={t("dialog.email")}>
           <Input
             id="user-email"
             type="email"
             required
             autoFocus
             spellCheck={false}
-            placeholder="alice@example.com"
+            placeholder={t("dialog.emailPlaceholder")}
             value={email}
             disabled={pending}
             aria-invalid={emailInvalid || undefined}
@@ -95,7 +98,7 @@ function EmailUserForm({ user, onClose }: { user: EmailUser | null; onClose: () 
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="user-first-name" label="First name">
+          <Field id="user-first-name" label={t("dialog.firstName")}>
             <Input
               id="user-first-name"
               required
@@ -105,7 +108,7 @@ function EmailUserForm({ user, onClose }: { user: EmailUser | null; onClose: () 
             />
           </Field>
 
-          <Field id="user-last-name" label="Last name">
+          <Field id="user-last-name" label={t("dialog.lastName")}>
             <Input
               id="user-last-name"
               required
@@ -118,11 +121,11 @@ function EmailUserForm({ user, onClose }: { user: EmailUser | null; onClose: () 
 
         <div className="flex justify-end gap-2 border-t pt-4">
           <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
+            {common("cancel")}
           </Button>
           <Button type="submit" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {user ? "Save changes" : "Add user"}
+            {user ? t("dialog.saveChanges") : t("dialog.create")}
           </Button>
         </div>
       </form>

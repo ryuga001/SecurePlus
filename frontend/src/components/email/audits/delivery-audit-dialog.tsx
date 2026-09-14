@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { CircleAlert, Loader2 } from "lucide-react";
 
 import { StatusBadge } from "@/components/data-table/status-badge";
@@ -39,29 +40,33 @@ function duration(startedAt: string, finishedAt: string) {
 }
 
 function Details({ audit }: { audit: DeliveryAudit }) {
+  const t = useTranslations("audits.delivery.dialog");
+
   return (
     <div className="mt-5 flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Field label="Status" value={<StatusBadge status={audit.status} />} />
-        <Field label="Received" value={new Date(audit.created_at).toLocaleString()} />
-        <Field label="Last update" value={new Date(audit.updated_at).toLocaleString()} />
-        <Field label="From" value={audit.from} />
-        <Field label="Sender domain" value={audit.sender_domain} />
-        <Field label="Size" value={formatBytes(audit.size)} />
+        <Field label={t("status")} value={<StatusBadge status={audit.status} />} />
+        <Field label={t("received")} value={new Date(audit.created_at).toLocaleString()} />
+        <Field label={t("lastUpdate")} value={new Date(audit.updated_at).toLocaleString()} />
+        <Field label={t("from")} value={audit.from} />
+        <Field label={t("senderDomain")} value={audit.sender_domain} />
+        <Field label={t("size")} value={formatBytes(audit.size)} />
         <Field
-          label="Correlation ID"
+          label={t("correlationId")}
           value={<span className="font-mono text-xs">{audit.correlation_id}</span>}
         />
         <Field
-          label="Message ID"
+          label={t("messageId")}
           value={<span className="font-mono text-xs">{audit.message_id}</span>}
         />
         <Field
-          label="DKIM"
+          label={t("dkim")}
           value={
             audit.dkim.signed
-              ? `Signed as ${audit.dkim.selector}._domainkey.${audit.dkim.domain}`
-              : "Not signed"
+              ? t("signedAs", {
+                  identity: `${audit.dkim.selector}._domainkey.${audit.dkim.domain}`,
+                })
+              : t("notSigned")
           }
         />
       </div>
@@ -69,31 +74,31 @@ function Details({ audit }: { audit: DeliveryAudit }) {
       {audit.failure ? (
         <div className="border border-destructive/30 bg-destructive/8 p-4">
           <p className="text-sm font-semibold text-destructive">
-            {audit.failure.type} failure
+            {t("failureTitle", { type: audit.failure.type })}
             {audit.failure.smtp_code > 0 ? ` · SMTP ${audit.failure.smtp_code}` : ""}
           </p>
           <p className="mt-1 text-sm break-words text-destructive/90">
-            {audit.failure.reason || "No reason recorded."}
+            {audit.failure.reason || t("noReason")}
           </p>
         </div>
       ) : null}
 
-      <Section title={`Recipients (${audit.recipients.length})`}>
+      <Section title={t("recipients", { count: audit.recipients.length })}>
         <div className="overflow-x-auto border">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b bg-muted/60 text-left">
                 <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                  Address
+                  {t("address")}
                 </th>
                 <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                  Status
+                  {t("status")}
                 </th>
                 <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                  Code
+                  {t("code")}
                 </th>
                 <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                  Detail
+                  {t("detail")}
                 </th>
               </tr>
             </thead>
@@ -115,10 +120,10 @@ function Details({ audit }: { audit: DeliveryAudit }) {
         </div>
       </Section>
 
-      <Section title={`Relay attempts (${audit.attempts.length})`}>
+      <Section title={t("attempts", { count: audit.attempts.length })}>
         {audit.attempts.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No relay was attempted for this message.
+            {t("noAttempts")}
           </p>
         ) : (
           <div className="overflow-x-auto border">
@@ -129,19 +134,19 @@ function Details({ audit }: { audit: DeliveryAudit }) {
                     #
                   </th>
                   <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                    MX host
+                    {t("mxHost")}
                   </th>
                   <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                    TLS
+                    {t("tls")}
                   </th>
                   <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                    Code
+                    {t("code")}
                   </th>
                   <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                    Took
+                    {t("took")}
                   </th>
                   <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                    Detail
+                    {t("detail")}
                   </th>
                 </tr>
               </thead>
@@ -150,7 +155,7 @@ function Details({ audit }: { audit: DeliveryAudit }) {
                   <tr key={attempt.number} className="border-b last:border-b-0">
                     <td className="px-3 py-2">{attempt.number}</td>
                     <td className="px-3 py-2">{attempt.mx_host || "—"}</td>
-                    <td className="px-3 py-2">{attempt.tls || "none"}</td>
+                    <td className="px-3 py-2">{attempt.tls || t("none")}</td>
                     <td className="px-3 py-2 font-mono text-xs">{attempt.smtp_code || "—"}</td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {duration(attempt.started_at, attempt.finished_at)}
@@ -176,6 +181,9 @@ export function DeliveryAuditDialog({
   correlationId: string | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useTranslations("audits.delivery.dialog");
+  const common = useTranslations("common");
+
   const { data, isLoading, isError, error } = useGetDeliveryAuditQuery(correlationId as string, {
     skip: !correlationId,
   });
@@ -183,15 +191,13 @@ export function DeliveryAuditDialog({
   return (
     <Dialog open={correlationId !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100vh-4rem)] max-w-3xl overflow-y-auto">
-        <DialogTitle>Delivery audit</DialogTitle>
-        <DialogDescription>
-          The full record of what happened to this message after it was accepted.
-        </DialogDescription>
+        <DialogTitle>{t("title")}</DialogTitle>
+        <DialogDescription>{t("description")}</DialogDescription>
 
         {isLoading ? (
           <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
             <Loader2 className="size-6 animate-spin text-primary" />
-            <p className="text-sm">Loading record...</p>
+            <p className="text-sm">{t("loading")}</p>
           </div>
         ) : null}
 
@@ -199,7 +205,7 @@ export function DeliveryAuditDialog({
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <CircleAlert className="size-6 text-destructive" />
             <p className="max-w-md text-sm text-muted-foreground">
-              {apiErrorMessage(error, "Could not load this delivery audit")}
+              {apiErrorMessage(error, t("loadFailed"))}
             </p>
           </div>
         ) : null}
@@ -208,7 +214,7 @@ export function DeliveryAuditDialog({
 
         <div className="mt-6 flex justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {common("close")}
           </Button>
         </div>
       </DialogContent>

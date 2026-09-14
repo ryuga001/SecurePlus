@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth-provider";
+import { IntlProvider } from "@/components/intl-provider";
 import { StoreProvider } from "@/components/store-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <StoreProvider>
           <AuthProvider>
-            <ThemeProvider>{children}</ThemeProvider>
+            <IntlProvider>
+              <ThemeProvider>{children}</ThemeProvider>
+            </IntlProvider>
           </AuthProvider>
         </StoreProvider>
         <Toaster position="top-right" />

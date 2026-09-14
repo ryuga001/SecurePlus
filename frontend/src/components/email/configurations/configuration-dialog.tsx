@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -36,6 +37,9 @@ function ConfigurationDialogBody({
   configuration: EmailConfiguration | null;
   onClose: () => void;
 }) {
+  const t = useTranslations("configurations");
+  const common = useTranslations("common");
+
   const editing = configuration !== null;
 
   const [step, setStep] = React.useState<Step>(editing ? "details" : "provider");
@@ -82,13 +86,13 @@ function ConfigurationDialogBody({
     const domain = values.domain.trim().toLowerCase();
 
     if (!name) {
-      setError("Enter a configuration name.");
+      setError(t("dialog.nameRequired"));
       return;
     }
 
     if (!DOMAIN_PATTERN.test(domain)) {
       setDomainInvalid(true);
-      setError("Enter a valid domain, for example example.com.");
+      setError(t("dialog.domainRequired"));
       return;
     }
 
@@ -102,15 +106,15 @@ function ConfigurationDialogBody({
         const created = await createConfiguration(input).unwrap();
         setConfigurationId(created.id);
         setValues({ name: created.name, domain: created.domain });
-        toast.success("Configuration created");
+        toast.success(t("dialog.created"));
       } else {
         const updated = await updateConfiguration({ id: configurationId, ...input }).unwrap();
         setValues({ name: updated.name, domain: updated.domain });
-        toast.success("Configuration updated");
+        toast.success(t("dialog.updated"));
       }
     } catch (caught) {
       setDomainInvalid(apiErrorStatus(caught) === 409);
-      setError(apiErrorMessage(caught, "Could not save this configuration"));
+      setError(apiErrorMessage(caught, t("dialog.saveFailed")));
     }
   }
 
@@ -118,11 +122,11 @@ function ConfigurationDialogBody({
 
   return (
     <>
-      <DialogTitle>{editing ? "Edit configuration" : "Add configuration"}</DialogTitle>
+      <DialogTitle>{editing ? t("dialog.editTitle") : t("dialog.addTitle")}</DialogTitle>
       <DialogDescription>
         {step === "provider"
-          ? "Choose the mail provider this configuration connects to."
-          : "Name the configuration, set its domain, then generate credentials."}
+          ? t("dialog.providerStep")
+          : t("dialog.detailsStep")}
       </DialogDescription>
 
       {editing ? null : (
@@ -137,7 +141,7 @@ function ConfigurationDialogBody({
 
           <div className="mt-6 flex justify-end border-t pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {common("cancel")}
             </Button>
           </div>
         </>
@@ -170,17 +174,17 @@ function ConfigurationDialogBody({
             {!editing && !saved ? (
               <Button type="button" variant="outline" onClick={() => setStep("provider")}>
                 <ArrowLeft />
-                Back
+                {t("dialog.back")}
               </Button>
             ) : (
               <Button type="button" variant="outline" onClick={onClose}>
-                Done
+                {t("dialog.done")}
               </Button>
             )}
 
             <Button type="submit" disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
-              {saved ? "Save changes" : "Create configuration"}
+              {saved ? t("dialog.saveChanges") : t("dialog.create")}
             </Button>
           </div>
         </form>

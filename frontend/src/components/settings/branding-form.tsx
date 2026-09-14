@@ -1,6 +1,7 @@
 "use client";
 
 import { ImageOff, Loader2, Search, Trash2, Upload } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import * as React from "react";
 import { toast } from "sonner";
@@ -25,13 +26,6 @@ const MAX_LOGO_BYTES = 1024 * 1024;
 
 const ACCEPTED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
-const INVALID_LOGO_MESSAGE = "Logo must be PNG, JPEG, or WebP and 1 MB or less.";
-
-const THEMES: { value: Theme; label: string; hint: string }[] = [
-  { value: "LIGHT", label: "Light", hint: "Bright background" },
-  { value: "DARK", label: "Dark", hint: "Dim background" },
-];
-
 const LANGUAGES: { value: Language; label: string }[] = [
   { value: "ENGLISH", label: "English" },
   { value: "JAPANESE", label: "日本語" },
@@ -40,6 +34,7 @@ const LANGUAGES: { value: Language; label: string }[] = [
 
 export function BrandingForm() {
   const { identity, loading, reload } = useAuth();
+  const t = useTranslations("settings.branding");
   const branding = identity?.branding;
 
   if (loading) return <BrandingSkeleton />;
@@ -47,7 +42,7 @@ export function BrandingForm() {
   if (!branding) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-        Branding settings are not available for this workspace.
+        {t("unavailable")}
       </div>
     );
   }
@@ -64,6 +59,9 @@ function BrandingFields({
   branding: Branding;
   reload: () => Promise<void>;
 }) {
+  const t = useTranslations("settings.branding");
+  const common = useTranslations("common");
+
   const [updateBranding, { isLoading: saving }] = useUpdateBrandingMutation();
   const [uploadLogo, { isLoading: uploading }] = useUploadLogoMutation();
   const [removeLogo, { isLoading: removing }] = useRemoveLogoMutation();
@@ -84,9 +82,9 @@ function BrandingFields({
     try {
       await updateBranding({ theme, language, timezone }).unwrap();
       await reload();
-      toast.success("Branding updated");
+      toast.success(t("updated"));
     } catch (cause) {
-      setError(apiErrorMessage(cause, "Unable to save branding settings."));
+      setError(apiErrorMessage(cause, t("saveFailed")));
     }
   }
 
@@ -99,16 +97,16 @@ function BrandingFields({
     setError(undefined);
 
     if (file.size > MAX_LOGO_BYTES || !ACCEPTED_LOGO_TYPES.includes(file.type)) {
-      setError(INVALID_LOGO_MESSAGE);
+      setError(t("invalidLogo"));
       return;
     }
 
     try {
       await uploadLogo(file).unwrap();
       await reload();
-      toast.success("Logo updated");
+      toast.success(t("logoUpdated"));
     } catch (cause) {
-      setError(apiErrorMessage(cause, "Unable to upload logo."));
+      setError(apiErrorMessage(cause, t("uploadFailed")));
     }
   }
 
@@ -118,9 +116,9 @@ function BrandingFields({
     try {
       await removeLogo().unwrap();
       await reload();
-      toast.success("Logo removed");
+      toast.success(t("logoRemoved"));
     } catch (cause) {
-      setError(apiErrorMessage(cause, "Unable to remove logo."));
+      setError(apiErrorMessage(cause, t("uploadFailed")));
     }
   }
 
@@ -128,7 +126,7 @@ function BrandingFields({
     <form onSubmit={onSubmit} className="flex max-w-2xl flex-col gap-6">
       <FormError message={error} />
 
-      <Field id="logo" label="Logo" hint="PNG, JPEG or WebP, up to 1 MB.">
+      <Field id="logo" label={t("logo")} hint={t("logoHint")}>
         <div className="flex flex-wrap items-center gap-4">
           <LogoPreview branding={branding} />
 
@@ -149,12 +147,12 @@ function BrandingFields({
               onClick={() => fileInput.current?.click()}
             >
               {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              {uploading ? "Uploading…" : "Upload logo"}
+              {uploading ? t("uploading") : t("uploadLogo")}
             </Button>
             {branding.logo_url ? (
               <Button type="button" variant="outline" disabled={busy} onClick={onLogoRemoved}>
                 {removing ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-                Remove
+                {common("remove")}
               </Button>
             ) : null}
           </div>
@@ -162,9 +160,14 @@ function BrandingFields({
       </Field>
 
       <fieldset className="flex flex-col gap-2" disabled={busy}>
-        <Label>Theme</Label>
+        <Label>{t("theme")}</Label>
         <div className="flex flex-wrap gap-3">
-          {THEMES.map((option) => (
+          {(
+            [
+              { value: "LIGHT", label: t("themeLight"), hint: t("themeLightHint") },
+              { value: "DARK", label: t("themeDark"), hint: t("themeDarkHint") },
+            ] as { value: Theme; label: string; hint: string }[]
+          ).map((option) => (
             <label
               key={option.value}
               className={cn(
@@ -189,7 +192,7 @@ function BrandingFields({
         </div>
       </fieldset>
 
-      <Field id="language" label="Language">
+      <Field id="language" label={t("language")}>
         <Select
           id="language"
           value={language}
@@ -204,7 +207,7 @@ function BrandingFields({
       <div className="flex justify-end border-t pt-4">
         <Button type="submit" disabled={busy}>
           {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-          {saving ? "Saving…" : "Save"}
+          {saving ? common("saving") : common("save")}
         </Button>
       </div>
     </form>
@@ -212,11 +215,13 @@ function BrandingFields({
 }
 
 function LogoPreview({ branding }: { branding: Branding }) {
+  const t = useTranslations("settings.branding");
+
   if (!branding.logo_url) {
     return (
       <div className="flex size-24 flex-col items-center justify-center gap-1 border border-dashed text-muted-foreground">
         <ImageOff className="size-5" />
-        <span className="text-xs">No logo</span>
+        <span className="text-xs">{t("noLogo")}</span>
       </div>
     );
   }
@@ -224,7 +229,7 @@ function LogoPreview({ branding }: { branding: Branding }) {
   return (
     <Image
       src={branding.logo_url}
-      alt="Customer logo"
+      alt={t("logoAlt")}
       width={96}
       height={96}
       unoptimized
@@ -242,6 +247,7 @@ function TimezonePicker({
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
+  const t = useTranslations("settings.branding");
   const [search, setSearch] = React.useState("");
   const options = React.useMemo(() => timezoneOptions(), []);
 
@@ -253,14 +259,14 @@ function TimezonePicker({
   const selected = options.find((option) => option.value === value);
 
   return (
-    <Field id="timezone-search" label="Timezone" hint={selected?.label ?? value}>
+    <Field id="timezone-search" label={t("timezone")} hint={selected?.label ?? value}>
       <div className="flex flex-col gap-2">
         <div className="relative">
           <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="timezone-search"
             className="h-9 pl-9"
-            placeholder="Search timezone…"
+            placeholder={t("timezoneSearch")}
             value={search}
             disabled={disabled}
             onChange={(event) => setSearch(event.target.value)}
@@ -269,7 +275,7 @@ function TimezonePicker({
 
         <div className="max-h-56 overflow-y-auto border">
           {visible.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">No matches</p>
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("noMatches")}</p>
           ) : (
             visible.map((option) => (
               <label

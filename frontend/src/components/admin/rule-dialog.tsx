@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -18,12 +19,15 @@ import {
   type RuleType,
 } from "@/store/api/rules-api";
 
-const TYPE_OPTIONS = [
-  { label: "Keyword", value: "KEYWORD" },
-  { label: "Regular expression", value: "REGEX" },
-];
-
 function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void }) {
+  const t = useTranslations("rules");
+  const common = useTranslations("common");
+
+  const TYPE_OPTIONS = [
+    { label: t("type.keyword"), value: "KEYWORD" },
+    { label: t("type.regex"), value: "REGEX" },
+  ];
+
   const [name, setName] = React.useState(rule?.rule_name ?? "");
   const [type, setType] = React.useState<RuleType>(rule?.type ?? "KEYWORD");
   const [value, setValue] = React.useState(rule?.value ?? "");
@@ -41,12 +45,12 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
     const input = { rule_name: name.trim(), type, value };
 
     if (!input.rule_name) {
-      setError("Enter a rule name.");
+      setError(t("dialog.nameRequired"));
       return;
     }
     if (!input.value.trim()) {
       setValueInvalid(true);
-      setError(type === "REGEX" ? "Enter a pattern to match." : "Enter a keyword to match.");
+      setError(type === "REGEX" ? t("dialog.patternRequired") : t("dialog.keywordRequired"));
       return;
     }
 
@@ -56,22 +60,22 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
     try {
       if (rule) {
         await updateRule({ id: rule.id, ...input }).unwrap();
-        toast.success("Rule updated");
+        toast.success(t("dialog.updated"));
       } else {
         await createRule(input).unwrap();
-        toast.success("Rule created");
+        toast.success(t("dialog.created"));
       }
 
       onClose();
     } catch (caught) {
       setValueInvalid(apiErrorStatus(caught) === 400);
-      setError(apiErrorMessage(caught, "Could not save this rule"));
+      setError(apiErrorMessage(caught, t("dialog.saveFailed")));
     }
   }
 
   return (
     <>
-      <DialogTitle>{rule ? "Edit rule" : "Add rule"}</DialogTitle>
+      <DialogTitle>{rule ? t("dialog.editTitle") : t("dialog.addTitle")}</DialogTitle>
       <DialogDescription>
         A rule matches message content by keyword or by regular expression.
       </DialogDescription>
@@ -79,12 +83,12 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
       <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-4">
         <FormError message={error} />
 
-        <Field id="rule-name" label="Rule name">
+        <Field id="rule-name" label={t("dialog.name")}>
           <Input
             id="rule-name"
             required
             autoFocus
-            placeholder="Card number"
+            placeholder={t("dialog.namePlaceholder")}
             value={name}
             disabled={pending}
             onChange={(event) => {
@@ -94,7 +98,7 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
           />
         </Field>
 
-        <Field id="rule-type" label="Match type">
+        <Field id="rule-type" label={t("dialog.matchType")}>
           <Select
             id="rule-type"
             value={type}
@@ -110,11 +114,9 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
 
         <Field
           id="rule-value"
-          label={type === "REGEX" ? "Pattern" : "Keyword"}
+          label={type === "REGEX" ? t("dialog.pattern") : t("dialog.keyword")}
           hint={
-            type === "REGEX"
-              ? "Go RE2 syntax, for example \\d{16}. Whitespace is significant."
-              : "Matched case-insensitively against message content."
+            type === "REGEX" ? t("dialog.patternHint") : t("dialog.keywordHint")
           }
         >
           <Textarea
@@ -136,11 +138,11 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
 
         <div className="flex justify-end gap-2 border-t pt-4">
           <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
+            {common("cancel")}
           </Button>
           <Button type="submit" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {rule ? "Save changes" : "Create rule"}
+            {rule ? t("dialog.saveChanges") : t("dialog.create")}
           </Button>
         </div>
       </form>

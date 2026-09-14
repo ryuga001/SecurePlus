@@ -142,6 +142,21 @@ The CSRF token is deliberately outside the cache: it is an HMAC of the access-to
 
 Cache failures degrade rather than fail. A Redis read error falls through to Postgres; an invalidation failure after a committed write logs a warning and still returns success, because the write did happen. The cost is that warm caches serve stale branding until the TTL expires.
 
+### Dashboard language
+
+`next-intl` runs **client-side only**, with no locale routing and no `createNextIntlPlugin`. The locale is not in the URL — it comes from `identity.branding.language` on the `/me` payload, which is only known after authentication, so `IntlProvider` sits inside `AuthProvider` and also drives `<html lang>`.
+
+Catalogues live in `frontend/messages/{en,ja,es}.json` and are keyed by namespace (`common`, `nav`, `table`, `status`, one per feature). Two conventions worth knowing before adding UI:
+
+- **`columns`/`filters` arrays must be built inside the component**, not at module scope, or they cannot reach `useTranslations`.
+- **Backend enums are translated through the `status` namespace** by lowercased key, with the raw value as fallback (`t.has(key) ? t(key) : value`). A new enum value renders as-is rather than crashing.
+
+`routes.ts` carries a `labelKey` per node rather than a label; the sidebar and tab strip resolve it against `nav`.
+
+> The Japanese and Spanish catalogues are machine-translated and **have not been reviewed by a native speaker**. This is a security product, and the vocabulary that carries the most risk — authentication, authorization, policy, incident, DLP, enforcement, quarantine, block, recipient, domain — is exactly where machine translation misleads about what the product does. Treat `en.json` as authoritative and get `ja`/`es` reviewed before they reach customers.
+
+The pre-auth pages (login, register, forgot/reset password) are deliberately **not** translated: branding language is customer-level and unknown until `/me` returns, so they have no locale source and would always render in the default.
+
 ### Logos
 
 Stored in S3/MinIO at a backend-controlled key — the frontend can never choose the path:

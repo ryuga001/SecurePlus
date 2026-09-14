@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -22,29 +23,36 @@ import {
   type EmailConfiguration,
 } from "@/store/api/email-configurations-api";
 
-const filters: FilterConfig[] = [
-  {
-    key: "search",
-    label: "Search",
-    type: "text",
-    placeholder: "Configuration name",
-    width: "w-72",
-  },
-];
-
-const columns: ColumnConfig<EmailConfiguration>[] = [
-  { key: "name", label: "Configuration Name" },
-  { key: "provider", label: "Provider", render: (value) => providerLabel(String(value)) },
-  {
-    key: "domain",
-    label: "Domain",
-    render: (value) => <span className="font-mono text-[0.8rem]">{String(value)}</span>,
-  },
-  { key: "created_at", label: "Created At", type: "date" },
-  { key: "updated_at", label: "Updated At", type: "date" },
-];
-
 export default function EmailConfigurationsPage() {
+  const t = useTranslations("configurations");
+  const common = useTranslations("common");
+
+  const filters: FilterConfig[] = [
+    {
+      key: "search",
+      label: common("search"),
+      type: "text",
+      placeholder: t("searchPlaceholder"),
+      width: "w-72",
+    },
+  ];
+
+  const columns: ColumnConfig<EmailConfiguration>[] = [
+    { key: "name", label: t("columns.name") },
+    {
+      key: "provider",
+      label: t("columns.provider"),
+      render: (value) => providerLabel(String(value)),
+    },
+    {
+      key: "domain",
+      label: t("columns.domain"),
+      render: (value) => <span className="font-mono text-[0.8rem]">{String(value)}</span>,
+    },
+    { key: "created_at", label: t("columns.createdAt"), type: "date" },
+    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
+  ];
+
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<EmailConfiguration | null>(null);
   const [deleting, setDeleting] = React.useState<EmailConfiguration | null>(null);
@@ -67,17 +75,17 @@ export default function EmailConfigurationsPage() {
 
     try {
       await deleteConfiguration(deleting.id).unwrap();
-      toast.success(`${deleting.name} deleted`);
+      toast.success(t("deleted", { name: deleting.name }));
       setDeleting(null);
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not delete this configuration"));
+      toast.error(apiErrorMessage(error, t("deleteFailed")));
     }
   }
 
   const actions: TableAction[] = [
     {
       key: "add",
-      label: "Add Configuration",
+      label: t("add"),
       icon: Plus,
       variant: "default",
       onClick: openCreate,
@@ -85,10 +93,10 @@ export default function EmailConfigurationsPage() {
   ];
 
   const rowActions: RowAction<EmailConfiguration>[] = [
-    { key: "edit", label: "Edit", icon: Pencil, variant: "ghost", onClick: openEdit },
+    { key: "edit", label: common("edit"), icon: Pencil, variant: "ghost", onClick: openEdit },
     {
       key: "delete",
-      label: "Delete",
+      label: common("delete"),
       icon: Trash2,
       variant: "destructive",
       onClick: (row) => setDeleting(row),
@@ -97,8 +105,8 @@ export default function EmailConfigurationsPage() {
 
   return (
     <Consolepage
-      heading="Email configurations"
-      subheading="Connected mailboxes, gateways and delivery settings."
+      heading={t("heading")}
+      subheading={t("subheading")}
       data={
         <>
           <DataTable
@@ -108,7 +116,7 @@ export default function EmailConfigurationsPage() {
             actions={actions}
             rowActions={rowActions}
             getRowId={(row) => row.id}
-            emptyMessage="No email configurations yet"
+            emptyMessage={t("empty")}
           />
 
           <EmailConfigurationDialog
@@ -123,13 +131,13 @@ export default function EmailConfigurationsPage() {
             onOpenChange={(open) => {
               if (!open) setDeleting(null);
             }}
-            title="Delete configuration"
+            title={t("deleteTitle")}
             description={
               deleting
-                ? `${deleting.name} (${deleting.domain}) will stop sending and its credentials will be revoked. This cannot be undone.`
+                ? t("deleteDescription", { name: deleting.name, domain: deleting.domain })
                 : undefined
             }
-            confirmLabel="Delete"
+            confirmLabel={common("delete")}
             destructive
             pending={deletePending}
             onConfirm={confirmDelete}

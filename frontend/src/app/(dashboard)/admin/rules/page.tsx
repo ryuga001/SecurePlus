@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -17,51 +18,60 @@ import type {
 import { apiErrorMessage } from "@/lib/api-error";
 import { useDeleteRuleMutation, useListRulesQuery, type Rule } from "@/store/api/rules-api";
 
-const filters: FilterConfig[] = [
-  { key: "search", label: "Search", type: "text", placeholder: "Rule name", width: "w-72" },
-];
-
-const columns: ColumnConfig<Rule>[] = [
-  { key: "rule_name", label: "Rule Name" },
-  {
-    key: "type",
-    label: "Type",
-    render: (value) => (value === "REGEX" ? "Regular expression" : "Keyword"),
-  },
-  {
-    key: "value",
-    label: "Matches",
-    render: (value) => (
-      <span className="block max-w-md truncate font-mono text-[0.8rem]">{String(value)}</span>
-    ),
-  },
-  { key: "created_at", label: "Created At", type: "date" },
-  { key: "updated_at", label: "Updated At", type: "date" },
-];
-
 export default function RulesPage() {
+  const t = useTranslations("rules");
+  const common = useTranslations("common");
+
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Rule | null>(null);
   const [deleting, setDeleting] = React.useState<Rule | null>(null);
 
   const [deleteRule, { isLoading: deletePending }] = useDeleteRuleMutation();
 
+  const filters: FilterConfig[] = [
+    {
+      key: "search",
+      label: common("search"),
+      type: "text",
+      placeholder: t("searchPlaceholder"),
+      width: "w-72",
+    },
+  ];
+
+  const columns: ColumnConfig<Rule>[] = [
+    { key: "rule_name", label: t("columns.name") },
+    {
+      key: "type",
+      label: t("columns.type"),
+      render: (value) => (value === "REGEX" ? t("type.regex") : t("type.keyword")),
+    },
+    {
+      key: "value",
+      label: t("columns.value"),
+      render: (value) => (
+        <span className="block max-w-md truncate font-mono text-[0.8rem]">{String(value)}</span>
+      ),
+    },
+    { key: "created_at", label: t("columns.createdAt"), type: "date" },
+    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
+  ];
+
   async function confirmDelete() {
     if (!deleting) return;
 
     try {
       await deleteRule(deleting.id).unwrap();
-      toast.success(`${deleting.rule_name} deleted`);
+      toast.success(t("deleted", { name: deleting.rule_name }));
       setDeleting(null);
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not delete this rule"));
+      toast.error(apiErrorMessage(error, t("deleteFailed")));
     }
   }
 
   const actions: TableAction[] = [
     {
       key: "add",
-      label: "Add Rule",
+      label: t("add"),
       icon: Plus,
       variant: "default",
       onClick: () => {
@@ -74,7 +84,7 @@ export default function RulesPage() {
   const rowActions: RowAction<Rule>[] = [
     {
       key: "edit",
-      label: "Edit",
+      label: common("edit"),
       icon: Pencil,
       variant: "ghost",
       onClick: (row) => {
@@ -84,7 +94,7 @@ export default function RulesPage() {
     },
     {
       key: "delete",
-      label: "Delete",
+      label: common("delete"),
       icon: Trash2,
       variant: "destructive",
       onClick: (row) => setDeleting(row),
@@ -93,8 +103,8 @@ export default function RulesPage() {
 
   return (
     <Consolepage
-      heading="Rules"
-      subheading="Keyword and regular-expression matchers that policies apply to mail."
+      heading={t("heading")}
+      subheading={t("subheading")}
       data={
         <>
           <DataTable
@@ -104,7 +114,7 @@ export default function RulesPage() {
             actions={actions}
             rowActions={rowActions}
             getRowId={(row) => row.id}
-            emptyMessage="No rules yet"
+            emptyMessage={t("empty")}
           />
 
           <RuleDialog
@@ -119,13 +129,11 @@ export default function RulesPage() {
             onOpenChange={(open) => {
               if (!open) setDeleting(null);
             }}
-            title="Delete rule"
+            title={t("deleteTitle")}
             description={
-              deleting
-                ? `${deleting.rule_name} will be removed from every policy that uses it. This cannot be undone.`
-                : undefined
+              deleting ? t("deleteDescription", { name: deleting.rule_name }) : undefined
             }
-            confirmLabel="Delete"
+            confirmLabel={common("delete")}
             destructive
             pending={deletePending}
             onConfirm={confirmDelete}

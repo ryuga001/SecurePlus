@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ export function TableFilters({
   onChange: (key: string, value: FilterValue) => void;
   onClear: () => void;
 }) {
+  const t = useTranslations("table");
+
   if (filters.length === 0) return null;
 
   const active = filters.some((filter) => {
@@ -57,7 +60,9 @@ export function TableFilters({
                 <Input
                   id={`filter-${filter.key}`}
                   className="pl-9"
-                  placeholder={filter.placeholder ?? `Search ${filter.label.toLowerCase()}`}
+                  placeholder={
+                    filter.placeholder ?? t("searchFilter", { label: filter.label.toLowerCase() })
+                  }
                   value={asText(value)}
                   onChange={(event) => onChange(filter.key, event.target.value)}
                 />
@@ -69,7 +74,7 @@ export function TableFilters({
                 id={`filter-${filter.key}`}
                 value={asText(value)}
                 onChange={(event) => onChange(filter.key, event.target.value)}
-                placeholder={filter.placeholder ?? "All"}
+                placeholder={filter.placeholder ?? t("all")}
                 options={filter.options}
               />
             ) : null}
@@ -123,7 +128,7 @@ export function TableFilters({
       {active ? (
         <Button type="button" variant="ghost" size="sm" className="h-11" onClick={onClear}>
           <X />
-          Clear
+          {t("clear")}
         </Button>
       ) : null}
     </div>

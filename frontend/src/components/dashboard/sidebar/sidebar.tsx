@@ -1,6 +1,8 @@
 "use client";
 
 import { ChevronDown, LogOut, ShieldCheck } from "lucide-react";
+import { useTranslations } from "next-intl";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -33,6 +35,7 @@ function NavLink({
 }) {
   const active = isActive(pathname, node);
   const Icon = node.icon;
+  const t = useTranslations("nav");
 
   return (
     <Link
@@ -47,7 +50,7 @@ function NavLink({
       )}
     >
       {Icon ? <Icon className="size-4.5 shrink-0" /> : null}
-      <span className="truncate">{node.label}</span>
+      <span className="truncate">{t(node.labelKey)}</span>
     </Link>
   );
 }
@@ -56,6 +59,7 @@ function NavGroup({ node, pathname }: { node: RouteNode; pathname: string }) {
   const active = isActive(pathname, node);
   const [open, setOpen] = useState(active);
   const Icon = node.icon;
+  const t = useTranslations("nav");
 
   return (
     <div>
@@ -71,7 +75,7 @@ function NavGroup({ node, pathname }: { node: RouteNode; pathname: string }) {
         )}
       >
         {Icon ? <Icon className="size-4.5 shrink-0" /> : null}
-        <span className="flex-1 truncate text-left">{node.label}</span>
+        <span className="flex-1 truncate text-left">{t(node.labelKey)}</span>
         <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
       </button>
 
@@ -94,6 +98,12 @@ const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { identity, signOut } = useAuth();
+  const t = useTranslations("common");
+  const [failedLogo, setFailedLogo] = useState<string | null>(null);
+
+  const orgName = identity?.customer.org_name ?? "SecurePlus";
+  const brandingLogo = identity?.branding?.logo_url ?? null;
+  const logoUrl = brandingLogo !== failedLogo ? brandingLogo : null;
 
   async function onSignOut() {
     await signOut();
@@ -103,10 +113,23 @@ const Sidebar = () => {
   return (
     <aside className="flex h-svh w-64 shrink-0 flex-col overflow-hidden border-r bg-sidebar">
       <Link href="/dashboard" className="flex shrink-0 items-center gap-3 border-b px-4 py-4">
-        <span className="flex size-9 items-center justify-center bg-primary">
-          <ShieldCheck className="size-5 text-primary-foreground" />
-        </span>
-        <span className="text-lg font-semibold tracking-tight">SecurePlus</span>
+        {logoUrl ? (
+          <Image
+            key={logoUrl}
+            src={logoUrl}
+            alt={orgName}
+            width={36}
+            height={36}
+            unoptimized
+            className="size-9 shrink-0 object-contain"
+            onError={() => setFailedLogo(brandingLogo)}
+          />
+        ) : (
+          <span className="flex size-9 shrink-0 items-center justify-center bg-primary">
+            <ShieldCheck className="size-5 text-primary-foreground" />
+          </span>
+        )}
+        <span className="truncate text-lg font-semibold tracking-tight">{orgName}</span>
       </Link>
 
       <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto py-3">
@@ -125,13 +148,13 @@ const Sidebar = () => {
             <p className="truncate text-sm font-medium">
               {identity.user.first_name} {identity.user.last_name}
             </p>
-            <p className="truncate text-xs text-muted-foreground">{identity.customer.org_name}</p>
+            <p className="truncate text-xs text-muted-foreground">{identity.user.email}</p>
           </div>
         ) : null}
 
         <Button variant="outline" className="w-full justify-start" onClick={onSignOut}>
           <LogOut />
-          Sign out
+          {t("signOut")}
         </Button>
       </div>
     </aside>

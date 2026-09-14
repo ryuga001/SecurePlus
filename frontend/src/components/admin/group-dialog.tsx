@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -23,6 +24,7 @@ import { useListEmailUsersQuery } from "@/store/api/email-users-api";
 const ALL_USERS = { page: 1, pageSize: 100, filters: {} };
 
 function Members({ groupId }: { groupId: number }) {
+  const t = useTranslations("groups");
   const { data: members, isLoading: loadingMembers } = useListGroupMembersQuery(groupId);
   const { data: users, isLoading: loadingUsers } = useListEmailUsersQuery(ALL_USERS);
 
@@ -45,14 +47,14 @@ function Members({ groupId }: { groupId: number }) {
         await removeMember({ groupId, emailUserId }).unwrap();
       }
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not update membership"));
+      toast.error(apiErrorMessage(error, t("dialog.membershipFailed")));
     }
   }
 
   return (
     <div className="flex flex-col gap-3 border-t pt-5">
       <div>
-        <h3 className="text-sm font-medium">Members</h3>
+        <h3 className="text-sm font-medium">{t("dialog.members")}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           Ticking a name adds them to this group straight away.
         </p>
@@ -68,8 +70,8 @@ function Members({ groupId }: { groupId: number }) {
           options={options}
           selected={selected}
           onToggle={onToggle}
-          searchPlaceholder="Search users"
-          emptyMessage="Add email users first"
+          searchPlaceholder={t("dialog.searchUsers")}
+          emptyMessage={t("dialog.noUsers")}
         />
       )}
     </div>
@@ -77,6 +79,8 @@ function Members({ groupId }: { groupId: number }) {
 }
 
 function GroupForm({ group, onClose }: { group: EmailGroup | null; onClose: () => void }) {
+  const t = useTranslations("groups");
+  const common = useTranslations("common");
   const [name, setName] = React.useState(group?.name ?? "");
   const [groupId, setGroupId] = React.useState<number | null>(group?.id ?? null);
   const [error, setError] = React.useState("");
@@ -91,7 +95,7 @@ function GroupForm({ group, onClose }: { group: EmailGroup | null; onClose: () =
 
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Enter a group name.");
+      setError(t("dialog.nameRequired"));
       return;
     }
 
@@ -102,20 +106,20 @@ function GroupForm({ group, onClose }: { group: EmailGroup | null; onClose: () =
         const created = await createGroup({ name: trimmed }).unwrap();
         setGroupId(created.id);
         setName(created.name);
-        toast.success("Group created");
+        toast.success(t("dialog.created"));
       } else {
         const updated = await updateGroup({ id: groupId, name: trimmed }).unwrap();
         setName(updated.name);
-        toast.success("Group updated");
+        toast.success(t("dialog.updated"));
       }
     } catch (caught) {
-      setError(apiErrorMessage(caught, "Could not save this group"));
+      setError(apiErrorMessage(caught, t("dialog.saveFailed")));
     }
   }
 
   return (
     <>
-      <DialogTitle>{group ? "Edit group" : "Add group"}</DialogTitle>
+      <DialogTitle>{group ? t("dialog.editTitle") : t("dialog.addTitle")}</DialogTitle>
       <DialogDescription>
         A group collects email users so a policy can target them together.
       </DialogDescription>
@@ -123,12 +127,12 @@ function GroupForm({ group, onClose }: { group: EmailGroup | null; onClose: () =
       <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-5">
         <FormError message={error} />
 
-        <Field id="group-name" label="Group name">
+        <Field id="group-name" label={t("dialog.name")}>
           <Input
             id="group-name"
             required
             autoFocus
-            placeholder="Finance"
+            placeholder={t("dialog.namePlaceholder")}
             value={name}
             disabled={pending}
             onChange={(event) => {
@@ -148,11 +152,11 @@ function GroupForm({ group, onClose }: { group: EmailGroup | null; onClose: () =
 
         <div className="flex justify-end gap-2 border-t pt-4">
           <Button type="button" variant="outline" onClick={onClose}>
-            {groupId === null ? "Cancel" : "Done"}
+            {groupId === null ? common("cancel") : t("dialog.done")}
           </Button>
           <Button type="submit" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {groupId === null ? "Create group" : "Save changes"}
+            {groupId === null ? t("dialog.create") : t("dialog.saveChanges")}
           </Button>
         </div>
       </form>

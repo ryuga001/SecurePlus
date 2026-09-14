@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import Consolepage from "@/components/dashboard/pageThemes/consolepage";
@@ -12,101 +13,112 @@ import {
   type EmailIncidentListItem,
 } from "@/store/api/email-incidents-api";
 
-const filters: FilterConfig[] = [
-  {
-    key: "search",
-    label: "Search",
-    type: "text",
-    placeholder: "Sender, recipient, rule or policy",
-    width: "w-80",
-  },
-  {
-    key: "trigger",
-    label: "Trigger",
-    type: "select",
-    options: [
-      { label: "Restriction", value: "RESTRICTION" },
-      { label: "Content rule", value: "CONTENT" },
-    ],
-  },
-  {
-    key: "action",
-    label: "Action",
-    type: "select",
-    options: [
-      { label: "Block", value: "BLOCK" },
-      { label: "Quarantine", value: "QUARANTINE" },
-      { label: "Redact", value: "REDACT" },
-      { label: "Audit", value: "AUDIT" },
-    ],
-  },
-  { key: "created", label: "Raised", type: "dateRange" },
-];
-
-const columns: ColumnConfig<EmailIncidentListItem>[] = [
-  { key: "created_at", label: "Raised", type: "datetime", sortable: true, width: "12rem" },
-  { key: "from", label: "From", sortable: true },
-  {
-    key: "recipients",
-    label: "To",
-    render: (_value, row) => (
-      <span className="block max-w-xs truncate">
-        {row.recipients[0] ?? "—"}
-        {row.recipient_count > 1 ? (
-          <span className="text-muted-foreground"> +{row.recipient_count - 1}</span>
-        ) : null}
-      </span>
-    ),
-  },
-  {
-    key: "trigger",
-    label: "Trigger",
-    sortable: true,
-    render: (_value, row) => <StatusBadge status={row.trigger} />,
-  },
-  {
-    key: "effective_action",
-    label: "Action",
-    sortable: true,
-    render: (_value, row) => (
-      <div className="flex items-center gap-2">
-        <StatusBadge status={row.effective_action} />
-        {row.action_status === "FAILED" ? (
-          <span className="text-xs text-destructive">executor failed</span>
-        ) : null}
-      </div>
-    ),
-  },
-  {
-    key: "evidence",
-    label: "Evidence",
-    align: "right",
-    width: "10rem",
-    accessor: (row) => row.match_count + row.violation_count,
-    render: (_value, row) => (
-      <span className="text-muted-foreground">
-        {row.trigger === "RESTRICTION"
-          ? `${row.violation_count} violation${row.violation_count === 1 ? "" : "s"}`
-          : `${row.match_count} rule${row.match_count === 1 ? "" : "s"}`}
-      </span>
-    ),
-  },
-  {
-    key: "withheld_count",
-    label: "Withheld",
-    type: "number",
-    align: "right",
-    width: "7rem",
-  },
-];
-
 export default function EmailIncidentsPage() {
+  const t = useTranslations("audits");
+  const i = useTranslations("audits.incidents");
+  const status = useTranslations("status");
+  const common = useTranslations("common");
+
   const [selected, setSelected] = React.useState<string | null>(null);
+
+  const filters: FilterConfig[] = [
+    {
+      key: "search",
+      label: common("search"),
+      type: "text",
+      placeholder: i("searchPlaceholder"),
+      width: "w-80",
+    },
+    {
+      key: "trigger",
+      label: i("triggerFilter"),
+      type: "select",
+      options: [
+        { label: status("restriction"), value: "RESTRICTION" },
+        { label: status("content"), value: "CONTENT" },
+      ],
+    },
+    {
+      key: "action",
+      label: i("actionFilter"),
+      type: "select",
+      options: [
+        { label: status("block"), value: "BLOCK" },
+        { label: status("quarantine"), value: "QUARANTINE" },
+        { label: status("redact"), value: "REDACT" },
+        { label: status("audit"), value: "AUDIT" },
+      ],
+    },
+    { key: "created", label: i("raisedFilter"), type: "dateRange" },
+  ];
+
+  const columns: ColumnConfig<EmailIncidentListItem>[] = [
+    {
+      key: "created_at",
+      label: i("columns.raised"),
+      type: "datetime",
+      sortable: true,
+      width: "12rem",
+    },
+    { key: "from", label: i("columns.from"), sortable: true },
+    {
+      key: "recipients",
+      label: i("columns.to"),
+      render: (_value, row) => (
+        <span className="block max-w-xs truncate">
+          {row.recipients[0] ?? "—"}
+          {row.recipient_count > 1 ? (
+            <span className="text-muted-foreground"> +{row.recipient_count - 1}</span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: "trigger",
+      label: i("columns.trigger"),
+      sortable: true,
+      render: (_value, row) => <StatusBadge status={row.trigger} />,
+    },
+    {
+      key: "effective_action",
+      label: i("columns.action"),
+      sortable: true,
+      render: (_value, row) => (
+        <div className="flex items-center gap-2">
+          <StatusBadge status={row.effective_action} />
+          {row.action_status === "FAILED" ? (
+            <span className="text-xs text-destructive">{i("executorFailed")}</span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "evidence",
+      label: i("columns.evidence"),
+      align: "right",
+      width: "10rem",
+      accessor: (row) => row.match_count + row.violation_count,
+      render: (_value, row) => (
+        <span className="text-muted-foreground">
+          {row.trigger === "RESTRICTION"
+            ? i("violations", { count: row.violation_count })
+            : i("matches", { count: row.match_count })}
+        </span>
+      ),
+    },
+    {
+      key: "withheld_count",
+      label: i("columns.withheld"),
+      type: "number",
+      align: "right",
+      width: "7rem",
+    },
+  ];
 
   return (
     <Consolepage
-      heading="Email audits"
-      subheading="Policy violations raised against outbound mail."
+      heading={t("heading")}
+      subheading={i("subheading")}
       data={
         <>
           <DataTable
@@ -116,7 +128,7 @@ export default function EmailIncidentsPage() {
             getRowId={(row) => row.correlation_id}
             onRowClick={(row) => setSelected(row.correlation_id)}
             defaultSort={{ key: "created_at", direction: "desc" }}
-            emptyMessage="No incidents raised yet"
+            emptyMessage={i("empty")}
           />
 
           <EmailIncidentDialog

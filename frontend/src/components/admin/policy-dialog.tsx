@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -27,30 +28,6 @@ import { useListRulesQuery, type Rule } from "@/store/api/rules-api";
 
 const ALL = { page: 1, pageSize: 100, filters: {} };
 
-const STATUS_OPTIONS = [
-  { label: "Enabled", value: "true" },
-  { label: "Disabled", value: "false" },
-];
-
-const ACTION_OPTIONS = [
-  { label: "Audit", value: "AUDIT" },
-  { label: "Block", value: "BLOCK" },
-  { label: "Quarantine", value: "QUARANTINE" },
-  { label: "Redact", value: "REDACT" },
-];
-
-const RESTRICTION_OPTIONS = [
-  { label: "No restriction", value: "NONE" },
-  { label: "Block list", value: "BLOCK" },
-  { label: "Allow list", value: "ALLOW" },
-];
-
-const RESTRICTION_HINT: Record<RestrictionMode, string> = {
-  NONE: "Everything passes straight to the rule checks.",
-  BLOCK: "Anything on this list is blocked outright. Everything else goes through the rule checks.",
-  ALLOW: "Only what is on this list goes through the rule checks. Everything else is blocked.",
-};
-
 function toggle(ids: number[], id: number, checked: boolean) {
   return checked ? [...ids, id] : ids.filter((value) => value !== id);
 }
@@ -68,6 +45,35 @@ function PolicyForm({
   fileTypes: FileType[];
   onClose: () => void;
 }) {
+  const t = useTranslations("policies");
+  const status = useTranslations("status");
+  const common = useTranslations("common");
+
+  const STATUS_OPTIONS = [
+    { label: status("enabled"), value: "true" },
+    { label: status("disabled"), value: "false" },
+  ];
+
+  const ACTION_OPTIONS = [
+    { label: status("audit"), value: "AUDIT" },
+    { label: status("block"), value: "BLOCK" },
+    { label: status("quarantine"), value: "QUARANTINE" },
+    { label: status("redact"), value: "REDACT" },
+  ];
+
+  const RESTRICTION_OPTIONS = [
+    { label: t("dialog.restrictionNone"), value: "NONE" },
+    { label: t("dialog.restrictionBlock"), value: "BLOCK" },
+    { label: t("dialog.restrictionAllow"), value: "ALLOW" },
+  ];
+
+  const restrictionHint = (mode: RestrictionMode) =>
+    mode === "BLOCK"
+      ? t("dialog.hintBlock")
+      : mode === "ALLOW"
+        ? t("dialog.hintAllow")
+        : t("dialog.hintNone");
+
   const [createPolicy, { isLoading: creating }] = useCreatePolicyMutation();
   const [updatePolicy, { isLoading: updating }] = useUpdatePolicyMutation();
 
@@ -145,10 +151,10 @@ function PolicyForm({
     try {
       if (policyId === null) {
         await createPolicy(input).unwrap();
-        toast.success("Policy created");
+        toast.success(t("dialog.created"));
       } else {
         await updatePolicy({ id: policyId, ...input }).unwrap();
-        toast.success("Policy updated");
+        toast.success(t("dialog.updated"));
       }
 
       onClose();
@@ -158,8 +164,8 @@ function PolicyForm({
         apiErrorMessage(
           caught,
           code === "group_not_found" || code === "rule_not_found"
-            ? "One of the selected items is no longer available"
-            : "Could not save this policy"
+            ? t("dialog.staleSelection")
+            : t("dialog.saveFailed")
         )
       );
     }
@@ -167,21 +173,19 @@ function PolicyForm({
 
   return (
     <>
-      <DialogTitle>{policyId === null ? "Add policy" : "Edit policy"}</DialogTitle>
-      <DialogDescription>
-        An email policy applies its rules to the users in the groups you choose.
-      </DialogDescription>
+      <DialogTitle>{policyId === null ? t("dialog.addTitle") : t("dialog.editTitle")}</DialogTitle>
+      <DialogDescription>{t("dialog.description")}</DialogDescription>
 
       <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-5">
           <FormError message={error} />
 
           <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
-            <Field id="policy-name" label="Policy name">
+            <Field id="policy-name" label={t("dialog.name")}>
               <Input
                 id="policy-name"
                 required
                 autoFocus
-                placeholder="Outbound PII"
+                placeholder={t("dialog.namePlaceholder")}
                 value={name}
                 disabled={pending}
                 onChange={(event) => {
@@ -191,7 +195,7 @@ function PolicyForm({
               />
             </Field>
 
-            <Field id="policy-status" label="Status">
+            <Field id="policy-status" label={t("dialog.status")}>
               <Select
                 id="policy-status"
                 value={String(active)}
@@ -204,8 +208,8 @@ function PolicyForm({
 
           <Field
             id="policy-action"
-            label="Action"
-            hint="What happens to a message this policy matches."
+            label={t("dialog.action")}
+            hint={t("dialog.actionHint")}
           >
             <Select
               id="policy-action"
@@ -216,7 +220,7 @@ function PolicyForm({
             />
           </Field>
 
-          <Field id="policy-rules" label="Rules" hint="What this policy looks for.">
+          <Field id="policy-rules" label={t("dialog.rules")} hint={t("dialog.rulesHint")}>
             <CheckboxList
               options={rules.map((rule) => ({
                 id: rule.id,
@@ -225,8 +229,8 @@ function PolicyForm({
               }))}
               selected={ruleIDs}
               disabled={pending}
-              searchPlaceholder="Search rules"
-              emptyMessage="Create a rule first"
+              searchPlaceholder={t("dialog.searchRules")}
+              emptyMessage={t("dialog.noRules")}
               onToggle={(id, checked) => {
                 setRuleIDs((current) => toggle(current, id, checked));
                 setError("");
@@ -234,17 +238,17 @@ function PolicyForm({
             />
           </Field>
 
-          <Field id="policy-groups" label="Groups" hint="Whose mail this policy applies to.">
+          <Field id="policy-groups" label={t("dialog.groups")} hint={t("dialog.groupsHint")}>
             <CheckboxList
               options={groups.map((group) => ({
                 id: group.id,
                 label: group.name,
-                hint: `${group.member_count} members`,
+                hint: t("dialog.memberCount", { count: group.member_count }),
               }))}
               selected={groupIDs}
               disabled={pending}
-              searchPlaceholder="Search groups"
-              emptyMessage="Create a group first"
+              searchPlaceholder={t("dialog.searchGroups")}
+              emptyMessage={t("dialog.noGroups")}
               onToggle={(id, checked) => {
                 setGroupIDs((current) => toggle(current, id, checked));
                 setError("");
@@ -255,8 +259,8 @@ function PolicyForm({
           <div className="flex flex-col gap-3 border-t pt-5">
             <Field
               id="policy-domain-mode"
-              label="Recipient domain restriction"
-              hint={RESTRICTION_HINT[domainMode]}
+              label={t("dialog.domainRestriction")}
+              hint={restrictionHint(domainMode)}
             >
               <Select
                 id="policy-domain-mode"
@@ -278,9 +282,9 @@ function PolicyForm({
                   setError("");
                 }}
                 disabled={pending}
-                placeholder="partner.com"
-                addLabel="Add domain"
-                emptyMessage="No domains added yet"
+                placeholder={t("dialog.domainPlaceholder")}
+                addLabel={t("dialog.addDomain")}
+                emptyMessage={t("dialog.noDomains")}
               />
             )}
           </div>
@@ -288,8 +292,8 @@ function PolicyForm({
           <div className="flex flex-col gap-3 border-t pt-5">
             <Field
               id="policy-attachment-mode"
-              label="Attachment restriction"
-              hint={RESTRICTION_HINT[attachmentMode]}
+              label={t("dialog.attachmentRestriction")}
+              hint={restrictionHint(attachmentMode)}
             >
               <Select
                 id="policy-attachment-mode"
@@ -314,8 +318,8 @@ function PolicyForm({
                   .filter((fileType) => extensions.includes(fileType.extension))
                   .map((fileType) => fileType.id)}
                 disabled={pending}
-                searchPlaceholder="Search file types"
-                emptyMessage="No file types configured"
+                searchPlaceholder={t("dialog.searchFileTypes")}
+                emptyMessage={t("dialog.noFileTypes")}
                 onToggle={(id, checked) => {
                   const match = fileTypes.find((fileType) => fileType.id === id);
                   if (!match) return;
@@ -333,11 +337,11 @@ function PolicyForm({
 
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {common("cancel")}
             </Button>
             <Button type="submit" disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
-              {policyId === null ? "Create policy" : "Save changes"}
+              {policyId === null ? t("dialog.create") : t("dialog.saveChanges")}
             </Button>
           </div>
         </form>
@@ -347,6 +351,8 @@ function PolicyForm({
 }
 
 function PolicyLoader({ policyId, onClose }: { policyId: number | null; onClose: () => void }) {
+  const t = useTranslations("policies");
+
   const { data: policy, isLoading: loadingPolicy } = useGetPolicyQuery(policyId as number, {
     skip: policyId === null,
   });
@@ -357,12 +363,12 @@ function PolicyLoader({ policyId, onClose }: { policyId: number | null; onClose:
   if (loadingPolicy || loadingRules || loadingGroups || loadingFileTypes) {
     return (
       <>
-        <DialogTitle>{policyId === null ? "Add policy" : "Edit policy"}</DialogTitle>
-        <DialogDescription>Loading rules and groups...</DialogDescription>
+        <DialogTitle>{policyId === null ? t("dialog.addTitle") : t("dialog.editTitle")}</DialogTitle>
+        <DialogDescription>{t("dialog.loading")}</DialogDescription>
 
         <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          One moment
+          {t("dialog.oneMoment")}
         </div>
       </>
     );

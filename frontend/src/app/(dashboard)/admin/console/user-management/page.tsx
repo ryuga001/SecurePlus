@@ -1,6 +1,7 @@
 "use client";
 
 import { Download, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table/data-table";
@@ -8,73 +9,93 @@ import type { ColumnConfig, FilterConfig, RowAction, TableAction } from "@/compo
 import Consolepage from "@/components/dashboard/pageThemes/consolepage";
 import { useListUsersQuery, type User } from "@/store/api/users-api";
 
-const filters: FilterConfig[] = [
-  { key: "search", label: "Search", type: "text", placeholder: "Name or email", width: "w-64" },
-  {
-    key: "status",
-    label: "Status",
-    type: "select",
-    options: [
-      { label: "Active", value: "active" },
-      { label: "Invited", value: "invited" },
-      { label: "Disabled", value: "disabled" },
-    ],
-  },
-  {
-    key: "role",
-    label: "Role",
-    type: "select",
-    options: [
-      { label: "Administrator", value: "admin" },
-      { label: "Analyst", value: "analyst" },
-      { label: "Auditor", value: "auditor" },
-    ],
-  },
-  { key: "createdAt", label: "Created", type: "dateRange", width: "w-80" },
-  { key: "onlyMfa", label: "MFA", type: "checkbox", placeholder: "MFA enabled only" },
-];
-
-const columns: ColumnConfig<User>[] = [
-  {
-    key: "name",
-    label: "Name",
-    sortable: true,
-    accessor: (row) => `${row.first_name} ${row.last_name}`.trim(),
-  },
-  { key: "email", label: "Email", sortable: true },
-  { key: "role", label: "Role" },
-  { key: "status", label: "Status", type: "status" },
-  { key: "last_login_at", label: "Last login", type: "datetime", sortable: true },
-  { key: "created_at", label: "Created", type: "date", sortable: true, align: "right" },
-];
-
 export default function UserManagementPage() {
+  const t = useTranslations("console.users");
+  const status = useTranslations("status");
+  const common = useTranslations("common");
+
+  const filters: FilterConfig[] = [
+    {
+      key: "search",
+      label: common("search"),
+      type: "text",
+      placeholder: t("searchPlaceholder"),
+      width: "w-64",
+    },
+    {
+      key: "status",
+      label: t("columns.status"),
+      type: "select",
+      options: [
+        { label: status("active"), value: "active" },
+        { label: status("invited"), value: "invited" },
+        { label: status("disabled"), value: "disabled" },
+      ],
+    },
+    {
+      key: "role",
+      label: t("columns.role"),
+      type: "select",
+      options: [
+        { label: t("roles.admin"), value: "admin" },
+        { label: t("roles.analyst"), value: "analyst" },
+        { label: t("roles.auditor"), value: "auditor" },
+      ],
+    },
+    { key: "createdAt", label: t("createdFilter"), type: "dateRange", width: "w-80" },
+    { key: "onlyMfa", label: t("mfaFilter"), type: "checkbox", placeholder: t("mfaOnly") },
+  ];
+
+  const columns: ColumnConfig<User>[] = [
+    {
+      key: "name",
+      label: t("columns.name"),
+      sortable: true,
+      accessor: (row) => `${row.first_name} ${row.last_name}`.trim(),
+    },
+    { key: "email", label: t("columns.email"), sortable: true },
+    { key: "role", label: t("columns.role") },
+    { key: "status", label: t("columns.status"), type: "status" },
+    { key: "last_login_at", label: t("columns.lastLogin"), type: "datetime", sortable: true },
+    { key: "created_at", label: t("columns.created"), type: "date", sortable: true, align: "right" },
+  ];
+
   const actions: TableAction[] = [
     {
       key: "add",
-      label: "Add user",
+      label: t("add"),
       icon: Plus,
       variant: "default",
-      onClick: () => toast.info("Add user"),
+      onClick: () => toast.info(t("add")),
     },
-    { key: "export", label: "Export", icon: Download, onClick: () => toast.info("Export started") },
-    { key: "refresh", label: "Refresh", icon: RefreshCw, onClick: () => toast.success("Refreshed") },
+    {
+      key: "export",
+      label: common("export"),
+      icon: Download,
+      onClick: () => toast.info(t("exportStarted")),
+    },
+    {
+      key: "refresh",
+      label: common("refresh"),
+      icon: RefreshCw,
+      onClick: () => toast.success(common("refreshed")),
+    },
   ];
 
   const rowActions: RowAction<User>[] = [
     {
       key: "delete",
-      label: "Delete",
+      label: common("delete"),
       icon: Trash2,
       variant: "destructive",
-      onClick: (row) => toast.warning(`Delete ${row.email}`),
+      onClick: (row) => toast.warning(t("deletePrompt", { email: row.email })),
     },
   ];
 
   return (
     <Consolepage
-      heading="User Management"
-      subheading="People with access to this console."
+      heading={t("heading")}
+      subheading={t("subheading")}
       data={
         <DataTable
           query={useListUsersQuery}
@@ -83,7 +104,7 @@ export default function UserManagementPage() {
           actions={actions}
           rowActions={rowActions}
           getRowId={(row) => row.id}
-          emptyMessage="No users match these filters"
+          emptyMessage={t("empty")}
         />
       }
     />

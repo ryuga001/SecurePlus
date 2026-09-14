@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -21,40 +22,49 @@ import {
   type EmailGroup,
 } from "@/store/api/email-groups-api";
 
-const filters: FilterConfig[] = [
-  { key: "search", label: "Search", type: "text", placeholder: "Group name", width: "w-72" },
-];
-
-const columns: ColumnConfig<EmailGroup>[] = [
-  { key: "name", label: "Group Name" },
-  { key: "member_count", label: "Members", type: "number", align: "right" },
-  { key: "created_at", label: "Created At", type: "date" },
-  { key: "updated_at", label: "Updated At", type: "date" },
-];
-
 export default function EmailGroupsPage() {
+  const t = useTranslations("groups");
+  const common = useTranslations("common");
+
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<EmailGroup | null>(null);
   const [deleting, setDeleting] = React.useState<EmailGroup | null>(null);
 
   const [deleteGroup, { isLoading: deletePending }] = useDeleteEmailGroupMutation();
 
+  const filters: FilterConfig[] = [
+    {
+      key: "search",
+      label: common("search"),
+      type: "text",
+      placeholder: t("searchPlaceholder"),
+      width: "w-72",
+    },
+  ];
+
+  const columns: ColumnConfig<EmailGroup>[] = [
+    { key: "name", label: t("columns.name") },
+    { key: "member_count", label: t("columns.members"), type: "number", align: "right" },
+    { key: "created_at", label: t("columns.createdAt"), type: "date" },
+    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
+  ];
+
   async function confirmDelete() {
     if (!deleting) return;
 
     try {
       await deleteGroup(deleting.id).unwrap();
-      toast.success(`${deleting.name} deleted`);
+      toast.success(t("deleted", { name: deleting.name }));
       setDeleting(null);
     } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not delete this group"));
+      toast.error(apiErrorMessage(error, t("deleteFailed")));
     }
   }
 
   const actions: TableAction[] = [
     {
       key: "add",
-      label: "Add Group",
+      label: t("add"),
       icon: Plus,
       variant: "default",
       onClick: () => {
@@ -67,7 +77,7 @@ export default function EmailGroupsPage() {
   const rowActions: RowAction<EmailGroup>[] = [
     {
       key: "edit",
-      label: "Edit",
+      label: common("edit"),
       icon: Pencil,
       variant: "ghost",
       onClick: (row) => {
@@ -77,7 +87,7 @@ export default function EmailGroupsPage() {
     },
     {
       key: "delete",
-      label: "Delete",
+      label: common("delete"),
       icon: Trash2,
       variant: "destructive",
       onClick: (row) => setDeleting(row),
@@ -86,8 +96,8 @@ export default function EmailGroupsPage() {
 
   return (
     <Consolepage
-      heading="Email groups"
-      subheading="Collections of users that policies target together."
+      heading={t("heading")}
+      subheading={t("subheading")}
       data={
         <>
           <DataTable
@@ -97,7 +107,7 @@ export default function EmailGroupsPage() {
             actions={actions}
             rowActions={rowActions}
             getRowId={(row) => row.id}
-            emptyMessage="No groups yet"
+            emptyMessage={t("empty")}
           />
 
           <GroupDialog
@@ -112,13 +122,16 @@ export default function EmailGroupsPage() {
             onOpenChange={(open) => {
               if (!open) setDeleting(null);
             }}
-            title="Delete group"
+            title={t("deleteTitle")}
             description={
               deleting
-                ? `${deleting.name} will be detached from every policy that targets it, and its ${deleting.member_count} memberships will be removed. This cannot be undone.`
+                ? t("deleteDescription", {
+                    name: deleting.name,
+                    count: deleting.member_count,
+                  })
                 : undefined
             }
-            confirmLabel="Delete"
+            confirmLabel={common("delete")}
             destructive
             pending={deletePending}
             onConfirm={confirmDelete}

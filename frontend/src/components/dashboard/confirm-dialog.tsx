@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,8 +16,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   destructive,
   pending,
   onConfirm,
@@ -31,6 +32,8 @@ export function ConfirmDialog({
   pending?: boolean;
   onConfirm: () => void;
 }) {
+  const t = useTranslations("common");
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -39,7 +42,7 @@ export function ConfirmDialog({
 
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {cancelLabel}
+            {cancelLabel ?? t("cancel")}
           </Button>
 
           <Button
@@ -49,7 +52,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
           >
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {confirmLabel}
+            {confirmLabel ?? t("confirm")}
           </Button>
         </div>
       </DialogContent>

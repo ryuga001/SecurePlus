@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -30,6 +31,7 @@ function findTabParent(pathname: string, map: RouteMap): RouteNode | undefined {
 
 const PageTabs = () => {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const parent = findTabParent(pathname, routes as RouteMap);
   const tabs = Object.entries(parent?.children ?? {}).filter(
     ([, child]) => child.routePath && !child.hidden
@@ -56,7 +58,7 @@ const PageTabs = () => {
             )}
           >
             {Icon ? <Icon className="size-4" /> : null}
-            {tab.label}
+            {t(tab.labelKey)}
           </Link>
         );
       })}

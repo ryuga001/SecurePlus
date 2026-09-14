@@ -17,12 +17,10 @@ import {
 } from "lucide-react";
 
 export type RouteNode = {
-    label: string;
+    labelKey: string;
     routePath?: string;
     icon?: LucideIcon;
     privileges: readonly string[];
-    heading?: string;
-    subheading?: string;
     hidden?: boolean;
     children?: Record<string, RouteNode>;
 };
@@ -31,103 +29,83 @@ export type RouteMap = Record<string, RouteNode>;
 
 export const routes = {
     dashboard: {
-        label: "Dashboard",
+        labelKey: "dashboard",
         routePath: "/dashboard",
         icon: LayoutDashboard,
         privileges: [],
-        heading: "Security overview",
-        subheading: "Live posture, recent incidents and outstanding actions.",
     },
 
     emailProtection: {
-        label: "Email Protection",
+        labelKey: "emailProtection",
         icon: Mail,
         privileges: [],
         children: {
             configurations: {
-                label: "Configurations",
+                labelKey: "configurations",
                 routePath: "/admin/email/configurations",
                 icon: SlidersHorizontal,
                 privileges: [],
-                heading: "Email configurations",
-                subheading: "Connected mailboxes, gateways and delivery settings.",
             },
             policies: {
-                label: "Policies",
+                labelKey: "policies",
                 routePath: "/admin/policies",
                 icon: ShieldCheck,
                 privileges: [],
-                heading: "Email policies",
-                subheading: "Which rules apply to which groups of users.",
             },
             rules: {
-                label: "Rules",
+                labelKey: "rules",
                 routePath: "/admin/rules",
                 icon: Regex,
                 privileges: [],
-                heading: "Rules",
-                subheading: "Keyword and regular-expression matchers that policies apply to mail.",
             },
             users: {
-                label: "Users",
+                labelKey: "users",
                 routePath: "/admin/email/users",
                 icon: Users,
                 privileges: [],
-                heading: "Email users",
-                subheading: "The mailboxes this workspace protects.",
             },
             groups: {
-                label: "Groups",
+                labelKey: "groups",
                 routePath: "/admin/email/groups",
                 icon: UsersRound,
                 privileges: [],
-                heading: "Email groups",
-                subheading: "Collections of users that policies target together.",
             },
             audits: {
-                label: "Audits",
+                labelKey: "audits",
                 routePath: "/admin/email/audits",
                 icon: FileText,
                 privileges: ["admin.email.audit.view"],
-                heading: "Email audits",
-                subheading: "Every message this workspace accepted, and what happened to it.",
                 children: {
                     incidents: {
-                        label: "Incidents",
+                        labelKey: "incidents",
                         routePath: "/admin/email/audits/incidents",
                         icon: ShieldAlert,
                         privileges: ["admin.email.incident.view"],
-                        heading: "Email audits",
-                        subheading: "Policy violations raised against outbound mail.",
                     },
                     delivery: {
-                        label: "Delivery Audit",
+                        labelKey: "delivery",
                         routePath: "/admin/email/audits/delivery",
                         icon: Send,
                         privileges: ["admin.email.audit.view"],
-                        heading: "Email audits",
-                        subheading: "Every message this workspace accepted, and what happened to it.",
                     },
                 },
             }
         },
     },
     admin_console: {
-        label: "Admin Console",
+        labelKey: "adminConsole",
         routePath: "/admin/console",
         icon: ScrollText,
         privileges: [],
-        heading: "Admin console",
-        subheading: "Manage and configure your organisation.",
         children: {
             user_roles: {
-                label: "User Roles",
+                labelKey: "userRoles",
                 routePath: "/admin/console/user-roles",
                 icon: Users,
                 privileges: [],
             },
             user_management: {
-                label: "User Management",
+                labelKey: "userManagement",
                 routePath: "/admin/console/user-management",
                 icon: Users,
                 privileges: [],
@@ -135,21 +113,19 @@ export const routes = {
         }
     },
     settings: {
-        label: "Settings",
+        labelKey: "settings",
         routePath: "/admin/settings",
         icon: Settings,
         privileges: [],
-        heading: "Organisation settings",
-        subheading: "Profile, security defaults and retention windows.",
         children: {
             profile: {
-                label: "Profile",
+                labelKey: "profile",
                 routePath: "/admin/settings/profile",
                 icon: UserRound,
                 privileges: [],
             },
             branding: {
-                label: "Branding",
+                labelKey: "branding",
                 routePath: "/admin/settings/branding",
                 icon: Palette,
                 privileges: ["admin.branding.edit"],

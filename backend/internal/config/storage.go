@@ -4,30 +4,38 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 type Storage struct {
-	Endpoint  string
-	Region    string
-	AccessKey string
-	SecretKey string
-	Bucket    string
-	UseSSL    bool
+	Endpoint       string
+	Region         string
+	AccessKey      string
+	SecretKey      string
+	Bucket         string
+	UseSSL         bool
+	LogoPresignTTL time.Duration
 }
 
 func loadStorage() Storage {
 	useSSL, _ := strconv.ParseBool(os.Getenv("S3_USE_SSL"))
 
+	presignTTL, _ := time.ParseDuration(os.Getenv("S3_LOGO_PRESIGN_TTL"))
+	if presignTTL <= IdentityTTL {
+		presignTTL = 24 * time.Hour
+	}
+
 	return Storage{
-		Endpoint:  os.Getenv("S3_ENDPOINT"),
-		Region:    os.Getenv("S3_REGION"),
-		AccessKey: os.Getenv("S3_ACCESS_KEY"),
-		SecretKey: os.Getenv("S3_SECRET_KEY"),
-		Bucket:    os.Getenv("S3_BUCKET"),
-		UseSSL:    useSSL,
+		Endpoint:       os.Getenv("S3_ENDPOINT"),
+		Region:         os.Getenv("S3_REGION"),
+		AccessKey:      os.Getenv("S3_ACCESS_KEY"),
+		SecretKey:      os.Getenv("S3_SECRET_KEY"),
+		Bucket:         os.Getenv("S3_BUCKET"),
+		UseSSL:         useSSL,
+		LogoPresignTTL: presignTTL,
 	}
 }
 

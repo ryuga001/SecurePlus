@@ -18,4 +18,5 @@ var (
 	ErrUnavailable        = errors.New("dependency unavailable")
 	ErrEmailSendFailed    = errors.New("email send failed")
 	ErrTemplateMissing    = errors.New("email template missing")
+	ErrIdentityNotCached  = errors.New("identity not cached")
 )

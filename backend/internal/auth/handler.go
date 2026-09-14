@@ -176,13 +176,16 @@ func (h *Handler) login(c *gin.Context) {
 		return
 	}
 
-	user, pair, err := h.svc.Login(c.Request.Context(), req.Email, req.Password)
+	snapshot, pair, err := h.svc.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		respond(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, ToIdentity(user, h.applyPair(c, pair)))
+	c.JSON(http.StatusOK, Identity{
+		IdentitySnapshot: snapshot,
+		CSRFToken:        h.applyPair(c, pair),
+	})
 }
 
 func (h *Handler) startRegistration(c *gin.Context) {
@@ -230,13 +233,16 @@ func (h *Handler) completeRegistration(c *gin.Context) {
 		return
 	}
 
-	user, pair, err := h.svc.CompleteRegistration(c.Request.Context(), req)
+	snapshot, pair, err := h.svc.CompleteRegistration(c.Request.Context(), req)
 	if err != nil {
 		respond(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, ToIdentity(user, h.applyPair(c, pair)))
+	c.JSON(http.StatusCreated, Identity{
+		IdentitySnapshot: snapshot,
+		CSRFToken:        h.applyPair(c, pair),
+	})
 }
 
 func (h *Handler) resendCode(c *gin.Context) {
@@ -299,14 +305,17 @@ func (h *Handler) refresh(c *gin.Context) {
 		return
 	}
 
-	user, pair, err := h.svc.Refresh(c.Request.Context(), raw)
+	snapshot, pair, err := h.svc.Refresh(c.Request.Context(), raw)
 	if err != nil {
 		h.clearCookies(c)
 		respond(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, ToIdentity(user, h.applyPair(c, pair)))
+	c.JSON(http.StatusOK, Identity{
+		IdentitySnapshot: snapshot,
+		CSRFToken:        h.applyPair(c, pair),
+	})
 }
 
 func (h *Handler) logout(c *gin.Context) {
@@ -339,13 +348,16 @@ func (h *Handler) me(c *gin.Context) {
 		return
 	}
 
-	user, err := h.svc.Identity(c.Request.Context(), UserID(claims))
+	snapshot, err := h.svc.Identity(c.Request.Context(), UserID(claims))
 	if err != nil {
 		respond(c, ErrInvalidToken)
 		return
 	}
 
-	c.JSON(http.StatusOK, ToIdentity(user, CSRFToken(h.cfg.CSRFSecret, claims.ID)))
+	c.JSON(http.StatusOK, Identity{
+		IdentitySnapshot: snapshot,
+		CSRFToken:        CSRFToken(h.cfg.CSRFSecret, claims.ID),
+	})
 }
 
 func badRequest(c *gin.Context) {

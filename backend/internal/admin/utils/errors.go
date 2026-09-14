@@ -48,6 +48,12 @@ var (
 	ErrMappingExists    = errors.New(MsgMappingExists)
 	ErrMappingNotFound  = errors.New(MsgMappingNotFound)
 	ErrTooManyItems     = errors.New(MsgTooManyItems)
+
+	ErrBrandingNotFound = errors.New(MsgBrandingNotFound)
+	ErrInvalidTheme     = errors.New(MsgInvalidTheme)
+	ErrInvalidLanguage  = errors.New(MsgInvalidLanguage)
+	ErrInvalidTimezone  = errors.New(MsgInvalidTimezone)
+	ErrInvalidLogo      = errors.New(MsgInvalidLogo)
 )
 
 func Taken(sentinel error, value string) error {

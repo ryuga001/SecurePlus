@@ -1,5 +1,16 @@
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
+export type Theme = "LIGHT" | "DARK";
+
+export type Language = "ENGLISH" | "JAPANESE" | "SPANISH";
+
+export type Branding = {
+  logo_url: string | null;
+  theme: Theme;
+  language: Language;
+  timezone: string;
+};
+
 export type Identity = {
   user: {
     id: number;
@@ -9,6 +20,7 @@ export type Identity = {
     role?: string;
   };
   customer: { id: number; org_name: string };
+  branding?: Branding;
   csrf_token: string;
 };
 

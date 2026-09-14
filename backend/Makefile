@@ -2,7 +2,7 @@
 export
 
 MIGRATE := go run -tags 'postgres file' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.1
-COMPOSE := docker compose --env-file .env.docker
+COMPOSE := docker compose
 
 .PHONY: run build up down logs migrate-up migrate-down migrate-force migrate-create test test-unit test-integration test-db
 

@@ -15,16 +15,19 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
+	brandinghandler "dpdp-backend/internal/admin/handler/branding"
 	providerhandler "dpdp-backend/internal/admin/handler/emailprovider"
 	userhandler "dpdp-backend/internal/admin/handler/emailuser"
 	grouphandler "dpdp-backend/internal/admin/handler/group"
 	policyhandler "dpdp-backend/internal/admin/handler/policy"
 	rulehandler "dpdp-backend/internal/admin/handler/rule"
+	brandingrepo "dpdp-backend/internal/admin/repositories/branding"
 	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
 	userrepo "dpdp-backend/internal/admin/repositories/emailuser"
 	grouprepo "dpdp-backend/internal/admin/repositories/group"
 	policyrepo "dpdp-backend/internal/admin/repositories/policy"
 	rulerepo "dpdp-backend/internal/admin/repositories/rule"
+	brandingsvc "dpdp-backend/internal/admin/services/branding"
 	providersvc "dpdp-backend/internal/admin/services/emailprovider"
 	usersvc "dpdp-backend/internal/admin/services/emailuser"
 	groupsvc "dpdp-backend/internal/admin/services/group"
@@ -57,6 +60,7 @@ import (
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"dpdp-backend/internal/middleware"
 	"dpdp-backend/internal/notification"
+	"dpdp-backend/internal/storage"
 )
 
 func main() {
@@ -102,9 +106,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	minioClient, err := cfg.Storage.Connect(startupCtx)
+	if err != nil {
+		slog.Error("object storage connection failed", "error", err)
+		os.Exit(1)
+	}
+
+	objectStore := storage.New(minioClient, cfg.Storage.Bucket)
+
 	notifier := notification.NewService(database, cfg.SMTP)
 	store := auth.NewStore(rdb)
-	service := auth.NewService(database, store, notifier, cfg.Auth, cfg.App)
+
+	brandingService := brandingsvc.NewBrandingService(
+		brandingrepo.NewBrandingRepository(database),
+		objectStore,
+		store,
+		cfg.Storage.LogoPresignTTL,
+	)
+	brandingHandler := brandinghandler.NewBrandingHandler(brandingService)
+
+	service := auth.NewService(database, store, notifier, brandingService, cfg.Auth, cfg.App)
 	authHandler := auth.NewHandler(service, cfg.Auth)
 
 	providerRepository := providerrepo.NewEmailProviderRepository(database)
@@ -224,6 +245,7 @@ func main() {
 	ruleHandler.RegisterRoutes(protected, guard)
 	emailUserHandler.RegisterRoutes(protected, guard)
 	groupHandler.RegisterRoutes(protected, guard)
+	brandingHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
 	incidentHandler.RegisterRoutes(protected, guard)
 

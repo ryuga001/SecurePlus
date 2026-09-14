@@ -31,6 +31,8 @@ Relay   ──┘                email_incidents  one per flagged message
 
 An admin configures sending domains, DKIM keys, email users, groups, rules and policies through the dashboard. Policies bind rules and groups together and carry one action: `BLOCK`, `QUARANTINE`, `REDACT` or `AUDIT`.
 
+Each customer also has its own dashboard branding — logo, light/dark theme, language and timezone. See [Custom branding](#custom-branding).
+
 ## Repository layout
 
 ```
@@ -38,18 +40,20 @@ frontend/           Next.js 16 App Router, RTK Query, Tailwind v4, base-ui
 backend/
   cmd/api/          one binary: HTTP API + SMTP receiver
   internal/
-    auth/           registration, login, JWT cookies, CSRF
+    auth/           registration, login, JWT cookies, CSRF, identity cache
     middleware/     origin, auth, CSRF, privilege guards
-    admin/          configurations, policies, rules, email users, groups
+    admin/          configurations, policies, rules, email users, groups, branding
     delivery/       receiver → engine → relay  (the mail path)
       engine/       policy evaluation, matchers, action triggers
     audit/          delivery audits and email incidents (MongoDB)
     notification/   transactional email from templates
+    storage/        S3/MinIO object storage (customer logos)
     config/         environment loading
     db/             GORM models and shared scopes
   migrations/       golang-migrate SQL
   tests/            mirrors internal/, integration tests behind a build tag
   scripts/          send_test_mail.py
+  docker-compose.yml  Postgres, Redis, MongoDB, MinIO, Mailpit
 ```
 
 `admin`, `delivery` and `audit` are peer modules, each with its own `handler / services / repositories / dto / utils` layering. `audit` defines its own vocabulary and is not imported by `delivery` except through a recorder interface, so it could be extracted as a service later.
@@ -62,13 +66,23 @@ cp ../.env.example .env
 make up
 ```
 
-Brings up Postgres, Redis, MongoDB, Mailpit and MinIO, runs migrations, then the backend. Mailpit's UI is on <http://localhost:8025>.
+Brings up Postgres, Redis, MongoDB, Mailpit and MinIO from `backend/docker-compose.yml`, under compose project `dpdp`. Mailpit's UI is on <http://localhost:8025>, MinIO's console on <http://localhost:9001>.
 
-To run the backend from source against those containers:
+Postgres runs the `pgvector` image — migration `000001` creates the `vector`, `pgcrypto` and `citext` extensions, so a stock `postgres` image will not migrate.
+
+That brings up infrastructure only. To run the backend itself from source against those containers:
 
 ```bash
 make run
 ```
+
+To run the backend in Docker too, including a one-shot migration step:
+
+```bash
+docker compose --profile app up -d --build
+```
+
+The `app` profile expects in-cluster hostnames (`postgres`, `redis`, `mongo`, `minio`, `mailpit`) rather than the `localhost` values in `.env`; the compose file supplies those as overrides on top of `.env`, so one env file serves both ways of running.
 
 Frontend:
 
@@ -97,6 +111,51 @@ Set `RELAY_MX_OVERRIDE=localhost:1025` first so the relay delivers into Mailpit 
 
 Results land in the dashboard under **Email Protection → Audits**, split into Delivery Audit and Incidents.
 
+## Custom branding
+
+Branding is customer-level and admin-only. Every customer has exactly one `customer_branding` row:
+
+| Column | Values | Default |
+|---|---|---|
+| `logo_key` | S3 object key, never a URL | `NULL` |
+| `theme` | `LIGHT`, `DARK` | `LIGHT` |
+| `language` | `ENGLISH`, `JAPANESE`, `SPANISH` | `ENGLISH` |
+| `timezone` | IANA identifier, validated with `time.LoadLocation` | `UTC` |
+
+That row is created in the same transaction as the customer, and migration `000004` backfills every pre-existing customer — so the row is an invariant, not something the code repairs at runtime.
+
+**Reads go through `GET /api/v1/me`**, which every authenticated user may call. There is no branding GET; adding one would mean a second request at dashboard init and a second source of truth. The three write endpoints all require the `admin.branding.edit` privilege and all return `204`:
+
+```
+PATCH  /api/v1/admin/branding         theme · language · timezone, each optional
+POST   /api/v1/admin/branding/logo    multipart/form-data, logo=<file>
+DELETE /api/v1/admin/branding/logo
+```
+
+The customer id is never accepted from the request — it comes from the authenticated actor, so an admin cannot reach another customer's branding.
+
+### Identity cache
+
+The `/me` payload is cached in Redis under `auth:identity:<user_id>` for **1 hour**, with `auth:identity:customer:<customer_id>` indexing every cached user of a customer. Branding rides inside that payload, so a branding write invalidates the whole customer's index — not just the acting admin, who would otherwise be the only user to see the change.
+
+The CSRF token is deliberately outside the cache: it is an HMAC of the access-token id and differs per session.
+
+Cache failures degrade rather than fail. A Redis read error falls through to Postgres; an invalidation failure after a committed write logs a warning and still returns success, because the write did happen. The cost is that warm caches serve stale branding until the TTL expires.
+
+### Logos
+
+Stored in S3/MinIO at a backend-controlled key — the frontend can never choose the path:
+
+```
+customers/{customer_id}/branding/logo/logo.{png|jpg|webp}
+```
+
+Uploads must be 1 MB or less and PNG, JPEG or WebP. The type is decided by sniffing the first 512 bytes and then decoding the image, never by the filename or the client's `Content-Type`. The route is additionally wrapped in `http.MaxBytesReader`, since `MaxMultipartMemory` caps buffering rather than request size.
+
+The database stores `logo_key`; the presigned GET URL is minted when the branding snapshot is built and cached for an hour with it. Nothing that expires is ever persisted — the invariant is `S3_LOGO_PRESIGN_TTL > IdentityTTL`, so a served URL always outlives the cache entry carrying it.
+
+Replacement order is upload → update `logo_key` → commit → invalidate cache → delete the old object. A failure at any step leaves the old logo working; the worst case is an orphaned object.
+
 ## Migrations
 
 ```bash
@@ -110,7 +169,7 @@ make migrate-create name=add_something
 ```bash
 make test-unit            # no infrastructure required
 make test-db              # creates and migrates the test database
-make test-integration     # needs Postgres, Redis, MongoDB, Mailpit
+make test-integration     # needs Postgres, Redis, MongoDB, Mailpit, MinIO
 make test                 # both
 ```
 
@@ -122,9 +181,23 @@ TEST_REDIS_URL         redis://localhost:6379/1   non-zero database, it is flush
 TEST_MONGO_URI         mongodb://localhost:27017
 TEST_MONGO_DATABASE    secureplus_test
 TEST_MAILPIT_ADDR      localhost:1025
+TEST_S3_ENDPOINT       localhost:9000            optional, logo tests skip without it
+TEST_S3_ACCESS_KEY     minioadmin
+TEST_S3_SECRET_KEY     minioadmin
+TEST_S3_BUCKET         dpdp-test                 must differ from S3_BUCKET
+TEST_S3_USE_SSL        false
 ```
 
 `TEST_REDIS_URL` must select a different logical database than `REDIS_URL`; the suite refuses to run otherwise, because it flushes what it connects to.
+
+`TEST_S3_*` is the only optional group. Unset or unreachable object storage skips the logo round-trip tests and leaves the rest running — the bucket is created on connect, so it need not exist beforehand.
+
+Note that `make` loads `.env` itself; a bare `go test` does not. To run a subset directly:
+
+```bash
+set -a && . ./.env && set +a
+go test -tags integration -p 1 -count=1 ./tests/admin/handler/ -run TestBranding -v
+```
 
 ## Configuration
 
@@ -137,11 +210,14 @@ Everything is environment-driven. The ones without defaults:
 | `MONGO_URI`, `MONGO_DATABASE` | the process exits if Mongo is unreachable |
 | `PASSWORD_PEPPER`, `CSRF_SECRET` | mixed into every password hash and CSRF token |
 | `CORS_ALLOWED_ORIGIN` | exact origin, no trailing slash; credentials forbid wildcards |
+| `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` | object storage for customer logos; the process exits if it is unreachable |
 
 Notable defaults:
 
 | Variable | Default | Notes |
 |---|---|---|
+| `S3_USE_SSL` | `false` | **must be `false` for local MinIO**, which serves plain HTTP — otherwise startup fails with `server gave HTTP response to HTTPS client`. `S3_ENDPOINT` is a bare `host:port`, no scheme |
+| `S3_LOGO_PRESIGN_TTL` | `24h` | must exceed the 1 h identity cache TTL, or a cached logo URL can outlive its signature; values below that are ignored |
 | `APP_PORT` | — | no default; an unset value binds a random port |
 | `APP_ENV` | — | anything but `production` logs every SQL statement |
 | `COOKIE_SECURE` / `COOKIE_SAMESITE` | `false` / `lax` | cross-site deployments need `true` / `none` |

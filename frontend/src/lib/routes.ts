@@ -2,6 +2,7 @@ import {
     FileText,
     LayoutDashboard,
     Mail,
+    Palette,
     Regex,
     ScrollText,
     Send,
@@ -9,6 +10,7 @@ import {
     ShieldAlert,
     ShieldCheck,
     SlidersHorizontal,
+    UserRound,
     Users,
     UsersRound,
     type LucideIcon,
@@ -139,5 +141,19 @@ export const routes = {
         privileges: [],
         heading: "Organisation settings",
         subheading: "Profile, security defaults and retention windows.",
+        children: {
+            profile: {
+                label: "Profile",
+                routePath: "/admin/settings/profile",
+                icon: UserRound,
+                privileges: [],
+            },
+            branding: {
+                label: "Branding",
+                routePath: "/admin/settings/branding",
+                icon: Palette,
+                privileges: ["admin.branding.edit"],
+            },
+        }
     },
 } as const satisfies RouteMap;

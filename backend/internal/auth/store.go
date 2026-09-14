@@ -59,6 +59,11 @@ func rotationKey(id string) string       { return "auth:rot:" + id }
 func versionKey(userID int) string       { return "auth:ver:" + strconv.Itoa(userID) }
 func privilegeKey(roleID int) string     { return "priv:role:" + strconv.Itoa(roleID) }
 func regTokenKey(hash string) string     { return "auth:regtok:" + hash }
+func identityKey(userID int) string      { return "auth:identity:" + strconv.Itoa(userID) }
+
+func customerIdentityKey(customerID int) string {
+	return "auth:identity:customer:" + strconv.Itoa(customerID)
+}
 
 func (s *Store) PutSignup(ctx context.Context, email string, pending PendingSignup, ttl time.Duration) error {
 	payload, err := json.Marshal(pending)
@@ -240,4 +245,71 @@ func (s *Store) CachePrivileges(ctx context.Context, roleID int, names []string,
 	_, err := pipe.Exec(ctx)
 
 	return err
+}
+
+func (s *Store) Identity(ctx context.Context, userID int) (IdentitySnapshot, error) {
+	raw, err := s.rdb.Get(ctx, identityKey(userID)).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return IdentitySnapshot{}, ErrIdentityNotCached
+	}
+	if err != nil {
+		return IdentitySnapshot{}, err
+	}
+
+	var snapshot IdentitySnapshot
+	if err := json.Unmarshal(raw, &snapshot); err != nil {
+		return IdentitySnapshot{}, err
+	}
+
+	return snapshot, nil
+}
+
+func (s *Store) CacheIdentity(ctx context.Context, userID int, snapshot IdentitySnapshot, ttl time.Duration) error {
+	payload, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+
+	customerID := snapshot.Customer.ID
+	if customerID == 0 {
+		return s.rdb.Set(ctx, identityKey(userID), payload, ttl).Err()
+	}
+
+	index := customerIdentityKey(customerID)
+
+	pipe := s.rdb.TxPipeline()
+	pipe.Set(ctx, identityKey(userID), payload, ttl)
+	pipe.SAdd(ctx, index, userID)
+	pipe.Expire(ctx, index, ttl)
+	_, err = pipe.Exec(ctx)
+
+	return err
+}
+
+func (s *Store) DropIdentity(ctx context.Context, userID int) error {
+	return s.rdb.Del(ctx, identityKey(userID)).Err()
+}
+
+func (s *Store) DropCustomerIdentities(ctx context.Context, customerID int) error {
+	index := customerIdentityKey(customerID)
+
+	members, err := s.rdb.SMembers(ctx, index).Result()
+	if err != nil {
+		return err
+	}
+
+	keys := make([]string, 0, len(members)+1)
+
+	for _, member := range members {
+		userID, err := strconv.Atoi(member)
+		if err != nil {
+			continue
+		}
+
+		keys = append(keys, identityKey(userID))
+	}
+
+	keys = append(keys, index)
+
+	return s.rdb.Del(ctx, keys...).Err()
 }

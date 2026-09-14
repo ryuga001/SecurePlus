@@ -278,6 +278,33 @@ func (h harness) audit(t *testing.T, wantStatus string) bson.M {
 	return nil
 }
 
+func asDocument(value any) (bson.M, bool) {
+	switch typed := value.(type) {
+	case bson.M:
+		return typed, true
+	case bson.D:
+		fields := make(bson.M, len(typed))
+		for _, element := range typed {
+			fields[element.Key] = element.Value
+		}
+
+		return fields, true
+	}
+
+	return nil, false
+}
+
+func document(t *testing.T, value any, label string) bson.M {
+	t.Helper()
+
+	fields, ok := asDocument(value)
+	if !ok {
+		t.Fatalf("%s is not a document: %#v", label, value)
+	}
+
+	return fields
+}
+
 func (h harness) auditCount(t *testing.T) int64 {
 	t.Helper()
 
@@ -321,7 +348,7 @@ func TestIntegrationDeliversAndRecordsSuccess(t *testing.T) {
 		t.Fatalf("message id = %v", record["message_id"])
 	}
 
-	dkim, ok := record["dkim"].(bson.M)
+	dkim, ok := asDocument(record["dkim"])
 	if !ok || dkim["selector"] != deliveryutils.DefaultDKIMSelector || dkim["signed"] != true {
 		t.Fatalf("dkim = %v", record["dkim"])
 	}
@@ -331,7 +358,7 @@ func TestIntegrationDeliversAndRecordsSuccess(t *testing.T) {
 		t.Fatalf("recipients = %v", record["recipients"])
 	}
 
-	first := recipients[0].(bson.M)
+	first := document(t, recipients[0], "recipient")
 	if first["status"] != deliveryutils.StatusSuccess || first["smtp_code"].(int32) != 250 {
 		t.Fatalf("recipient = %v", first)
 	}
@@ -368,7 +395,7 @@ func TestIntegrationDKIMFailurePreventsRelay(t *testing.T) {
 
 	record := h.audit(t, deliveryutils.StatusFailed)
 
-	failure, ok := record["failure"].(bson.M)
+	failure, ok := asDocument(record["failure"])
 	if !ok {
 		t.Fatalf("failure = %v", record["failure"])
 	}
@@ -396,7 +423,7 @@ func TestIntegrationRelayFailureRecordsAttempts(t *testing.T) {
 
 	record := h.audit(t, deliveryutils.StatusFailed)
 
-	failure, ok := record["failure"].(bson.M)
+	failure, ok := asDocument(record["failure"])
 	if !ok || failure["type"] != deliveryutils.FailureRelay {
 		t.Fatalf("failure = %v", record["failure"])
 	}
@@ -503,7 +530,7 @@ func TestIntegrationWithholdsOnlyTheRestrictedRecipient(t *testing.T) {
 
 	statuses := map[string]string{}
 	for _, entry := range recipients {
-		row := entry.(bson.M)
+		row := document(t, entry, "recipient")
 		statuses[row["email"].(string)] = row["status"].(string)
 	}
 
@@ -524,7 +551,7 @@ func TestIntegrationWithholdsOnlyTheRestrictedRecipient(t *testing.T) {
 	if !ok || len(withheld) != 1 {
 		t.Fatalf("withheld = %v, want exactly one", incident["withheld_recipients"])
 	}
-	if withheld[0].(bson.M)["email"] != blocked {
+	if document(t, withheld[0], "withheld recipient")["email"] != blocked {
 		t.Fatalf("withheld = %v", withheld[0])
 	}
 
@@ -550,7 +577,7 @@ func TestIntegrationAllRecipientsRestrictedStopsDelivery(t *testing.T) {
 
 	record := h.audit(t, deliveryutils.StatusFailed)
 
-	failure, ok := record["failure"].(bson.M)
+	failure, ok := asDocument(record["failure"])
 	if !ok || failure["type"] != auditutils.FailureRule {
 		t.Fatalf("failure = %v, want RULE", record["failure"])
 	}
@@ -599,7 +626,7 @@ func TestIntegrationKeywordMatchRecordsIncidentAndStillDelivers(t *testing.T) {
 		t.Fatalf("matches = %v", incident["matches"])
 	}
 
-	match := matches[0].(bson.M)
+	match := document(t, matches[0], "match")
 
 	if match["rule_type"] != db.RuleTypeKeyword || match["configured_value"] != "confidential" {
 		t.Fatalf("match = %v", match)

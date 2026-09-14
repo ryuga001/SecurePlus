@@ -207,3 +207,15 @@ type PolicyRuleMapping struct {
 }
 
 func (PolicyRuleMapping) TableName() string { return "policy_rule_mapping" }
+
+type CustomerBranding struct {
+	CustomerID int       `gorm:"column:customer_id;primaryKey"`
+	LogoKey    *string   `gorm:"column:logo_key"`
+	Theme      string    `gorm:"column:theme"`
+	Language   string    `gorm:"column:language"`
+	Timezone   string    `gorm:"column:timezone"`
+	CreatedAt  time.Time `gorm:"column:created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at"`
+}
+
+func (CustomerBranding) TableName() string { return "customer_branding" }

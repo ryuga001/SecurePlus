@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -18,16 +19,19 @@ import (
 	grouphandler "dpdp-backend/internal/admin/handler/group"
 	policyhandler "dpdp-backend/internal/admin/handler/policy"
 	rulehandler "dpdp-backend/internal/admin/handler/rule"
+	brandingrepo "dpdp-backend/internal/admin/repositories/branding"
 	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
 	userrepo "dpdp-backend/internal/admin/repositories/emailuser"
 	grouprepo "dpdp-backend/internal/admin/repositories/group"
 	policyrepo "dpdp-backend/internal/admin/repositories/policy"
 	rulerepo "dpdp-backend/internal/admin/repositories/rule"
+	brandingsvc "dpdp-backend/internal/admin/services/branding"
 	providersvc "dpdp-backend/internal/admin/services/emailprovider"
 	usersvc "dpdp-backend/internal/admin/services/emailuser"
 	groupsvc "dpdp-backend/internal/admin/services/group"
 	policysvc "dpdp-backend/internal/admin/services/policy"
 	rulesvc "dpdp-backend/internal/admin/services/rule"
+	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/db"
 	"dpdp-backend/tests/testsupport"
@@ -44,6 +48,7 @@ type harness struct {
 	users     *usersvc.EmailUserService
 	groups    *groupsvc.GroupService
 	providers *providersvc.EmailProviderService
+	branding  *brandingsvc.BrandingService
 }
 
 func setup(t *testing.T) harness {
@@ -67,6 +72,12 @@ func setup(t *testing.T) harness {
 		users:     usersvc.NewEmailUserService(database, userrepo.NewEmailUserRepository(database)),
 		groups:    groupsvc.NewGroupService(database, grouprepo.NewGroupRepository(database)),
 		providers: providersvc.NewEmailProviderService(database, providerrepo.NewEmailProviderRepository(database), providerrepo.NewRedisRepository(rdb), config.Auth{Issuer: "dpdp"}),
+		branding: brandingsvc.NewBrandingService(
+			brandingrepo.NewBrandingRepository(database),
+			testsupport.OptionalStorage(t),
+			auth.NewStore(rdb),
+			24*time.Hour,
+		),
 	}
 }
 

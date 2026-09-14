@@ -20,6 +20,7 @@ import (
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/db"
+	"dpdp-backend/internal/storage"
 )
 
 var (
@@ -105,6 +106,75 @@ func Mongo(t *testing.T) *mongo.Client {
 	return client
 }
 
+func Storage(t *testing.T) *storage.Storage {
+	t.Helper()
+
+	store, err := connectStorage()
+	if err != nil {
+		t.Skipf("test object storage is unavailable: %v", err)
+	}
+	if store == nil {
+		t.Skip("TEST_S3_ENDPOINT is not set")
+	}
+
+	return store
+}
+
+func OptionalStorage(t *testing.T) *storage.Storage {
+	t.Helper()
+
+	store, err := connectStorage()
+	if err != nil {
+		t.Logf("test object storage is unavailable, logo tests will skip: %v", err)
+		return nil
+	}
+
+	return store
+}
+
+func connectStorage() (*storage.Storage, error) {
+	endpoint := os.Getenv("TEST_S3_ENDPOINT")
+	if endpoint == "" {
+		return nil, nil
+	}
+
+	bucket := os.Getenv("TEST_S3_BUCKET")
+	if bucket == "" {
+		bucket = "dpdp-test"
+	}
+
+	useSSL, _ := strconv.ParseBool(os.Getenv("TEST_S3_USE_SSL"))
+
+	settings := config.Storage{
+		Endpoint:  endpoint,
+		Region:    os.Getenv("TEST_S3_REGION"),
+		AccessKey: os.Getenv("TEST_S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("TEST_S3_SECRET_KEY"),
+		Bucket:    bucket,
+		UseSSL:    useSSL,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := settings.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return storage.New(client, bucket), nil
+}
+
+func Branding(t *testing.T, database *gorm.DB, customerID int) {
+	t.Helper()
+
+	insert := `INSERT INTO customer_branding (customer_id) VALUES (?) ON CONFLICT (customer_id) DO NOTHING`
+
+	if err := database.Exec(insert, customerID).Error; err != nil {
+		t.Fatalf("branding insert failed: %v", err)
+	}
+}
+
 func MongoDatabase() string {
 	database := os.Getenv("TEST_MONGO_DATABASE")
 	if database == "" {
@@ -158,6 +228,8 @@ func Customer(t *testing.T, database *gorm.DB) db.Customer {
 	if err := database.Omit("JWTSecret", "CreatedAt").Create(&customer).Error; err != nil {
 		t.Fatalf("customer insert failed: %v", err)
 	}
+
+	Branding(t, database, customer.ID)
 
 	return customer
 }

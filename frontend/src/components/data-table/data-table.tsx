@@ -3,7 +3,10 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, CircleAlert, Inbox, Loader2 } from "lucide-react";
 import * as React from "react";
 
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
+import type { Language } from "@/lib/api";
+import { formatInZone } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 import { StatusBadge } from "./status-badge";
@@ -59,16 +62,21 @@ function useDebounced<T>(value: T, delay = 350) {
   return debounced;
 }
 
-function formatValue(value: unknown, type: ColumnConfig<unknown>["type"]) {
+function formatValue(
+  value: unknown,
+  type: ColumnConfig<unknown>["type"],
+  timezone: string,
+  language: Language
+) {
   if (value === null || value === undefined || value === "") return "—";
 
   switch (type) {
     case "number":
       return typeof value === "number" ? value.toLocaleString() : String(value);
     case "date":
-      return new Date(String(value)).toLocaleDateString();
+      return formatInZone(String(value), timezone, language, "date");
     case "datetime":
-      return new Date(String(value)).toLocaleString();
+      return formatInZone(String(value), timezone, language);
     case "boolean":
       return value ? "Yes" : "No";
     case "status":
@@ -124,6 +132,10 @@ export function DataTable<Row>({
   emptyMessage = "No records found",
   className,
 }: DataTableProps<Row>) {
+  const { identity } = useAuth();
+  const timezone = identity?.branding?.timezone ?? "UTC";
+  const language = identity?.branding?.language ?? "ENGLISH";
+
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState<number>(defaultPageSize);
   const [sort, setSort] = React.useState<SortState>(defaultSort);
@@ -328,7 +340,7 @@ export function DataTable<Row>({
                         >
                           {column.render
                             ? column.render(value, row, index)
-                            : formatValue(value, column.type)}
+                            : formatValue(value, column.type, timezone, language)}
                         </td>
                       );
                     })}

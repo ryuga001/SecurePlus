@@ -48,6 +48,12 @@ const (
 	MsgMappingNotFound  = "this assignment does not exist"
 	MsgTooManyItems     = "too many items selected"
 
+	MsgBrandingNotFound = "branding settings are not available"
+	MsgInvalidTheme     = "choose either LIGHT or DARK"
+	MsgInvalidLanguage  = "choose either ENGLISH, JAPANESE or SPANISH"
+	MsgInvalidTimezone  = "enter a valid IANA timezone, for example Asia/Kolkata"
+	MsgInvalidLogo      = "logo must be a PNG, JPEG or WebP image of 1 MB or less"
+
 	MsgInvalidRequest    = "request body is invalid"
 	MsgInvalidIdentifier = "invalid identifier"
 	MsgUnauthenticated   = "unauthenticated"
@@ -80,6 +86,11 @@ const (
 	CodeRuleNotFound      = "rule_not_found"
 	CodeEmailUserNotFound = "email_user_not_found"
 	CodeMappingExists     = "mapping_exists"
+
+	CodeInvalidTheme    = "invalid_theme"
+	CodeInvalidLanguage = "invalid_language"
+	CodeInvalidTimezone = "invalid_timezone"
+	CodeInvalidLogo     = "invalid_logo"
 )
 
 const (

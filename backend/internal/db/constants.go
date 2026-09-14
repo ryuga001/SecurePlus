@@ -28,3 +28,14 @@ const (
 	RestrictionBlock = "BLOCK"
 	RestrictionAllow = "ALLOW"
 )
+
+const (
+	ThemeLight = "LIGHT"
+	ThemeDark  = "DARK"
+
+	LanguageEnglish  = "ENGLISH"
+	LanguageJapanese = "JAPANESE"
+	LanguageSpanish  = "SPANISH"
+
+	TimezoneUTC = "UTC"
+)

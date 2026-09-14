@@ -3,6 +3,16 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 import { api, setCsrfToken, type Identity } from "@/lib/api";
+import { THEME_STORAGE_KEY } from "@/lib/theme";
+
+function clearStoredTheme() {
+  try {
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+    document.documentElement.classList.remove("dark");
+  } catch {
+    return;
+  }
+}
 
 type AuthState = {
   identity: Identity | null;
@@ -59,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIdentity(null);
       setCsrfToken(null);
+      clearStoredTheme();
     }
   }, []);
 

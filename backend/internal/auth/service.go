@@ -20,18 +20,35 @@ type Service struct {
 	db       *gorm.DB
 	store    *Store
 	notifier notification.Sender
+	branding BrandingProvider
 	cfg      config.Auth
 	app      config.App
 }
 
-func NewService(database *gorm.DB, store *Store, notifier notification.Sender, cfg config.Auth, app config.App) *Service {
-	return &Service{db: database, store: store, notifier: notifier, cfg: cfg, app: app}
+func NewService(database *gorm.DB, store *Store, notifier notification.Sender, branding BrandingProvider, cfg config.Auth, app config.App) *Service {
+	return &Service{db: database, store: store, notifier: notifier, branding: branding, cfg: cfg, app: app}
 }
 
 type Identity struct {
-	User      IdentityUser     `json:"user"`
-	Customer  IdentityCustomer `json:"customer"`
-	CSRFToken string           `json:"csrf_token"`
+	IdentitySnapshot
+	CSRFToken string `json:"csrf_token"`
+}
+
+type IdentitySnapshot struct {
+	User     IdentityUser      `json:"user"`
+	Customer IdentityCustomer  `json:"customer"`
+	Branding *BrandingSnapshot `json:"branding,omitempty"`
+}
+
+type BrandingSnapshot struct {
+	LogoURL  *string `json:"logo_url"`
+	Theme    string  `json:"theme"`
+	Language string  `json:"language"`
+	Timezone string  `json:"timezone"`
+}
+
+type BrandingProvider interface {
+	Snapshot(ctx context.Context, customerID int) (BrandingSnapshot, error)
 }
 
 type IdentityUser struct {
@@ -86,31 +103,34 @@ func (s *Service) userByEmail(ctx context.Context, email string) (db.DashboardUs
 	return user, err
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (db.DashboardUser, TokenPair, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (IdentitySnapshot, TokenPair, error) {
 	key := Normalize(email)
 
 	user, err := s.userByEmail(ctx, key)
 	if err != nil {
 		BurnTime(s.cfg.Pepper, password)
-		return db.DashboardUser{}, TokenPair{}, ErrInvalidCredentials
+		return IdentitySnapshot{}, TokenPair{}, ErrInvalidCredentials
 	}
 
 	if err := VerifyPassword(s.cfg.Pepper, user.PasswordHash, user.PasswordSalt, password); err != nil {
-		return db.DashboardUser{}, TokenPair{}, ErrInvalidCredentials
+		return IdentitySnapshot{}, TokenPair{}, ErrInvalidCredentials
 	}
 
 	if user.RoleID == nil {
-		return db.DashboardUser{}, TokenPair{}, ErrNoRole
+		return IdentitySnapshot{}, TokenPair{}, ErrNoRole
 	}
 
 	pair, err := s.issue(ctx, user)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, err
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	s.syncPrivileges(ctx, user.Role)
 
-	return user, pair, nil
+	snapshot := s.snapshot(ctx, user)
+	s.cacheIdentity(ctx, user.ID, snapshot)
+
+	return snapshot, pair, nil
 }
 
 func (s *Service) syncPrivileges(ctx context.Context, role *db.Role) {
@@ -281,37 +301,40 @@ func (s *Service) VerifyEmail(ctx context.Context, email, code string) (string, 
 	return token, config.SignupTTL, nil
 }
 
-func (s *Service) CompleteRegistration(ctx context.Context, req CompleteRequest) (db.DashboardUser, TokenPair, error) {
+func (s *Service) CompleteRegistration(ctx context.Context, req CompleteRequest) (IdentitySnapshot, TokenPair, error) {
 	email, err := s.store.TakeRegistrationToken(ctx, HashToken(req.RegistrationToken))
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, ErrEmailNotVerified
+		return IdentitySnapshot{}, TokenPair{}, ErrEmailNotVerified
 	}
 
 	if err := s.ensureAvailable(ctx, email, req.OrgName); err != nil {
-		return db.DashboardUser{}, TokenPair{}, err
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	salt, err := NewSalt()
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, err
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	hashed, err := HashPassword(s.cfg.Pepper, req.Password, salt, s.cfg.BcryptCost)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, err
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	user, err := s.createTenant(ctx, req, email, hashed, salt)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, err
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	pair, err := s.issue(ctx, user)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, err
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	s.syncPrivileges(ctx, user.Role)
+
+	snapshot := s.snapshot(ctx, user)
+	s.cacheIdentity(ctx, user.ID, snapshot)
 
 	s.notify(ctx, notification.Email{
 		CustomerID: user.CustomerID,
@@ -324,7 +347,7 @@ func (s *Service) CompleteRegistration(ctx context.Context, req CompleteRequest)
 		},
 	})
 
-	return user, pair, nil
+	return snapshot, pair, nil
 }
 
 func (s *Service) createTenant(ctx context.Context, req CompleteRequest, email, hashed, salt string) (db.DashboardUser, error) {
@@ -358,6 +381,13 @@ func (s *Service) createTenant(ctx context.Context, req CompleteRequest, email, 
 		}
 
 		if err := tx.Omit("Customer", "Role").Create(&user).Error; err != nil {
+			return err
+		}
+
+		provision := `INSERT INTO customer_branding (customer_id) VALUES (?)
+			ON CONFLICT (customer_id) DO NOTHING`
+
+		if err := tx.Exec(provision, customer.ID).Error; err != nil {
 			return err
 		}
 
@@ -488,6 +518,7 @@ func (s *Service) ResetPassword(ctx context.Context, email, code, password strin
 	}
 
 	s.store.DropReset(ctx, key)
+	s.DropIdentity(ctx, state.UserID)
 
 	if err := s.store.BumpVersion(ctx, state.UserID); err != nil {
 		return ErrUnavailable
@@ -506,58 +537,61 @@ func (s *Service) ResetPassword(ctx context.Context, email, code, password strin
 	return nil
 }
 
-func (s *Service) Refresh(ctx context.Context, raw string) (db.DashboardUser, TokenPair, error) {
+func (s *Service) Refresh(ctx context.Context, raw string) (IdentitySnapshot, TokenPair, error) {
 	claims, err := Verify(ctx, raw, s.cfg.Issuer, TypeRefresh, s.TenantSecret)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, ErrInvalidToken
+		return IdentitySnapshot{}, TokenPair{}, ErrInvalidToken
 	}
 
 	userID := UserID(claims)
 
 	version, err := s.store.Version(ctx, userID)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, ErrUnavailable
+		return IdentitySnapshot{}, TokenPair{}, ErrUnavailable
 	}
 	if claims.Version < version {
-		return db.DashboardUser{}, TokenPair{}, ErrInvalidToken
+		return IdentitySnapshot{}, TokenPair{}, ErrInvalidToken
 	}
 
 	user, err := s.userByID(ctx, userID)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, ErrInvalidToken
+		return IdentitySnapshot{}, TokenPair{}, ErrInvalidToken
 	}
 
 	pair, err := s.issue(ctx, user)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, err
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	successor, err := encodePair(pair)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, err
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	outcome, payload, err := s.store.Rotate(ctx, claims.ID, successor,
 		time.Until(claims.ExpiresAt.Time), config.RotationGrace)
 	if err != nil {
-		return db.DashboardUser{}, TokenPair{}, ErrUnavailable
+		return IdentitySnapshot{}, TokenPair{}, ErrUnavailable
 	}
+
+	snapshot := s.snapshot(ctx, user)
+	s.cacheIdentity(ctx, user.ID, snapshot)
 
 	switch outcome {
 	case RotateOutcomeRotated:
-		return user, pair, nil
+		return snapshot, pair, nil
 
 	case RotateOutcomeSuccessor:
 		existing, err := decodePair(payload)
 		if err != nil {
-			return db.DashboardUser{}, TokenPair{}, err
+			return IdentitySnapshot{}, TokenPair{}, err
 		}
-		return user, existing, nil
+		return snapshot, existing, nil
 
 	default:
 		slog.WarnContext(ctx, "refresh token replay detected", "user_id", userID, "customer_id", user.CustomerID)
 		s.store.BumpVersion(ctx, userID)
-		return db.DashboardUser{}, TokenPair{}, ErrTokenReplayed
+		return IdentitySnapshot{}, TokenPair{}, ErrTokenReplayed
 	}
 }
 
@@ -575,8 +609,57 @@ func (s *Service) Logout(ctx context.Context, accessID, refreshID string, access
 	return nil
 }
 
-func (s *Service) Identity(ctx context.Context, userID int) (db.DashboardUser, error) {
-	return s.userByID(ctx, userID)
+func (s *Service) Identity(ctx context.Context, userID int) (IdentitySnapshot, error) {
+	snapshot, err := s.store.Identity(ctx, userID)
+	if err == nil {
+		return snapshot, nil
+	}
+	if !errors.Is(err, ErrIdentityNotCached) {
+		slog.WarnContext(ctx, "identity cache read failed", "user_id", userID, "error", err)
+	}
+
+	user, err := s.userByID(ctx, userID)
+	if err != nil {
+		return IdentitySnapshot{}, err
+	}
+
+	snapshot = s.snapshot(ctx, user)
+	s.cacheIdentity(ctx, userID, snapshot)
+
+	return snapshot, nil
+}
+
+func (s *Service) snapshot(ctx context.Context, user db.DashboardUser) IdentitySnapshot {
+	snapshot := ToSnapshot(user)
+	snapshot.Branding = s.brandingFor(ctx, user.CustomerID)
+
+	return snapshot
+}
+
+func (s *Service) brandingFor(ctx context.Context, customerID int) *BrandingSnapshot {
+	if s.branding == nil {
+		return nil
+	}
+
+	branding, err := s.branding.Snapshot(ctx, customerID)
+	if err != nil {
+		slog.WarnContext(ctx, "branding lookup failed", "customer_id", customerID, "error", err)
+		return nil
+	}
+
+	return &branding
+}
+
+func (s *Service) cacheIdentity(ctx context.Context, userID int, snapshot IdentitySnapshot) {
+	if err := s.store.CacheIdentity(ctx, userID, snapshot, config.IdentityTTL); err != nil {
+		slog.WarnContext(ctx, "identity cache write failed", "user_id", userID, "error", err)
+	}
+}
+
+func (s *Service) DropIdentity(ctx context.Context, userID int) {
+	if err := s.store.DropIdentity(ctx, userID); err != nil {
+		slog.WarnContext(ctx, "identity cache invalidation failed", "user_id", userID, "error", err)
+	}
 }
 
 func (s *Service) notify(ctx context.Context, email notification.Email) {
@@ -619,24 +702,23 @@ func decodePair(raw string) (TokenPair, error) {
 	}, nil
 }
 
-func ToIdentity(user db.DashboardUser, csrfToken string) Identity {
-	identity := Identity{
+func ToSnapshot(user db.DashboardUser) IdentitySnapshot {
+	snapshot := IdentitySnapshot{
 		User: IdentityUser{
 			ID:        user.ID,
 			Email:     user.Email,
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
 		},
-		CSRFToken: csrfToken,
 	}
 
 	if user.Customer != nil {
-		identity.Customer = IdentityCustomer{ID: user.Customer.ID, OrgName: user.Customer.OrgName}
+		snapshot.Customer = IdentityCustomer{ID: user.Customer.ID, OrgName: user.Customer.OrgName}
 	}
 
 	if user.Role != nil {
-		identity.User.Role = user.Role.Name
+		snapshot.User.Role = user.Role.Name
 	}
 
-	return identity
+	return snapshot
 }

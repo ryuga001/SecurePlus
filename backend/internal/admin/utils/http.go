@@ -115,7 +115,8 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrRuleNotFound),
 		errors.Is(err, ErrGroupNotFound),
 		errors.Is(err, ErrEmailUserNotFound),
-		errors.Is(err, ErrMappingNotFound):
+		errors.Is(err, ErrMappingNotFound),
+		errors.Is(err, ErrBrandingNotFound):
 		return http.StatusNotFound, CodeNotFound
 
 	case errors.Is(err, ErrDomainTaken):
@@ -150,6 +151,15 @@ func statusFor(err error) (int, string) {
 		return http.StatusBadRequest, CodeRuleNotFound
 	case errors.Is(err, ErrUnknownEmailUser):
 		return http.StatusBadRequest, CodeEmailUserNotFound
+
+	case errors.Is(err, ErrInvalidTheme):
+		return http.StatusBadRequest, CodeInvalidTheme
+	case errors.Is(err, ErrInvalidLanguage):
+		return http.StatusBadRequest, CodeInvalidLanguage
+	case errors.Is(err, ErrInvalidTimezone):
+		return http.StatusBadRequest, CodeInvalidTimezone
+	case errors.Is(err, ErrInvalidLogo):
+		return http.StatusBadRequest, CodeInvalidLogo
 
 	case errors.Is(err, ErrInvalidAction),
 		errors.Is(err, ErrInvalidRestrictionMode),

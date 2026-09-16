@@ -1,0 +1,141 @@
+package screening_test
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"sync/atomic"
+	"testing"
+
+	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery/repositories/provider"
+	"dpdp-backend/internal/delivery/services/screening"
+	deliveryutils "dpdp-backend/internal/delivery/utils"
+)
+
+type fakeLoader struct {
+	calls   atomic.Int32
+	release chan struct{}
+	cfg     delivery.TenantConfig
+	err     error
+}
+
+func (f *fakeLoader) SigningConfig(_ context.Context, customerID, configID int) (delivery.TenantConfig, error) {
+	f.calls.Add(1)
+
+	if f.release != nil {
+		<-f.release
+	}
+
+	if f.err != nil {
+		return delivery.TenantConfig{}, f.err
+	}
+
+	cfg := f.cfg
+	cfg.CustomerID = customerID
+	cfg.ConfigID = configID
+
+	return cfg, nil
+}
+
+func TestConfigKey(t *testing.T) {
+	if got := provider.ConfigKey(12); got != "delivery:config:12" {
+		t.Fatalf("ConfigKey = %q", got)
+	}
+}
+
+func TestResolveAppliesDefaultSelector(t *testing.T) {
+	loader := &fakeLoader{cfg: delivery.TenantConfig{Domain: "example.com", DKIMPrivateKey: "key"}}
+	cache := provider.NewConfigCache(loader, nil)
+
+	cfg, err := cache.Resolve(context.Background(), 1, 2)
+	if err != nil {
+		t.Fatalf("Resolve returned %v", err)
+	}
+
+	if cfg.DKIMSelector != deliveryutils.DefaultDKIMSelector {
+		t.Fatalf("selector = %q", cfg.DKIMSelector)
+	}
+	if cfg.CustomerID != 1 || cfg.ConfigID != 2 {
+		t.Fatalf("config = %+v", cfg)
+	}
+}
+
+func TestResolvePropagatesLoaderFailure(t *testing.T) {
+	failure := errors.New("no signing config")
+	cache := provider.NewConfigCache(&fakeLoader{err: failure}, nil)
+
+	if _, err := cache.Resolve(context.Background(), 1, 2); !errors.Is(err, failure) {
+		t.Fatalf("error = %v, want the loader failure", err)
+	}
+}
+
+func TestResolveCollapsesConcurrentMisses(t *testing.T) {
+	loader := &fakeLoader{
+		release: make(chan struct{}),
+		cfg:     delivery.TenantConfig{Domain: "example.com", DKIMPrivateKey: "key"},
+	}
+	cache := provider.NewConfigCache(loader, nil)
+
+	const callers = 50
+
+	var waiting sync.WaitGroup
+	var done sync.WaitGroup
+
+	waiting.Add(callers)
+	done.Add(callers)
+
+	for range callers {
+		go func() {
+			defer done.Done()
+
+			waiting.Done()
+
+			if _, err := cache.Resolve(context.Background(), 1, 2); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+
+	waiting.Wait()
+	close(loader.release)
+	done.Wait()
+
+	if calls := loader.calls.Load(); calls > 2 {
+		t.Fatalf("loader called %d times, singleflight should collapse concurrent misses", calls)
+	}
+}
+
+func TestProcessIsPassThrough(t *testing.T) {
+	loader := &fakeLoader{cfg: delivery.TenantConfig{Domain: "example.com", DKIMPrivateKey: "key"}}
+	processor := screening.NewEngine(provider.NewConfigCache(loader, nil), nil)
+
+	original := delivery.EmailMessage{
+		CorrelationID: "abc",
+		CustomerID:    1,
+		ConfigID:      2,
+		From:          "alice@example.com",
+		Recipients:    []string{"bob@other.test"},
+		Raw:           []byte("From: alice@example.com\r\n\r\nbody\r\n"),
+	}
+
+	outcome, err := processor.Process(context.Background(), original)
+	if err != nil {
+		t.Fatalf("Process returned %v", err)
+	}
+
+	processed := outcome.Message
+
+	if string(processed.Raw) != string(original.Raw) {
+		t.Fatal("the message body was modified")
+	}
+	if processed.CorrelationID != original.CorrelationID || processed.From != original.From {
+		t.Fatalf("message = %+v", processed)
+	}
+	if outcome.Config.Domain != "example.com" {
+		t.Fatalf("config = %+v", outcome.Config)
+	}
+	if len(outcome.Withheld) != 0 {
+		t.Fatalf("withheld = %+v, want none without an enforcer", outcome.Withheld)
+	}
+}

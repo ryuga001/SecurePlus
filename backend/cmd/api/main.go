@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/emersion/go-smtp"
+	gosmtp "github.com/emersion/go-smtp"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
@@ -41,22 +41,17 @@ import (
 	incidentsvc "dpdp-backend/internal/audit/services/emailincident"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
-	"dpdp-backend/internal/delivery"
-	"dpdp-backend/internal/delivery/engine"
-	"dpdp-backend/internal/delivery/engine/actiontrigger"
-	templaterepo "dpdp-backend/internal/delivery/engine/actiontrigger/repositories/emailtemplate"
-	"dpdp-backend/internal/delivery/engine/actiontrigger/services/blocknotice"
-	"dpdp-backend/internal/delivery/engine/contentengine"
-	engineeval "dpdp-backend/internal/delivery/engine/evaluation"
-	"dpdp-backend/internal/delivery/engine/incidentgenerator"
-	"dpdp-backend/internal/delivery/engine/parser"
-	policysetrepo "dpdp-backend/internal/delivery/engine/policy/repositories/policyset"
-	"dpdp-backend/internal/delivery/engine/policy/services/aggregator"
-	policycache "dpdp-backend/internal/delivery/engine/policy/services/cache"
-	"dpdp-backend/internal/delivery/engine/restrictionevalutor"
-	"dpdp-backend/internal/delivery/engine/rulematcher"
-	"dpdp-backend/internal/delivery/receiver"
-	"dpdp-backend/internal/delivery/relay"
+	"dpdp-backend/internal/delivery/handler/smtp"
+	templaterepo "dpdp-backend/internal/delivery/repositories/emailtemplate"
+	policysetrepo "dpdp-backend/internal/delivery/repositories/policyset"
+	"dpdp-backend/internal/delivery/repositories/provider"
+	"dpdp-backend/internal/delivery/services/adjudication"
+	"dpdp-backend/internal/delivery/services/dispatch"
+	"dpdp-backend/internal/delivery/services/inspection"
+	deliverypolicy "dpdp-backend/internal/delivery/services/policy"
+	"dpdp-backend/internal/delivery/services/recording"
+	"dpdp-backend/internal/delivery/services/screening"
+	"dpdp-backend/internal/delivery/services/transmission"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"dpdp-backend/internal/middleware"
 	"dpdp-backend/internal/notification"
@@ -131,47 +126,43 @@ func main() {
 	providerRepository := providerrepo.NewEmailProviderRepository(database)
 	domainRegistry := providerrepo.NewRedisRepository(rdb)
 
-	configurations := delivery.NewConfigurationStore(providerRepository)
-	authorizer := receiver.NewAuthorizer(delivery.NewDomainLookup(domainRegistry), configurations)
+	configurations := provider.NewConfigurationStore(providerRepository)
+	authorizer := smtp.NewAuthorizer(provider.NewDomainLookup(domainRegistry), configurations)
 
-	signingConfigs := engine.NewConfigCache(configurations, rdb)
-	mailRelay := relay.NewRelay(cfg.Relay)
+	signingConfigs := provider.NewConfigCache(configurations, rdb)
+	mailRelay := transmission.NewRelay(cfg.Relay)
 
-	blockNotice := blocknotice.NewBlockNoticeService(
+	blockNotice := adjudication.NewBlockNoticeService(
 		templaterepo.NewEmailTemplateRepository(database),
 		signingConfigs,
 		mailRelay,
 	)
 
-	policyCache := policycache.NewPolicyCacheService(
+	policyCache := deliverypolicy.NewPolicyCacheService(
 		policysetrepo.NewPolicySetRepository(database),
-		rulematcher.NewCompiler(aggregator.NewAggregator(), deliveryutils.MaxRules),
+		deliverypolicy.NewCompiler(deliveryutils.MaxRules),
 		rdb,
 		deliveryutils.CacheTTL,
 	)
 
-	enforcer := engineeval.NewEvaluationService(engineeval.Components{
-		Parser:      parser.NewMessageParser(),
+	enforcer := screening.New(screening.Options{
 		Cache:       policyCache,
-		Domain:      restrictionevalutor.NewDomainEvaluator(),
-		Attachment:  restrictionevalutor.NewAttachmentEvaluator(),
-		Content:     contentengine.NewContentEngine(rulematcher.DefaultMatcherFactory()),
-		Resolver:    actiontrigger.NewActionResolver(),
-		Actions:     actiontrigger.DefaultActionFactory(blockNotice),
-		Incidents:   incidentgenerator.NewIncidentGenerator(incidents),
+		Content:     inspection.NewContentEngine(inspection.DefaultMatcherFactory()),
+		Actions:     adjudication.DefaultActionFactory(blockNotice),
+		Incidents:   recording.NewIncidentGenerator(incidents),
 		FailsClosed: deliveryutils.FailClosed,
 	})
 
-	dispatcher := delivery.NewDispatcher(
+	dispatcher := dispatch.NewDispatcher(
 		ctx,
-		engine.NewEngine(signingConfigs, enforcer),
+		screening.NewEngine(signingConfigs, enforcer),
 		mailRelay,
 		recorder,
 	)
 
-	smtpServer := receiver.NewServer(
+	smtpServer := smtp.NewServer(
 		cfg.SMTPServer,
-		receiver.NewBackend(
+		smtp.NewBackend(
 			authorizer,
 			recorder,
 			dispatcher,
@@ -275,7 +266,7 @@ func main() {
 
 		slog.Info("smtp listening", "addr", smtpServer.Addr())
 
-		if err := smtpServer.ListenAndServe(); err != nil && !errors.Is(err, smtp.ErrServerClosed) {
+		if err := smtpServer.ListenAndServe(); err != nil && !errors.Is(err, gosmtp.ErrServerClosed) {
 			slog.Error("smtp server failed", "error", err)
 			stop()
 		}

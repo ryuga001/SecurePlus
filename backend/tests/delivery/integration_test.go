@@ -26,20 +26,16 @@ import (
 	auditutils "dpdp-backend/internal/audit/utils"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/db"
-	"dpdp-backend/internal/delivery"
-	"dpdp-backend/internal/delivery/engine"
-	"dpdp-backend/internal/delivery/engine/actiontrigger"
-	"dpdp-backend/internal/delivery/engine/contentengine"
-	engineeval "dpdp-backend/internal/delivery/engine/evaluation"
-	"dpdp-backend/internal/delivery/engine/incidentgenerator"
-	"dpdp-backend/internal/delivery/engine/parser"
-	policysetrepo "dpdp-backend/internal/delivery/engine/policy/repositories/policyset"
-	"dpdp-backend/internal/delivery/engine/policy/services/aggregator"
-	policycache "dpdp-backend/internal/delivery/engine/policy/services/cache"
-	"dpdp-backend/internal/delivery/engine/restrictionevalutor"
-	"dpdp-backend/internal/delivery/engine/rulematcher"
-	"dpdp-backend/internal/delivery/receiver"
-	"dpdp-backend/internal/delivery/relay"
+	smtphandler "dpdp-backend/internal/delivery/handler/smtp"
+	policysetrepo "dpdp-backend/internal/delivery/repositories/policyset"
+	"dpdp-backend/internal/delivery/repositories/provider"
+	"dpdp-backend/internal/delivery/services/adjudication"
+	"dpdp-backend/internal/delivery/services/dispatch"
+	"dpdp-backend/internal/delivery/services/inspection"
+	"dpdp-backend/internal/delivery/services/policy"
+	"dpdp-backend/internal/delivery/services/recording"
+	"dpdp-backend/internal/delivery/services/screening"
+	"dpdp-backend/internal/delivery/services/transmission"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"dpdp-backend/tests/testsupport"
 )
@@ -48,7 +44,7 @@ type harness struct {
 	database   *gorm.DB
 	mongo      *mongodriver.Client
 	addr       string
-	dispatcher *delivery.Dispatcher
+	dispatcher *dispatch.Dispatcher
 	customer   db.Customer
 }
 
@@ -89,8 +85,8 @@ func setup(t *testing.T, mxOverride string) harness {
 	repository := providerrepo.NewEmailProviderRepository(database)
 	registry := providerrepo.NewRedisRepository(rdb)
 
-	configurations := delivery.NewConfigurationStore(repository)
-	authorizer := receiver.NewAuthorizer(delivery.NewDomainLookup(registry), configurations)
+	configurations := provider.NewConfigurationStore(repository)
+	authorizer := smtphandler.NewAuthorizer(provider.NewDomainLookup(registry), configurations)
 
 	relayCfg := config.Relay{
 		HELOHost:          "test.local",
@@ -111,21 +107,17 @@ func setup(t *testing.T, mxOverride string) harness {
 		t.Fatalf("incident index creation failed: %v", err)
 	}
 
-	enforcer := engineeval.NewEvaluationService(engineeval.Components{
-		Parser:     parser.NewMessageParser(),
-		Cache:      policycache.NewPolicyCacheService(policysetrepo.NewPolicySetRepository(database), rulematcher.NewCompiler(aggregator.NewAggregator(), deliveryutils.MaxRules), rdb, time.Second),
-		Domain:     restrictionevalutor.NewDomainEvaluator(),
-		Attachment: restrictionevalutor.NewAttachmentEvaluator(),
-		Content:    contentengine.NewContentEngine(rulematcher.DefaultMatcherFactory()),
-		Resolver:   actiontrigger.NewActionResolver(),
-		Actions:    actiontrigger.DefaultActionFactory(nil),
-		Incidents:  incidentgenerator.NewIncidentGenerator(incidents),
+	enforcer := screening.New(screening.Options{
+		Cache:     policy.NewPolicyCacheService(policysetrepo.NewPolicySetRepository(database), policy.NewCompiler(deliveryutils.MaxRules), rdb, time.Second),
+		Content:   inspection.NewContentEngine(inspection.DefaultMatcherFactory()),
+		Actions:   adjudication.DefaultActionFactory(nil),
+		Incidents: recording.NewIncidentGenerator(incidents),
 	})
 
-	dispatcher := delivery.NewDispatcher(
+	dispatcher := dispatch.NewDispatcher(
 		ctx,
-		engine.NewEngine(engine.NewConfigCache(configurations, rdb), enforcer),
-		relay.NewRelay(relayCfg),
+		screening.NewEngine(provider.NewConfigCache(configurations, rdb), enforcer),
+		transmission.NewRelay(relayCfg),
 		recorder,
 	)
 
@@ -137,7 +129,7 @@ func setup(t *testing.T, mxOverride string) harness {
 	addr := listener.Addr().String()
 	listener.Close()
 
-	server := receiver.NewServer(
+	server := smtphandler.NewServer(
 		config.SMTPServer{
 			Addr:          addr,
 			MaxSize:       1024 * 1024,
@@ -146,7 +138,7 @@ func setup(t *testing.T, mxOverride string) harness {
 			ReadTimeout:   10 * time.Second,
 			WriteTimeout:  10 * time.Second,
 		},
-		receiver.NewBackend(authorizer, recorder, dispatcher, 4, 1024*1024, 10),
+		smtphandler.NewBackend(authorizer, recorder, dispatcher, 4, 1024*1024, 10),
 		"test.local",
 	)
 
@@ -587,6 +579,47 @@ func TestIntegrationAllRecipientsRestrictedStopsDelivery(t *testing.T) {
 	}
 
 	h.incident(t, "RESTRICTION")
+}
+
+func TestIntegrationKeywordMatchWithBlockActionStopsDelivery(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "alice@example.com"
+	to := "bob@recipient.test"
+
+	rule := testsupport.Rule(t, h.database, h.customer.ID, "Secrets", db.RuleTypeKeyword, "confidential")
+	h.policy(t, from, "Data Loss", db.ActionBlock,
+		db.Restriction{Mode: db.RestrictionNone, Values: []string{}}, rule.ID)
+
+	body := "From: " + from + "\r\nTo: " + to + "\r\nSubject: notice\r\n" +
+		"Message-ID: <blocked@sender.test>\r\n\r\nthis is CONFIDENTIAL material\r\n"
+
+	if err := h.send(t, from, []string{to}, body); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	record := h.audit(t, deliveryutils.StatusFailed)
+
+	failure, ok := record["failure"].(bson.M)
+	if !ok || failure["type"] != auditutils.FailureRule {
+		t.Fatalf("failure = %v, want a RULE failure", record["failure"])
+	}
+
+	recipients, ok := record["recipients"].(bson.A)
+	if !ok || len(recipients) != 1 {
+		t.Fatalf("recipients = %v", record["recipients"])
+	}
+
+	entry, _ := recipients[0].(bson.M)
+	if entry["status"] != deliveryutils.StatusBlocked {
+		t.Fatalf("recipient status = %v, want BLOCKED", entry["status"])
+	}
+
+	incident := h.incident(t, "CONTENT")
+	if incident["effective_action"] != db.ActionBlock {
+		t.Fatalf("effective action = %v, want BLOCK", incident["effective_action"])
+	}
 }
 
 func TestIntegrationKeywordMatchRecordsIncidentAndStillDelivers(t *testing.T) {

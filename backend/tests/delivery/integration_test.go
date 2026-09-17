@@ -45,6 +45,7 @@ type harness struct {
 	mongo    *mongodriver.Client
 	addr     string
 	workers  *delivery.WorkerPool
+	queue    *delivery.Queue
 	customer db.Customer
 }
 
@@ -179,6 +180,7 @@ func setup(t *testing.T, mxOverride string) harness {
 		mongo:    client,
 		addr:     addr,
 		workers:  workers,
+		queue:    queue,
 		customer: testsupport.Customer(t, database),
 	}
 }
@@ -636,7 +638,7 @@ func TestIntegrationKeywordMatchWithBlockActionStopsDelivery(t *testing.T) {
 
 	record := h.audit(t, deliveryutils.StatusFailed)
 
-	failure, ok := record["failure"].(bson.M)
+	failure, ok := asDocument(record["failure"])
 	if !ok || failure["type"] != auditutils.FailureRule {
 		t.Fatalf("failure = %v, want a RULE failure", record["failure"])
 	}
@@ -646,9 +648,9 @@ func TestIntegrationKeywordMatchWithBlockActionStopsDelivery(t *testing.T) {
 		t.Fatalf("recipients = %v", record["recipients"])
 	}
 
-	entry, _ := recipients[0].(bson.M)
-	if entry["status"] != deliveryutils.StatusBlocked {
-		t.Fatalf("recipient status = %v, want BLOCKED", entry["status"])
+	entry, ok := asDocument(recipients[0])
+	if !ok || entry["status"] != deliveryutils.StatusBlocked {
+		t.Fatalf("recipient = %v, want status BLOCKED", recipients[0])
 	}
 
 	incident := h.incident(t, "CONTENT")
@@ -771,4 +773,80 @@ func TestIntegrationUnregisteredSenderBypassesPolicies(t *testing.T) {
 	if total := h.incidentCount(t); total != 0 {
 		t.Fatalf("incidents = %d, an unregistered sender resolves to no policies", total)
 	}
+}
+
+func (h harness) waitForDrainedStream(t *testing.T) {
+	t.Helper()
+
+	deadline := time.Now().Add(10 * time.Second)
+
+	for time.Now().Before(deadline) {
+		pending, err := h.queue.Pending(context.Background())
+		if err != nil {
+			t.Fatalf("Pending returned %v", err)
+		}
+
+		if pending == 0 {
+			return
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	t.Fatal("stream still holds pending entries, the worker never acknowledged them")
+}
+
+func TestIntegrationAcceptedMessageTravelsTheStreamAndIsAcknowledged(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "alice@example.com"
+	to := "bob@recipient.test"
+
+	body := "From: " + from + "\r\nTo: " + to + "\r\nSubject: queued\r\n" +
+		"Message-ID: <queued@sender.test>\r\n\r\nnothing sensitive\r\n"
+
+	if err := h.send(t, from, []string{to}, body); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	record := h.audit(t, deliveryutils.StatusSuccess)
+
+	if record["correlation_id"] == nil || record["correlation_id"] == "" {
+		t.Fatal("the correlation id minted before publishing must reach the audit record")
+	}
+	if record["message_id"] != "<queued@sender.test>" {
+		t.Fatalf("message id = %v, want the one the sender supplied", record["message_id"])
+	}
+
+	h.waitForDrainedStream(t)
+}
+
+func TestIntegrationWorkerRetainsTheCorrelationIdAcrossTheStream(t *testing.T) {
+	h := setup(t, mailpitAddr(t))
+	h.configuration(t, "example.com", true)
+
+	from := "alice@example.com"
+	to := "bob@recipient.test"
+
+	rule := testsupport.Rule(t, h.database, h.customer.ID, "Secrets", db.RuleTypeKeyword, "confidential")
+	h.policy(t, from, "Data Loss", db.ActionQuarantine,
+		db.Restriction{Mode: db.RestrictionNone, Values: []string{}}, rule.ID)
+
+	body := "From: " + from + "\r\nTo: " + to + "\r\nSubject: notice\r\n" +
+		"Message-ID: <trace@sender.test>\r\n\r\nthis is CONFIDENTIAL material\r\n"
+
+	if err := h.send(t, from, []string{to}, body); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+
+	record := h.audit(t, deliveryutils.StatusSuccess)
+	incident := h.incident(t, "CONTENT")
+
+	if record["correlation_id"] != incident["correlation_id"] {
+		t.Fatalf("audit %v and incident %v disagree on the correlation id",
+			record["correlation_id"], incident["correlation_id"])
+	}
+
+	h.waitForDrainedStream(t)
 }

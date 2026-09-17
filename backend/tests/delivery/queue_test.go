@@ -9,6 +9,8 @@ import (
 	"net"
 	"net/smtp"
 	"net/textproto"
+
+	"github.com/redis/go-redis/v9"
 	"testing"
 	"time"
 
@@ -436,4 +438,188 @@ func waitForProcessed(t *testing.T, pool *delivery.WorkerPool, want int64) {
 	}
 
 	t.Fatalf("workers did not process %d messages within the deadline", want)
+}
+
+func smtpServerFor(t *testing.T, queue *delivery.Queue) string {
+	t.Helper()
+
+	addr := freeAddr(t)
+
+	server := smtphandler.NewServer(
+		config.SMTPServer{
+			Addr:          addr,
+			MaxSize:       1024 * 1024,
+			MaxRecipients: 10,
+			ReadTimeout:   5 * time.Second,
+			WriteTimeout:  5 * time.Second,
+		},
+		smtphandler.NewBackend(
+			smtphandler.NewAuthorizer(stubDomainCache{}, stubDomainStore{}),
+			&stubRecorder{},
+			queue,
+			1024*1024,
+			10,
+		),
+		"test.local",
+	)
+
+	go server.ListenAndServe()
+
+	t.Cleanup(func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		server.Shutdown(shutdownCtx)
+	})
+
+	waitForListener(t, addr)
+
+	return addr
+}
+
+func TestSMTPAcceptsOnlyAfterTheMessageReachesRedis(t *testing.T) {
+	queue, _ := testQueue(t)
+	addr := smtpServerFor(t, queue)
+
+	if err := sendOne(addr, "alice@example.com", "bob@recipient.test"); err != nil {
+		t.Fatalf("DATA returned %v, want 250 once Redis accepted the message", err)
+	}
+
+	queued, err := queue.Consume(context.Background(), "assert", 10, time.Second)
+	if err != nil {
+		t.Fatalf("Consume returned %v", err)
+	}
+
+	if len(queued) != 1 {
+		t.Fatalf("stream holds %d entries, want the accepted message", len(queued))
+	}
+
+	msg := queued[0].Message
+
+	if msg.CorrelationID == "" {
+		t.Fatal("the receiver must mint a correlation id before publishing")
+	}
+	if msg.From != "alice@example.com" {
+		t.Fatalf("envelope from = %q", msg.From)
+	}
+	if len(msg.Recipients) != 1 || msg.Recipients[0] != "bob@recipient.test" {
+		t.Fatalf("recipients = %v", msg.Recipients)
+	}
+	if msg.CustomerID != 1 || msg.ConfigID != 2 {
+		t.Fatalf("tenant = (%d,%d), want the authorized sender's tenant", msg.CustomerID, msg.ConfigID)
+	}
+	if len(msg.Raw) == 0 {
+		t.Fatal("the raw message body must travel on the stream")
+	}
+}
+
+func TestSMTPPublishesADistinctCorrelationIdPerMessage(t *testing.T) {
+	queue, _ := testQueue(t)
+	addr := smtpServerFor(t, queue)
+
+	for range 2 {
+		if err := sendOne(addr, "alice@example.com", "bob@recipient.test"); err != nil {
+			t.Fatalf("DATA returned %v", err)
+		}
+	}
+
+	queued, err := queue.Consume(context.Background(), "assert", 10, time.Second)
+	if err != nil {
+		t.Fatalf("Consume returned %v", err)
+	}
+
+	if len(queued) != 2 {
+		t.Fatalf("stream holds %d entries, want 2", len(queued))
+	}
+
+	if queued[0].Message.CorrelationID == queued[1].Message.CorrelationID {
+		t.Fatal("each accepted message must carry its own correlation id")
+	}
+	if queued[0].Entry == queued[1].Entry {
+		t.Fatal("each entry must have its own stream id")
+	}
+}
+
+func TestWorkerPoolRecoversAMessageAbandonedByADeadWorker(t *testing.T) {
+	queue, cfg := testQueue(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := queue.Publish(ctx, queuedMessage()); err != nil {
+		t.Fatalf("Publish returned %v", err)
+	}
+
+	if _, err := queue.Consume(ctx, "dead-worker", 10, time.Second); err != nil {
+		t.Fatalf("Consume returned %v", err)
+	}
+
+	pending, err := queue.Pending(ctx)
+	if err != nil || pending != 1 {
+		t.Fatalf("pending = %d (err %v), want the entry stranded by the dead worker", pending, err)
+	}
+
+	recorder := &stubRecorder{}
+	pool := delivery.NewWorkerPool(queue, delivery.NewDeliveryService(stubProcessor{}, stubSender{}, recorder), cfg)
+	pool.Start(ctx)
+
+	waitForProcessed(t, pool, 1)
+
+	cancel()
+	pool.Wait()
+
+	pending, err = queue.Pending(context.Background())
+	if err != nil {
+		t.Fatalf("Pending returned %v", err)
+	}
+
+	if pending != 0 {
+		t.Fatalf("pending = %d, the reclaimed entry must be acked once processed", pending)
+	}
+
+	if recorder.completed != 1 {
+		t.Fatalf("audit completions = %d, want the reclaimed message recorded once", recorder.completed)
+	}
+}
+
+func TestWorkerDiscardsAnUnreadableEntryInsteadOfLoopingForever(t *testing.T) {
+	queue, cfg := testQueue(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := testsupport.Redis(t)
+
+	unreadable := &redis.XAddArgs{
+		Stream: cfg.Stream,
+		Values: map[string]any{"junk": "no correlation id"},
+	}
+
+	if err := client.XAdd(ctx, unreadable).Err(); err != nil {
+		t.Fatalf("XAdd returned %v", err)
+	}
+
+	pool := delivery.NewWorkerPool(queue, delivery.NewDeliveryService(stubProcessor{}, stubSender{}, &stubRecorder{}), cfg)
+	pool.Start(ctx)
+
+	deadline := time.Now().Add(5 * time.Second)
+
+	for time.Now().Before(deadline) {
+		pending, err := queue.Pending(ctx)
+		if err == nil && pending == 0 {
+			break
+		}
+
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	cancel()
+	pool.Wait()
+
+	pending, err := queue.Pending(context.Background())
+	if err != nil {
+		t.Fatalf("Pending returned %v", err)
+	}
+
+	if pending != 0 {
+		t.Fatalf("pending = %d, an entry the worker cannot read must be acked rather than replayed", pending)
+	}
 }

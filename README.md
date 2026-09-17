@@ -1,79 +1,98 @@
 # SecurePlus
 
-An outbound email security gateway. Mail from a tenant's mail system is accepted over SMTP, evaluated against that tenant's data-loss-prevention policies, DKIM-signed, relayed to the recipient's MX, and recorded — with a dashboard over the resulting delivery audits and policy incidents.
+An outbound email security gateway. Mail from a tenant's mail system is accepted over SMTP, queued, evaluated against that tenant's data-loss-prevention policies, DKIM-signed, relayed to the recipient's MX, and recorded — with a dashboard over the resulting delivery audits and policy incidents.
 
-## What it does
+## How mail flows
 
 ```
 Exchange / Gmail
        │  SMTP
        ▼
-┌──────────────┐   authorize sender domain · envelope limits · correlation id
-│ SMTP Receiver│   250 only after Redis accepts the message, otherwise 451
-└──────┬───────┘
-       │ XADD
-       ▼
-┌──────────────┐   delivery:messages · consumer group delivery-workers
-│ Redis Stream │   the handoff buffer; entries stay pending until acked
-└──────┬───────┘
-       │ XREADGROUP
-       ▼
-┌──────────────┐   DELIVERY_WORKERS goroutines own processing concurrency
-│Delivery Worker│  crash leaves the entry pending · XAUTOCLAIM reclaims it
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐   resolve the sender's active policies (one query, cached)
-│ Policy Engine│   recipient-domain + attachment restrictions
-└──────┬───────┘   keyword (Aho-Corasick) and regex content rules
-       │           resolve one effective action · write an incident
-       ▼
-┌──────────────┐   DKIM sign · MX lookup · STARTTLS · retry with backoff
-│    Relay     │
-└──────┬───────┘
-       ▼
-Recipient MX
-
-Receiver ─┐
-Engine  ──┼──▶ MongoDB   delivery_audits   PROCESSING → SUCCESS | FAILED
-Relay   ──┘                email_incidents  one per flagged message
-
-                          XACK only after the terminal audit is written
+┌───────────────┐  authorize sender domain · envelope limits · correlation id
+│ SMTP Receiver │  250 only once Redis holds the message, otherwise 451
+└───────┬───────┘
+        │  XADD
+        ▼
+┌───────────────┐  delivery:messages · group delivery-workers
+│  Redis Stream │  an entry stays pending until it is acknowledged
+└───────┬───────┘
+        │  XREADGROUP
+        ▼
+┌───────────────┐  DELIVERY_WORKERS goroutines · one entry to one worker
+│ Delivery Pool │  a crash leaves the entry pending · XAUTOCLAIM reclaims it
+└───────┬───────┘
+        │
+        ▼
+┌───────────────┐  resolve the sender's active policies (one query, cached)
+│   Screening   │  recipient-domain and attachment restrictions
+└───────┬───────┘  keyword (Aho-Corasick) and regex content rules
+        │          resolve one effective action · write an incident
+        ▼
+┌───────────────┐  DKIM sign · MX lookup · STARTTLS · retry with backoff
+│     Relay     │
+└───────┬───────┘
+        ▼
+  Recipient MX
+        │
+        ▼
+      XACK        only after the terminal audit record is written
 ```
 
-An admin configures sending domains, DKIM keys, email users, groups, rules and policies through the dashboard. Policies bind rules and groups together and carry one action: `BLOCK`, `QUARANTINE`, `REDACT` or `AUDIT`.
+The SMTP session does the minimum: authorize the sender domain, validate the envelope, read the body, mint the correlation id, write a `PROCESSING` audit record, publish. Everything after that belongs to the worker pool.
+
+**`250` means the message crossed into Redis** — nothing more and nothing less. If the publish fails, the receiver completes the audit record as `FAILED` and answers `451`, so the sending MTA retries rather than believing the message was taken.
+
+**An entry is acknowledged only once its outcome is recorded.** A delivery that fails permanently is still a finished message: it gets a terminal `FAILED` audit and is acked, because replaying it would send the mail twice. The single case that leaves an entry pending is an outcome that could not be written down — precisely when reprocessing is safe. A worker that dies mid-message acknowledges nothing, and after `DELIVERY_CLAIM_IDLE` another worker reclaims the entry.
+
+**One correlation id** is minted in the SMTP session before publishing and carried unchanged through the stream, the worker, policy evaluation, the incident, the audit record and any block notice. The Redis entry id, the RFC822 `Message-ID` and the correlation id are three separate things.
+
+Four files tell the whole story:
+
+| File | Role |
+|---|---|
+| [`handler/smtp/receiver.go`](backend/internal/delivery/handler/smtp/receiver.go) | the SMTP session — validate, publish, answer |
+| [`queue.go`](backend/internal/delivery/queue.go) | Redis Streams — publish, consume, ack, reclaim, group creation |
+| [`worker.go`](backend/internal/delivery/worker.go) | the pool, the reclaimer, the stats reporter |
+| [`service.go`](backend/internal/delivery/service.go) | `DeliveryService.Process` — screening, audit, relay |
+
+An admin configures sending domains, DKIM keys, email users, groups, rules and policies through the dashboard. Policies bind rules and groups together and carry one action: `BLOCK`, `QUARANTINE`, `REDACT` or `AUDIT`. A `BLOCK` withholds recipients; the other three record an incident and deliver.
 
 Each customer also has its own dashboard branding — logo, light/dark theme, language and timezone. See [Custom branding](#custom-branding).
 
 ## Repository layout
 
 ```
-frontend/           Next.js 16 App Router, RTK Query, Tailwind v4, base-ui
+frontend/             Next.js 16 App Router, RTK Query, Tailwind v4, base-ui
 backend/
-  cmd/api/          one binary: HTTP API + SMTP receiver
+  cmd/api/            one binary: HTTP API + SMTP receiver + delivery workers
   internal/
-    auth/           registration, login, JWT cookies, CSRF, identity cache
-    middleware/     origin, auth, CSRF, privilege guards
-    admin/          configurations, policies, rules, email users, groups, branding
-    delivery/       smtp → redis stream → worker → policy → relay
-      queue.go      Redis Streams handoff (publish · consume · ack · reclaim)
-      worker.go     worker pool, ACK after the outcome is recorded
-      service.go    DeliveryService.Process — policy, audit, relay
-      handler/smtp/ SMTP session: validate, publish, 250 or 451
-      services/     screening · policy · inspection · restriction
-                    adjudication · transmission · recording
-    audit/          delivery audits and email incidents (MongoDB)
-    notification/   transactional email from templates
-    storage/        S3/MinIO object storage (customer logos)
-    config/         environment loading
-    db/             GORM models and shared scopes
-  migrations/       golang-migrate SQL
-  tests/            mirrors internal/, integration tests behind a build tag
-  scripts/          send_test_mail.py
+    auth/             registration, login, JWT cookies, CSRF, identity cache
+    middleware/       origin, auth, CSRF, privilege guards
+    admin/            configurations, policies, rules, email users, groups, branding
+    delivery/
+      model.go        EmailMessage, results, the Processor and Sender seams
+      queue.go        Redis Streams handoff
+      worker.go       worker pool and pending-entry recovery
+      service.go      DeliveryService.Process
+      handler/smtp/   SMTP server, session, sender authorization
+      services/       screening · policy · inspection · restriction
+                      adjudication · transmission · recording
+      repositories/   provider configs, policy sets, email templates
+      dto/            evaluation and policy-set value types
+    audit/            delivery audits and email incidents (MongoDB)
+    notification/     transactional email from templates
+    storage/          S3/MinIO object storage (customer logos)
+    config/           environment loading
+    db/               GORM models and shared scopes
+  migrations/         golang-migrate SQL
+  tests/              mirrors internal/, integration tests behind a build tag
+  scripts/            send_test_mail.py
   docker-compose.yml  Postgres, Redis, MongoDB, MinIO, Mailpit
 ```
 
-`admin`, `delivery` and `audit` are peer modules, each with its own `handler / services / repositories / dto / utils` layering. `audit` defines its own vocabulary and is not imported by `delivery` except through a recorder interface, so it could be extracted as a service later.
+`admin`, `delivery` and `audit` are peer modules sharing a `handler / services / repositories / dto / utils` layering. `audit` owns its own vocabulary and is reached from `delivery` only through a recorder interface, so it could be extracted as a service later.
+
+Redis carries three unrelated things: the delivery stream, the policy and signing-config caches, and the auth identity cache. They share one client built from `REDIS_URL`.
 
 ## Running locally
 
@@ -83,15 +102,17 @@ cp ../.env.example .env
 make up
 ```
 
-Brings up Postgres, Redis, MongoDB, Mailpit and MinIO from `backend/docker-compose.yml`, under compose project `dpdp`. Mailpit's UI is on <http://localhost:8025>, MinIO's console on <http://localhost:9001>.
+Brings up Postgres, Redis, MongoDB, Mailpit and MinIO from `backend/docker-compose.yml` under compose project `dpdp`. Mailpit's UI is on <http://localhost:8025>, MinIO's console on <http://localhost:9001>.
 
 Postgres runs the `pgvector` image — migration `000001` creates the `vector`, `pgcrypto` and `citext` extensions, so a stock `postgres` image will not migrate.
 
-That brings up infrastructure only. To run the backend itself from source against those containers:
+That is infrastructure only. To run the backend from source against those containers:
 
 ```bash
 make run
 ```
+
+The consumer group is created at startup (`XGROUP CREATE … MKSTREAM`); an existing group is not an error, so restarts are safe.
 
 To run the backend in Docker too, including a one-shot migration step:
 
@@ -99,7 +120,7 @@ To run the backend in Docker too, including a one-shot migration step:
 docker compose --profile app up -d --build
 ```
 
-The `app` profile expects in-cluster hostnames (`postgres`, `redis`, `mongo`, `minio`, `mailpit`) rather than the `localhost` values in `.env`; the compose file supplies those as overrides on top of `.env`, so one env file serves both ways of running.
+The `app` profile expects in-cluster hostnames (`postgres`, `redis`, `mongo`, `minio`, `mailpit`) rather than the `localhost` values in `.env`; the compose file supplies those as overrides, so one env file serves both ways of running.
 
 Frontend:
 
@@ -122,11 +143,20 @@ python3 scripts/send_test_mail.py \
   --body "this is confidential"
 ```
 
-Standard library only. `--help` lists the rest: multiple recipients, attachments, a fixed `Message-ID`, a pre-existing `DKIM-Signature`, concurrent sends, and full SMTP tracing.
+Standard library only. `--help` lists the rest: multiple recipients, attachments, a fixed `Message-ID`, a pre-existing `DKIM-Signature`, concurrent sends, and full SMTP tracing. The exit code follows the SMTP reply, so `250` and `451` are distinguishable from a script.
 
-Set `RELAY_MX_OVERRIDE=localhost:1025` first so the relay delivers into Mailpit instead of doing a real MX lookup. The envelope sender's domain must be a configured provider configuration, and for a policy to apply the address must also exist as an email user in a group bound to an active policy.
+Set `RELAY_MX_OVERRIDE=localhost:1025` first so the relay delivers into Mailpit instead of doing a real MX lookup. The envelope sender's domain must be a configured provider configuration; for a policy to apply, the address must also exist as an email user in a group bound to an active policy.
 
 Results land in the dashboard under **Email Protection → Audits**, split into Delivery Audit and Incidents.
+
+To watch the handoff itself:
+
+```bash
+redis-cli XLEN delivery:messages                       # entries ever published
+redis-cli XPENDING delivery:messages delivery-workers  # taken but not yet acked
+```
+
+A healthy idle system reports zero pending. A number that does not fall is a worker that died mid-message; it clears itself once `DELIVERY_CLAIM_IDLE` elapses and another worker reclaims it.
 
 ## Custom branding
 
@@ -202,12 +232,14 @@ make migrate-create name=add_something
 
 ```bash
 make test-unit            # no infrastructure required
-make test-db              # creates and migrates the test database
+make test-db              # drops, creates and migrates the test database
 make test-integration     # needs Postgres, Redis, MongoDB, Mailpit, MinIO
 make test                 # both
 ```
 
-Integration tests sit behind a `//go:build integration` tag and need:
+Integration tests sit behind a `//go:build integration` tag, so `make test-unit` compiles neither them nor their helpers. Run `go build -tags integration ./tests/...` after changing shared wiring, or a break there stays invisible until someone runs the full suite.
+
+They need:
 
 ```
 TEST_DATABASE_URL      postgres://...
@@ -222,15 +254,15 @@ TEST_S3_BUCKET         dpdp-test                 must differ from S3_BUCKET
 TEST_S3_USE_SSL        false
 ```
 
-`TEST_REDIS_URL` must select a different logical database than `REDIS_URL`; the suite refuses to run otherwise, because it flushes what it connects to.
+`TEST_REDIS_URL` must select a different logical database than `REDIS_URL`; the suite refuses to run otherwise, because it flushes what it connects to. Each delivery test also uses its own stream name, so runs do not interfere.
 
 `TEST_S3_*` is the only optional group. Unset or unreachable object storage skips the logo round-trip tests and leaves the rest running — the bucket is created on connect, so it need not exist beforehand.
 
-Note that `make` loads `.env` itself; a bare `go test` does not. To run a subset directly:
+`make` loads `.env` itself; a bare `go test` does not. To run a subset directly:
 
 ```bash
 set -a && . ./.env && set +a
-go test -tags integration -p 1 -count=1 ./tests/admin/handler/ -run TestBranding -v
+go test -tags integration -p 1 -count=1 ./tests/delivery/ -run TestQueue -v
 ```
 
 ## Configuration
@@ -240,7 +272,7 @@ Everything is environment-driven. The ones without defaults:
 | Variable | Notes |
 |---|---|
 | `DATABASE_URL` | an empty value silently falls back to a local Unix socket |
-| `REDIS_URL` | full URL — `rediss://` enables TLS |
+| `REDIS_URL` | full URL — `rediss://` enables TLS. One client serves the delivery stream, the caches and the identity cache |
 | `MONGO_URI`, `MONGO_DATABASE` | the process exits if Mongo is unreachable |
 | `PASSWORD_PEPPER`, `CSRF_SECRET` | mixed into every password hash and CSRF token |
 | `CORS_ALLOWED_ORIGIN` | exact origin, no trailing slash; credentials forbid wildcards |
@@ -257,14 +289,19 @@ Notable defaults:
 | `APP_ENV` | — | anything but `production` logs every SQL statement |
 | `COOKIE_SECURE` / `COOKIE_SAMESITE` | `false` / `lax` | cross-site deployments need `true` / `none` |
 | `SMTP_SERVER_ADDR` | `:2525` | Docker maps `25:2525` so the process stays unprivileged |
-| `SMTP_MAX_SIZE` | 10 MB | also the ceiling on any entry written to the delivery stream |
+| `SMTP_MAX_SIZE` | 10 MB | the only message-size limit; nothing larger can reach the stream |
 | `SMTP_MAX_CONNECTIONS` | 100 | SMTP connection capacity, independent of delivery concurrency |
-| `DELIVERY_WORKERS` | 4 | delivery-processing concurrency; the worker pool owns it, not SMTP |
-| `DELIVERY_STREAM` / `DELIVERY_CONSUMER_GROUP` | `delivery:messages` / `delivery-workers` | Redis Streams handoff |
-| `DELIVERY_CLAIM_IDLE` | 5m | how long an entry may sit pending before another worker reclaims it |
-| `DELIVERY_BATCH_SIZE` / `DELIVERY_BLOCK_TIME` | 10 / 1s | `XREADGROUP` count and block duration |
+| `DELIVERY_WORKERS` | 4 | delivery-processing concurrency, per instance |
+| `DELIVERY_STREAM` | `delivery:messages` | the handoff stream |
+| `DELIVERY_CONSUMER_GROUP` | `delivery-workers` | shared across instances, so one entry goes to one worker |
+| `DELIVERY_CLAIM_IDLE` | `5m` | pending time after which another worker reclaims an entry |
+| `DELIVERY_BATCH_SIZE` / `DELIVERY_BLOCK_TIME` | `10` / `1s` | `XREADGROUP` count and block duration |
 | `RELAY_MX_OVERRIDE` | empty | force all mail to one host, for development |
-| `RELAY_MAX_ATTEMPTS` | 3 | with 1m → 5m backoff, capped at 15m |
+| `RELAY_MAX_ATTEMPTS` | `3` | with 1m → 5m backoff, capped at 15m |
+| `SHUTDOWN_TIMEOUT` | `30s` | bounds the worker drain |
 
-The remaining `SMTP_*`, `RELAY_*` and `DELIVERY_*` knobs are in `internal/config/smtpserver.go`, `internal/config/relay.go` and `internal/config/delivery.go`. Redis reuses the single `REDIS_URL` client — there is no second Redis configuration.
+The remaining `SMTP_*`, `RELAY_*` and `DELIVERY_*` knobs live in `internal/config/smtpserver.go`, `internal/config/relay.go` and `internal/config/delivery.go`.
 
+`SMTP_MAX_CONNECTIONS` and `DELIVERY_WORKERS` are independent: the first caps concurrent SMTP conversations, the second caps concurrent deliveries, and the stream absorbs the difference. Scaling out adds workers to the same consumer group, so throughput rises without duplicating deliveries; caches and the worker count stay per-instance.
+
+On shutdown the SMTP listener stops first, then the HTTP API, then the workers stop asking Redis for new entries while finishing the message they hold. Anything unfinished when the budget expires is simply never acknowledged, so the next process to start reclaims it.

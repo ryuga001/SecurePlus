@@ -2,12 +2,6 @@
 
 The mail path. Everything between "a tenant's mail server hands us a message" and "the recipient's MX has it, and we have written down what happened."
 
-> **Note:** mail no longer flows straight from the SMTP session into processing. The
-> receiver publishes to a Redis Stream and returns; a worker pool consumes it. Sections
-> covering the pipeline, admission control, concurrency and shutdown below have been
-> updated for that; the policy, matching, restriction, relay and audit sections are
-> unchanged and remain accurate.
-
 This is the only module in the backend with **no HTTP surface**. It registers no routes and no handlers. It is driven entirely by an SMTP listener started in [`cmd/api/main.go`](../../cmd/api/main.go), does its work on detached goroutines, and reports outcomes through two injected recorder interfaces that write to MongoDB. The dashboard reads those records back through `internal/audit`, which this module never imports.
 
 | Sub-package | Files | LOC | Responsibility |
@@ -1826,7 +1820,7 @@ Receiver-side SMTP codes not backed by a sentinel: `501 5.1.3` malformed address
 
 An entry whose worker does not finish inside the budget is simply never acked, so it stays pending and the next process to start reclaims it. Nothing is acknowledged that did not complete.
 
-Draining is bounded, not guaranteed — but unlike before, exceeding the deadline is now recoverable rather than lossy: the entry is still pending in Redis. The terminal audit write and the `XACK` both use `context.WithoutCancel`, so a delivery that does finish during shutdown records its outcome and acknowledges cleanly.
+Draining is bounded rather than guaranteed, and exceeding the deadline is recoverable rather than lossy: the entry is still pending in Redis. The terminal audit write and the `XACK` both use `context.WithoutCancel`, so a delivery that does finish during shutdown records its outcome and acknowledges cleanly.
 
 **Session context.** `session.ctx` is `context.Background()`, not derived from the connection, and the dispatcher uses the long-lived application context. There is no per-message deadline; the bounds that exist are the dial, DNS and read/write timeouts.
 

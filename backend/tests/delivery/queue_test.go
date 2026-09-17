@@ -349,8 +349,7 @@ func TestSMTPRejectsWithTemporaryFailureWhenTheQueueIsUnavailable(t *testing.T) 
 		},
 		smtphandler.NewBackend(
 			smtphandler.NewAuthorizer(stubDomainCache{}, stubDomainStore{}),
-			&stubRecorder{},
-			queue,
+			delivery.NewAcceptor(&stubRecorder{}, queue),
 			1024*1024,
 			10,
 		),
@@ -455,8 +454,7 @@ func smtpServerFor(t *testing.T, queue *delivery.Queue) string {
 		},
 		smtphandler.NewBackend(
 			smtphandler.NewAuthorizer(stubDomainCache{}, stubDomainStore{}),
-			&stubRecorder{},
-			queue,
+			delivery.NewAcceptor(&stubRecorder{}, queue),
 			1024*1024,
 			10,
 		),

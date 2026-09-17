@@ -160,7 +160,7 @@ func setup(t *testing.T, mxOverride string) harness {
 			ReadTimeout:  10 * time.Second,
 			WriteTimeout: 10 * time.Second,
 		},
-		smtphandler.NewBackend(authorizer, recorder, queue, 1024*1024, 10),
+		smtphandler.NewBackend(authorizer, delivery.NewAcceptor(recorder, queue), 1024*1024, 10),
 		"test.local",
 	)
 

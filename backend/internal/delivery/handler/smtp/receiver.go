@@ -5,15 +5,10 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net/mail"
 	"strings"
-	"time"
 
 	gosmtp "github.com/emersion/go-smtp"
-	"github.com/google/uuid"
 
-	auditdto "dpdp-backend/internal/audit/dto/deliveryaudit"
-	auditutils "dpdp-backend/internal/audit/utils"
 	"dpdp-backend/internal/delivery"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
@@ -37,23 +32,20 @@ type Authorization struct {
 
 type Backend struct {
 	authorizer *Authorizer
-	recorder   auditdto.Recorder
-	queue      *delivery.Queue
+	acceptor   *delivery.Acceptor
 	maxSize    int64
 	maxRcpt    int
 }
 
 func NewBackend(
 	authorizer *Authorizer,
-	recorder auditdto.Recorder,
-	queue *delivery.Queue,
+	acceptor *delivery.Acceptor,
 	maxSize int64,
 	maxRecipients int,
 ) *Backend {
 	return &Backend{
 		authorizer: authorizer,
-		recorder:   recorder,
-		queue:      queue,
+		acceptor:   acceptor,
 		maxSize:    maxSize,
 		maxRcpt:    maxRecipients,
 	}
@@ -130,66 +122,21 @@ func (s *session) Data(r io.Reader) error {
 		return errMessageTooBig
 	}
 
-	msg := delivery.EmailMessage{
-		CorrelationID: uuid.NewString(),
-		MessageID:     MessageID(raw),
-		CustomerID:    s.auth.CustomerID,
-		ConfigID:      s.auth.ConfigID,
-		From:          s.from,
-		SenderDomain:  s.domain,
-		Recipients:    append([]string(nil), s.recipients...),
-		Raw:           raw,
-		Size:          int64(len(raw)),
-		ReceivedAt:    time.Now().UTC(),
-	}
+	_, err = s.backend.acceptor.Accept(s.ctx, delivery.Submission{
+		CustomerID:   s.auth.CustomerID,
+		ConfigID:     s.auth.ConfigID,
+		From:         s.from,
+		SenderDomain: s.domain,
+		Recipients:   s.recipients,
+		Raw:          raw,
+	})
 
-	record := auditdto.Record{
-		CorrelationID: msg.CorrelationID,
-		MessageID:     msg.MessageID,
-		CustomerID:    msg.CustomerID,
-		ConfigID:      msg.ConfigID,
-		From:          msg.From,
-		SenderDomain:  msg.SenderDomain,
-		Recipients:    pendingRecipients(msg.Recipients),
-		Size:          msg.Size,
-	}
-
-	if err := s.backend.recorder.Create(s.ctx, record); err != nil {
-		slog.ErrorContext(s.ctx, "delivery audit create failed",
-			"correlation_id", msg.CorrelationID,
-			"customer_id", msg.CustomerID,
-			"error", err,
-		)
-
+	switch {
+	case errors.Is(err, delivery.ErrAuditUnavailable):
 		return errAuditDown
-	}
-
-	if err := s.backend.queue.Publish(s.ctx, msg); err != nil {
-		slog.ErrorContext(s.ctx, "delivery queue publish failed",
-			"correlation_id", msg.CorrelationID,
-			"customer_id", msg.CustomerID,
-			"error", err,
-		)
-
-		s.backend.recorder.Complete(s.ctx, msg.CorrelationID, auditdto.Result{
-			Status:     auditutils.StatusFailed,
-			Recipients: failedRecipients(msg.Recipients, "delivery queue unavailable"),
-			Failure: &auditdto.Failure{
-				Type:   auditutils.FailureProcessing,
-				Reason: "delivery queue unavailable",
-			},
-		})
-
+	case err != nil:
 		return errQueueDown
 	}
-
-	slog.InfoContext(s.ctx, "message accepted",
-		"correlation_id", msg.CorrelationID,
-		"customer_id", msg.CustomerID,
-		"message_id", msg.MessageID,
-		"recipients", len(msg.Recipients),
-		"size", msg.Size,
-	)
 
 	s.reset()
 
@@ -214,40 +161,6 @@ func (s *session) reset() {
 	s.auth = Authorization{}
 }
 
-func pendingRecipients(recipients []string) []auditdto.Recipient {
-	entries := make([]auditdto.Recipient, 0, len(recipients))
-
-	for _, recipient := range recipients {
-		entries = append(entries, auditdto.Recipient{
-			Email:  recipient,
-			Domain: delivery.DomainOf(recipient),
-			Status: auditutils.StatusProcessing,
-		})
-	}
-
-	return entries
-}
-
 func MessageID(raw []byte) string {
-	message, err := mail.ReadMessage(strings.NewReader(string(raw)))
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(message.Header.Get("Message-ID"))
-}
-
-func failedRecipients(recipients []string, reason string) []auditdto.Recipient {
-	entries := make([]auditdto.Recipient, 0, len(recipients))
-
-	for _, recipient := range recipients {
-		entries = append(entries, auditdto.Recipient{
-			Email:  recipient,
-			Domain: delivery.DomainOf(recipient),
-			Status: auditutils.StatusFailed,
-			Error:  reason,
-		})
-	}
-
-	return entries
+	return delivery.MessageIDOf(raw)
 }

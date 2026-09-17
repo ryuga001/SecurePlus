@@ -42,6 +42,7 @@ import (
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/delivery"
+	"dpdp-backend/internal/delivery/handler/rest"
 	"dpdp-backend/internal/delivery/handler/smtp"
 	templaterepo "dpdp-backend/internal/delivery/repositories/emailtemplate"
 	policysetrepo "dpdp-backend/internal/delivery/repositories/policyset"
@@ -166,13 +167,13 @@ func main() {
 	}
 
 	workers := delivery.NewWorkerPool(queue, deliveryService, cfg.Delivery)
+	acceptor := delivery.NewAcceptor(recorder, queue)
 
 	smtpServer := smtp.NewServer(
 		cfg.SMTPServer,
 		smtp.NewBackend(
 			authorizer,
-			recorder,
-			queue,
+			acceptor,
 			cfg.SMTPServer.MaxSize,
 			cfg.SMTPServer.MaxRecipients,
 		),
@@ -245,6 +246,18 @@ func main() {
 	brandingHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
 	incidentHandler.RegisterRoutes(protected, guard)
+
+	rest.NewSubmitHandler(
+		authorizer,
+		acceptor,
+		cfg.SMTPServer.MaxSize,
+		cfg.SMTPServer.MaxRecipients,
+	).RegisterRoutes(api)
+
+	slog.Warn("unauthenticated mail submission route enabled",
+		"route", "POST /api/v1/delivery/messages",
+		"reason", "port 25 stopgap",
+	)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.App.Port,

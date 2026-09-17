@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 

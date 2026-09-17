@@ -1,7 +1,7 @@
 package restriction
 
 import (
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	dto "dpdp-backend/internal/delivery/dto/evaluation"
 	"dpdp-backend/internal/delivery/utils"
 )

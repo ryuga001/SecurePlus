@@ -3,7 +3,7 @@ package screening
 import (
 	"context"
 
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/repositories/provider"
 )
 

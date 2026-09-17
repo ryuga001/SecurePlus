@@ -11,7 +11,6 @@ type SMTPServer struct {
 	MaxSize         int64
 	MaxRecipients   int
 	MaxConnections  int
-	MaxDeliveries   int
 	ReadTimeout     time.Duration
 	WriteTimeout    time.Duration
 	ShutdownTimeout time.Duration
@@ -23,7 +22,6 @@ func loadSMTPServer() SMTPServer {
 		MaxSize:         int64(envInt("SMTP_MAX_SIZE", 10*1024*1024)),
 		MaxRecipients:   envInt("SMTP_MAX_RECIPIENTS", 100),
 		MaxConnections:  envInt("SMTP_MAX_CONNECTIONS", 100),
-		MaxDeliveries:   envInt("SMTP_MAX_DELIVERIES", 32),
 		ReadTimeout:     envDuration("SMTP_READ_TIMEOUT", time.Minute),
 		WriteTimeout:    envDuration("SMTP_WRITE_TIMEOUT", time.Minute),
 		ShutdownTimeout: envDuration("SHUTDOWN_TIMEOUT", 30*time.Second),

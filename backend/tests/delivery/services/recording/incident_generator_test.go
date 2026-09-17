@@ -9,7 +9,7 @@ import (
 
 	auditdto "dpdp-backend/internal/audit/dto/emailincident"
 	auditutils "dpdp-backend/internal/audit/utils"
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	dto "dpdp-backend/internal/delivery/dto/evaluation"
 	"dpdp-backend/internal/delivery/services/recording"
 	generatordto "dpdp-backend/internal/delivery/services/recording"

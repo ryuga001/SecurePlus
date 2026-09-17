@@ -26,11 +26,11 @@ import (
 	auditutils "dpdp-backend/internal/audit/utils"
 	"dpdp-backend/internal/config"
 	"dpdp-backend/internal/db"
+	"dpdp-backend/internal/delivery"
 	smtphandler "dpdp-backend/internal/delivery/handler/smtp"
 	policysetrepo "dpdp-backend/internal/delivery/repositories/policyset"
 	"dpdp-backend/internal/delivery/repositories/provider"
 	"dpdp-backend/internal/delivery/services/adjudication"
-	"dpdp-backend/internal/delivery/services/dispatch"
 	"dpdp-backend/internal/delivery/services/inspection"
 	"dpdp-backend/internal/delivery/services/policy"
 	"dpdp-backend/internal/delivery/services/recording"
@@ -41,11 +41,11 @@ import (
 )
 
 type harness struct {
-	database   *gorm.DB
-	mongo      *mongodriver.Client
-	addr       string
-	dispatcher *dispatch.Dispatcher
-	customer   db.Customer
+	database *gorm.DB
+	mongo    *mongodriver.Client
+	addr     string
+	workers  *delivery.WorkerPool
+	customer db.Customer
 }
 
 func mailpitAddr(t *testing.T) string {
@@ -114,12 +114,33 @@ func setup(t *testing.T, mxOverride string) harness {
 		Incidents: recording.NewIncidentGenerator(incidents),
 	})
 
-	dispatcher := dispatch.NewDispatcher(
-		ctx,
+	deliveryService := delivery.NewDeliveryService(
 		screening.NewEngine(provider.NewConfigCache(configurations, rdb), enforcer),
 		transmission.NewRelay(relayCfg),
 		recorder,
 	)
+
+	deliveryCfg := config.Delivery{
+		Stream:        fmt.Sprintf("delivery:messages:test:%d", time.Now().UnixNano()),
+		ConsumerGroup: "delivery-workers",
+		Workers:       2,
+		ClaimIdle:     500 * time.Millisecond,
+		BatchSize:     10,
+		BlockTime:     50 * time.Millisecond,
+	}
+
+	queue := delivery.NewQueue(rdb, deliveryCfg)
+	if err := queue.EnsureGroup(context.Background()); err != nil {
+		t.Fatalf("consumer group creation failed: %v", err)
+	}
+
+	workers := delivery.NewWorkerPool(queue, deliveryService, deliveryCfg)
+	workers.Start(ctx)
+
+	t.Cleanup(func() {
+		cancel()
+		workers.Wait()
+	})
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -134,11 +155,11 @@ func setup(t *testing.T, mxOverride string) harness {
 			Addr:          addr,
 			MaxSize:       1024 * 1024,
 			MaxRecipients: 10,
-			MaxDeliveries: 4,
-			ReadTimeout:   10 * time.Second,
-			WriteTimeout:  10 * time.Second,
+
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
 		},
-		smtphandler.NewBackend(authorizer, recorder, dispatcher, 4, 1024*1024, 10),
+		smtphandler.NewBackend(authorizer, recorder, queue, 1024*1024, 10),
 		"test.local",
 	)
 
@@ -154,11 +175,11 @@ func setup(t *testing.T, mxOverride string) harness {
 	waitForListener(t, addr)
 
 	return harness{
-		database:   database,
-		mongo:      client,
-		addr:       addr,
-		dispatcher: dispatcher,
-		customer:   testsupport.Customer(t, database),
+		database: database,
+		mongo:    client,
+		addr:     addr,
+		workers:  workers,
+		customer: testsupport.Customer(t, database),
 	}
 }
 
@@ -440,11 +461,25 @@ func TestIntegrationSameMessageIDProducesTwoAudits(t *testing.T) {
 		}
 	}
 
-	h.dispatcher.Wait()
-
-	if total := h.auditCount(t); total != 2 {
+	if total := h.waitForAuditCount(t, 2); total != 2 {
 		t.Fatalf("audit records = %d, want 2 (no deduplication by Message-ID)", total)
 	}
+}
+
+func (h harness) waitForAuditCount(t *testing.T, want int64) int64 {
+	t.Helper()
+
+	var total int64
+
+	for range 100 {
+		if total = h.auditCount(t); total >= want {
+			return total
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return total
 }
 
 func (h harness) incident(t *testing.T, wantTrigger string) bson.M {

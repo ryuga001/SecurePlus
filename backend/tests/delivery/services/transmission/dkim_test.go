@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/services/transmission"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 )

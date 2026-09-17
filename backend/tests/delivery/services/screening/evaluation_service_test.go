@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	incidentdto "dpdp-backend/internal/audit/dto/emailincident"
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	dto "dpdp-backend/internal/delivery/dto/evaluation"
 	"dpdp-backend/internal/delivery/services/adjudication"
 	"dpdp-backend/internal/delivery/services/inspection"

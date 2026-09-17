@@ -2,6 +2,12 @@
 
 The mail path. Everything between "a tenant's mail server hands us a message" and "the recipient's MX has it, and we have written down what happened."
 
+> **Note:** mail no longer flows straight from the SMTP session into processing. The
+> receiver publishes to a Redis Stream and returns; a worker pool consumes it. Sections
+> covering the pipeline, admission control, concurrency and shutdown below have been
+> updated for that; the policy, matching, restriction, relay and audit sections are
+> unchanged and remain accurate.
+
 This is the only module in the backend with **no HTTP surface**. It registers no routes and no handlers. It is driven entirely by an SMTP listener started in [`cmd/api/main.go`](../../cmd/api/main.go), does its work on detached goroutines, and reports outcomes through two injected recorder interfaces that write to MongoDB. The dashboard reads those records back through `internal/audit`, which this module never imports.
 
 | Sub-package | Files | LOC | Responsibility |
@@ -44,15 +50,17 @@ flowchart TD
     SESS -->|"MAIL FROM"| AUTHZ["Authorizer.Authorize"]
     AUTHZ --> RDS1[("Redis<br/>authorized_domain:*")]
     AUTHZ --> PG1[("Postgres<br/>email_provider_configurations")]
-    SESS -->|"first RCPT"| SLOT{"acquire slot<br/>MaxDeliveries"}
-    SLOT -->|full| R451["451 4.3.2"]
-    SLOT -->|ok| DATA["DATA"]
+    SESS --> DATA["DATA"]
     DATA --> CREATE["Recorder.Create<br/>status PROCESSING"]
     CREATE --> MONGO1[("MongoDB<br/>delivery_audits")]
-    CREATE --> ACCEPT["250 accepted"]
-    ACCEPT --> DISP["Dispatcher.Dispatch<br/>new goroutine"]
+    CREATE --> PUB["Queue.Publish<br/>XADD delivery:messages"]
+    PUB -->|error| R451["451 4.3.2<br/>audit completed FAILED"]
+    PUB -->|ok| ACCEPT["250 accepted"]
+    ACCEPT --> STREAM[("Redis Stream<br/>entry pending")]
+    STREAM --> WORK["WorkerPool<br/>XREADGROUP"]
+    WORK --> SVC["DeliveryService.Process"]
 
-    DISP --> ENG["Engine.Process"]
+    SVC --> ENG["Engine.Process"]
     ENG --> CFG["ConfigCache.Resolve"]
     CFG --> RDS2[("Redis<br/>delivery:config:*")]
     ENG --> ENF["EvaluationService.Enforce"]
@@ -69,9 +77,10 @@ flowchart TD
 
     RELAY --> DONE["Recorder.Complete<br/>SUCCESS | FAILED"]
     DONE --> MONGO1
+    DONE --> ACK["XACK<br/>only after the outcome is recorded"]
 ```
 
-The `250 accepted` is returned before any policy or relay work happens. Everything below that line runs on its own goroutine.
+`250` is returned only once Redis has accepted the entry — that is the whole contract of the handoff. If the publish fails the receiver completes the audit record as `FAILED` and answers `451`, so the sending MTA retries. Everything below the stream runs in the worker pool, which a crash cannot lose: an entry stays pending until `XACK`, and `XAUTOCLAIM` hands it to another worker after `DELIVERY_CLAIM_IDLE`.
 
 ### 1.2 Accepted and delivered
 
@@ -1606,26 +1615,27 @@ Otherwise: `LookupMX`, sorted stable by preference. On a lookup failure that is 
 			destinations = append(destinations, Destination{Host: host, Addr: net.JoinHostPort(address, "25")})
 ```
 
-### 6.15 Admission control
+### 6.15 The SMTP → Redis handoff
 
-[`receiver/receiver.go`](receiver/receiver.go)
+[`queue.go`](queue.go), [`handler/smtp/receiver.go`](handler/smtp/receiver.go)
 
-`slots` is a buffered channel sized `SMTP_MAX_DELIVERIES`. Acquisition is a non-blocking send, so a full pipeline rejects rather than queues:
+The receiver does SMTP work only: authorize the sender, validate recipients, enforce
+`SMTP_MAX_RECIPIENTS` and `SMTP_MAX_SIZE`, read DATA, mint the correlation and message
+ids, write the `PROCESSING` audit record, then `XADD` to `delivery:messages`.
 
-```go
-func (b *Backend) acquire() bool {
-	select {
-	case b.slots <- struct{}{}:
-		return true
-	default:
-		return false
-	}
-}
-```
+There is no delivery-slot channel any more. SMTP connection capacity
+(`SMTP_MAX_CONNECTIONS`, enforced by `netutil.LimitListener`) and delivery-processing
+capacity (`DELIVERY_WORKERS`) are now independent, with the stream as the buffer between
+them.
 
-A slot is taken on the first RCPT and released in one of two ways: by the `done` callback handed to `Dispatch` once delivery finishes, or by `reset()` if the session is reset, logs out, or errors before DATA. The `holding` flag prevents a double release, and `release()` uses a non-blocking receive so an extra release is a harmless no-op rather than a deadlock.
+The publish is the acceptance boundary. On failure the receiver completes the audit
+record as `FAILED` and returns `451`, so no message is ever acknowledged that did not
+reach Redis, and no orphan `PROCESSING` record is left behind.
 
-This is separate from `MaxConnections`, which is enforced by `netutil.LimitListener` at the socket level in [`receiver/server.go`](receiver/server.go).
+Entries carry `id`, `correlation_id`, `customer_id`, `config_id`, `envelope_from`,
+`sender_domain`, `recipients` (JSON) and `raw` as native stream fields — no envelope
+JSON wrapper, so the body is not base64'd. `customer_id` and `config_id` are on the
+entry because the worker needs both for policy resolution and DKIM signing.
 
 ### 6.16 Block-notice composition
 
@@ -1740,10 +1750,20 @@ SMTP receiver — [`config/smtpserver.go`](../config/smtpserver.go):
 | `SMTP_MAX_SIZE` | 10485760 | Max message bytes; over it, `552` |
 | `SMTP_MAX_RECIPIENTS` | 100 | Max RCPT per message; over it, `452` |
 | `SMTP_MAX_CONNECTIONS` | 100 | Socket-level cap via `netutil.LimitListener` |
-| `SMTP_MAX_DELIVERIES` | 32 | Concurrent deliveries; over it, `451` |
 | `SMTP_READ_TIMEOUT` | 1m | Per-connection read timeout |
 | `SMTP_WRITE_TIMEOUT` | 1m | Per-connection write timeout |
-| `SHUTDOWN_TIMEOUT` | 30s | Bounds `dispatcher.Wait()` on shutdown |
+| `SHUTDOWN_TIMEOUT` | 30s | Bounds the worker drain on shutdown |
+
+Delivery handoff — [`config/delivery.go`](../config/delivery.go):
+
+| Variable | Default | Effect |
+|---|---|---|
+| `DELIVERY_STREAM` | `delivery:messages` | Redis stream the receiver publishes to |
+| `DELIVERY_CONSUMER_GROUP` | `delivery-workers` | Consumer group; one entry goes to one worker |
+| `DELIVERY_WORKERS` | 4 | Delivery-processing concurrency |
+| `DELIVERY_CLAIM_IDLE` | 5m | Pending time after which another worker reclaims an entry |
+| `DELIVERY_BATCH_SIZE` | 10 | `XREADGROUP`/`XAUTOCLAIM` count |
+| `DELIVERY_BLOCK_TIME` | 1s | `XREADGROUP` block duration |
 
 Relay — [`config/relay.go`](../config/relay.go):
 
@@ -1760,7 +1780,9 @@ Relay — [`config/relay.go`](../config/relay.go):
 | `RELAY_IPV6` | false | When false, AAAA addresses are skipped |
 | `RELAY_MX_OVERRIDE` | *(empty)* | Bypasses DNS entirely; `host` or `host:port` |
 
-`envInt` and `envDuration` fall back to the default on any parse error **and** on any value ≤ 0, so `SMTP_MAX_DELIVERIES=0` does not disable deliveries — it yields 32.
+`envInt` and `envDuration` fall back to the default on any parse error **and** on any value ≤ 0, so `DELIVERY_WORKERS=0` does not disable the pool — it yields 4.
+
+`SMTP_MAX_SIZE` is the only message-size limit: the receiver rejects an oversized message with `552` before publishing, so no stream entry can exceed it.
 
 ### 7.4 Errors and how they surface
 
@@ -1787,7 +1809,7 @@ Receiver-side SMTP codes not backed by a sentinel: `501 5.1.3` malformed address
 
 ## 8. Concurrency, failure and lifecycle
 
-**One goroutine per accepted message.** `Dispatch` starts it, `sync.WaitGroup` tracks it, `Wait()` drains. There is no worker pool and no queue — concurrency is bounded on the way in, by the `slots` channel, not on the way out.
+**A fixed worker pool, not a goroutine per message.** `DELIVERY_WORKERS` consumers each run `XREADGROUP` in a loop, plus one reclaimer and one stats reporter, all tracked by a single `sync.WaitGroup`. Concurrency is bounded on the way *out*, by the pool; the stream absorbs bursts that arrive faster than the pool drains them.
 
 **Panic containment.** Every delivery goroutine defers a recovery that logs and writes a terminal audit record with failure type `UNKNOWN`. A panic in evaluation or relay kills that message, not the process.
 
@@ -1796,12 +1818,15 @@ Receiver-side SMTP codes not backed by a sentinel: `501 5.1.3` malformed address
 **Shutdown ordering**, [`cmd/api/main.go:286-312`](../../cmd/api/main.go#L286-L312):
 
 1. A `shutdownCtx` is created with `SHUTDOWN_TIMEOUT` as its deadline.
-2. `smtpServer.Shutdown(shutdownCtx)` — stop accepting new messages.
+2. `smtpServer.Shutdown(shutdownCtx)` — stop accepting new SMTP connections.
 3. `server.Shutdown(shutdownCtx)` — stop the HTTP API.
 4. `servers.Wait()` — both listeners have returned.
-5. `dispatcher.Wait()` runs in its own goroutine, closing a `drained` channel when finished; a `select` races that channel against `shutdownCtx.Done()` and logs `"shutdown deadline reached with deliveries in flight"` if the deadline wins.
+5. `stopWorkers()` cancels the worker context — the consumers stop asking Redis for new entries, but a worker already inside `Process` runs to completion.
+6. `workers.Wait()` runs in its own goroutine, closing a `drained` channel when finished; a `select` races it against `shutdownCtx.Done()`.
 
-Draining is therefore bounded, not guaranteed. A delivery still sleeping between retry rounds when the context is cancelled hits `markInterrupted` and is recorded `FAILED` with `"interrupted by shutdown"` rather than being silently lost; one that exceeds the deadline is abandoned with its audit record still at `PROCESSING`.
+An entry whose worker does not finish inside the budget is simply never acked, so it stays pending and the next process to start reclaims it. Nothing is acknowledged that did not complete.
+
+Draining is bounded, not guaranteed — but unlike before, exceeding the deadline is now recoverable rather than lossy: the entry is still pending in Redis. The terminal audit write and the `XACK` both use `context.WithoutCancel`, so a delivery that does finish during shutdown records its outcome and acknowledges cleanly.
 
 **Session context.** `session.ctx` is `context.Background()`, not derived from the connection, and the dispatcher uses the long-lived application context. There is no per-message deadline; the bounds that exist are the dial, DNS and read/write timeouts.
 
@@ -1853,7 +1878,7 @@ The L1 tier makes staleness per-instance. With two backends running, the two can
 
 `CompiledSet` cannot cross a process boundary: it holds `*regexp.Regexp` and the automaton. That constraint is what forces the two-tier split — Redis caches the cheap, serialisable part (the rows) and each process pays the compile cost itself.
 
-The same locality applies to the `slots` counter. `SMTP_MAX_DELIVERIES=32` means 32 per instance, not 32 in total. The module scales horizontally, but its limits and caches are per-instance and there is no shared accounting.
+The same locality applies to `DELIVERY_WORKERS`: 4 means 4 per instance. The consumer group, however, *is* shared — Redis hands each entry to exactly one worker across every instance, so adding instances adds throughput without duplicating deliveries. Caches remain per-instance.
 
 ### 9.7 Matching semantics a policy author will notice
 

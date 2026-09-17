@@ -41,12 +41,12 @@ import (
 	incidentsvc "dpdp-backend/internal/audit/services/emailincident"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
+	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/handler/smtp"
 	templaterepo "dpdp-backend/internal/delivery/repositories/emailtemplate"
 	policysetrepo "dpdp-backend/internal/delivery/repositories/policyset"
 	"dpdp-backend/internal/delivery/repositories/provider"
 	"dpdp-backend/internal/delivery/services/adjudication"
-	"dpdp-backend/internal/delivery/services/dispatch"
 	"dpdp-backend/internal/delivery/services/inspection"
 	deliverypolicy "dpdp-backend/internal/delivery/services/policy"
 	"dpdp-backend/internal/delivery/services/recording"
@@ -153,20 +153,26 @@ func main() {
 		FailsClosed: deliveryutils.FailClosed,
 	})
 
-	dispatcher := dispatch.NewDispatcher(
-		ctx,
+	deliveryService := delivery.NewDeliveryService(
 		screening.NewEngine(signingConfigs, enforcer),
 		mailRelay,
 		recorder,
 	)
+
+	queue := delivery.NewQueue(rdb, cfg.Delivery)
+	if err := queue.EnsureGroup(startupCtx); err != nil {
+		slog.Error("delivery consumer group creation failed", "error", err)
+		os.Exit(1)
+	}
+
+	workers := delivery.NewWorkerPool(queue, deliveryService, cfg.Delivery)
 
 	smtpServer := smtp.NewServer(
 		cfg.SMTPServer,
 		smtp.NewBackend(
 			authorizer,
 			recorder,
-			dispatcher,
-			cfg.SMTPServer.MaxDeliveries,
+			queue,
 			cfg.SMTPServer.MaxSize,
 			cfg.SMTPServer.MaxRecipients,
 		),
@@ -246,6 +252,11 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	workerCtx, stopWorkers := context.WithCancel(context.Background())
+	defer stopWorkers()
+
+	workers.Start(workerCtx)
+
 	var servers sync.WaitGroup
 
 	servers.Add(2)
@@ -288,10 +299,12 @@ func main() {
 
 	servers.Wait()
 
+	stopWorkers()
+
 	drained := make(chan struct{})
 
 	go func() {
-		dispatcher.Wait()
+		workers.Wait()
 		close(drained)
 	}()
 

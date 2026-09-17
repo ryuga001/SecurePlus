@@ -5,7 +5,7 @@ import (
 
 	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
 	"dpdp-backend/internal/db"
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 

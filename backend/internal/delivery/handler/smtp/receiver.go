@@ -14,8 +14,7 @@ import (
 
 	auditdto "dpdp-backend/internal/audit/dto/deliveryaudit"
 	auditutils "dpdp-backend/internal/audit/utils"
-	"dpdp-backend/internal/delivery/dto/delivery"
-	"dpdp-backend/internal/delivery/services/dispatch"
+	"dpdp-backend/internal/delivery"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 
@@ -23,9 +22,9 @@ var (
 	errNotAuthorized  = &gosmtp.SMTPError{Code: 550, EnhancedCode: gosmtp.EnhancedCode{5, 7, 1}, Message: "sender domain not authorized"}
 	errBadAddress     = &gosmtp.SMTPError{Code: 501, EnhancedCode: gosmtp.EnhancedCode{5, 1, 3}, Message: "malformed address"}
 	errTooManyRcpt    = &gosmtp.SMTPError{Code: 452, EnhancedCode: gosmtp.EnhancedCode{4, 5, 3}, Message: "too many recipients"}
-	errCapacityFull   = &gosmtp.SMTPError{Code: 451, EnhancedCode: gosmtp.EnhancedCode{4, 3, 2}, Message: "delivery capacity exhausted"}
 	errLookupDown     = &gosmtp.SMTPError{Code: 451, EnhancedCode: gosmtp.EnhancedCode{4, 3, 0}, Message: "sender domain lookup unavailable"}
 	errAuditDown      = &gosmtp.SMTPError{Code: 451, EnhancedCode: gosmtp.EnhancedCode{4, 3, 0}, Message: "delivery audit unavailable"}
+	errQueueDown      = &gosmtp.SMTPError{Code: 451, EnhancedCode: gosmtp.EnhancedCode{4, 3, 2}, Message: "requested action aborted: temporary failure"}
 	errMessageTooBig  = &gosmtp.SMTPError{Code: 552, EnhancedCode: gosmtp.EnhancedCode{5, 3, 4}, Message: "message exceeds maximum size"}
 	errNoValidSenders = &gosmtp.SMTPError{Code: 550, EnhancedCode: gosmtp.EnhancedCode{5, 7, 1}, Message: "sender is required"}
 )
@@ -39,8 +38,7 @@ type Authorization struct {
 type Backend struct {
 	authorizer *Authorizer
 	recorder   auditdto.Recorder
-	dispatcher *dispatch.Dispatcher
-	slots      chan struct{}
+	queue      *delivery.Queue
 	maxSize    int64
 	maxRcpt    int
 }
@@ -48,16 +46,14 @@ type Backend struct {
 func NewBackend(
 	authorizer *Authorizer,
 	recorder auditdto.Recorder,
-	dispatcher *dispatch.Dispatcher,
-	maxDeliveries int,
+	queue *delivery.Queue,
 	maxSize int64,
 	maxRecipients int,
 ) *Backend {
 	return &Backend{
 		authorizer: authorizer,
 		recorder:   recorder,
-		dispatcher: dispatcher,
-		slots:      make(chan struct{}, maxDeliveries),
+		queue:      queue,
 		maxSize:    maxSize,
 		maxRcpt:    maxRecipients,
 	}
@@ -67,22 +63,6 @@ func (b *Backend) NewSession(conn *gosmtp.Conn) (gosmtp.Session, error) {
 	return &session{backend: b, ctx: context.Background()}, nil
 }
 
-func (b *Backend) acquire() bool {
-	select {
-	case b.slots <- struct{}{}:
-		return true
-	default:
-		return false
-	}
-}
-
-func (b *Backend) release() {
-	select {
-	case <-b.slots:
-	default:
-	}
-}
-
 type session struct {
 	backend    *Backend
 	ctx        context.Context
@@ -90,7 +70,6 @@ type session struct {
 	domain     string
 	recipients []string
 	auth       Authorization
-	holding    bool
 }
 
 func (s *session) Mail(from string, opts *gosmtp.MailOptions) error {
@@ -133,15 +112,6 @@ func (s *session) Rcpt(to string, opts *gosmtp.RcptOptions) error {
 	}
 
 	s.recipients = append(s.recipients, address)
-
-	if len(s.recipients) == 1 {
-		if !s.backend.acquire() {
-			s.recipients = nil
-			return errCapacityFull
-		}
-
-		s.holding = true
-	}
 
 	return nil
 }
@@ -194,6 +164,25 @@ func (s *session) Data(r io.Reader) error {
 		return errAuditDown
 	}
 
+	if err := s.backend.queue.Publish(s.ctx, msg); err != nil {
+		slog.ErrorContext(s.ctx, "delivery queue publish failed",
+			"correlation_id", msg.CorrelationID,
+			"customer_id", msg.CustomerID,
+			"error", err,
+		)
+
+		s.backend.recorder.Complete(s.ctx, msg.CorrelationID, auditdto.Result{
+			Status:     auditutils.StatusFailed,
+			Recipients: failedRecipients(msg.Recipients, "delivery queue unavailable"),
+			Failure: &auditdto.Failure{
+				Type:   auditutils.FailureProcessing,
+				Reason: "delivery queue unavailable",
+			},
+		})
+
+		return errQueueDown
+	}
+
 	slog.InfoContext(s.ctx, "message accepted",
 		"correlation_id", msg.CorrelationID,
 		"customer_id", msg.CustomerID,
@@ -202,8 +191,6 @@ func (s *session) Data(r io.Reader) error {
 		"size", msg.Size,
 	)
 
-	s.holding = false
-	s.backend.dispatcher.Dispatch(msg, s.backend.release)
 	s.reset()
 
 	return nil
@@ -220,10 +207,6 @@ func (s *session) Logout() error {
 }
 
 func (s *session) reset() {
-	if s.holding {
-		s.backend.release()
-		s.holding = false
-	}
 
 	s.from = ""
 	s.domain = ""
@@ -252,4 +235,19 @@ func MessageID(raw []byte) string {
 	}
 
 	return strings.TrimSpace(message.Header.Get("Message-ID"))
+}
+
+func failedRecipients(recipients []string, reason string) []auditdto.Recipient {
+	entries := make([]auditdto.Recipient, 0, len(recipients))
+
+	for _, recipient := range recipients {
+		entries = append(entries, auditdto.Recipient{
+			Email:  recipient,
+			Domain: delivery.DomainOf(recipient),
+			Status: auditutils.StatusFailed,
+			Error:  reason,
+		})
+	}
+
+	return entries
 }

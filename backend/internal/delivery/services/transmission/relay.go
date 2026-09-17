@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"dpdp-backend/internal/config"
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 

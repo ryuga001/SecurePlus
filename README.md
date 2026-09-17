@@ -9,9 +9,19 @@ Exchange / Gmail
        │  SMTP
        ▼
 ┌──────────────┐   authorize sender domain · envelope limits · correlation id
-│ SMTP Receiver│
+│ SMTP Receiver│   250 only after Redis accepts the message, otherwise 451
 └──────┬───────┘
-       │ 250 accepted, processing continues in the background
+       │ XADD
+       ▼
+┌──────────────┐   delivery:messages · consumer group delivery-workers
+│ Redis Stream │   the handoff buffer; entries stay pending until acked
+└──────┬───────┘
+       │ XREADGROUP
+       ▼
+┌──────────────┐   DELIVERY_WORKERS goroutines own processing concurrency
+│Delivery Worker│  crash leaves the entry pending · XAUTOCLAIM reclaims it
+└──────┬───────┘
+       │
        ▼
 ┌──────────────┐   resolve the sender's active policies (one query, cached)
 │ Policy Engine│   recipient-domain + attachment restrictions
@@ -27,6 +37,8 @@ Recipient MX
 Receiver ─┐
 Engine  ──┼──▶ MongoDB   delivery_audits   PROCESSING → SUCCESS | FAILED
 Relay   ──┘                email_incidents  one per flagged message
+
+                          XACK only after the terminal audit is written
 ```
 
 An admin configures sending domains, DKIM keys, email users, groups, rules and policies through the dashboard. Policies bind rules and groups together and carry one action: `BLOCK`, `QUARANTINE`, `REDACT` or `AUDIT`.
@@ -43,8 +55,13 @@ backend/
     auth/           registration, login, JWT cookies, CSRF, identity cache
     middleware/     origin, auth, CSRF, privilege guards
     admin/          configurations, policies, rules, email users, groups, branding
-    delivery/       receiver → engine → relay  (the mail path)
-      engine/       policy evaluation, matchers, action triggers
+    delivery/       smtp → redis stream → worker → policy → relay
+      queue.go      Redis Streams handoff (publish · consume · ack · reclaim)
+      worker.go     worker pool, ACK after the outcome is recorded
+      service.go    DeliveryService.Process — policy, audit, relay
+      handler/smtp/ SMTP session: validate, publish, 250 or 451
+      services/     screening · policy · inspection · restriction
+                    adjudication · transmission · recording
     audit/          delivery audits and email incidents (MongoDB)
     notification/   transactional email from templates
     storage/        S3/MinIO object storage (customer logos)
@@ -240,9 +257,14 @@ Notable defaults:
 | `APP_ENV` | — | anything but `production` logs every SQL statement |
 | `COOKIE_SECURE` / `COOKIE_SAMESITE` | `false` / `lax` | cross-site deployments need `true` / `none` |
 | `SMTP_SERVER_ADDR` | `:2525` | Docker maps `25:2525` so the process stays unprivileged |
-| `SMTP_MAX_SIZE` / `SMTP_MAX_DELIVERIES` | 10 MB / 32 | messages are held in memory; the product of these is the ceiling |
+| `SMTP_MAX_SIZE` | 10 MB | also the ceiling on any entry written to the delivery stream |
+| `SMTP_MAX_CONNECTIONS` | 100 | SMTP connection capacity, independent of delivery concurrency |
+| `DELIVERY_WORKERS` | 4 | delivery-processing concurrency; the worker pool owns it, not SMTP |
+| `DELIVERY_STREAM` / `DELIVERY_CONSUMER_GROUP` | `delivery:messages` / `delivery-workers` | Redis Streams handoff |
+| `DELIVERY_CLAIM_IDLE` | 5m | how long an entry may sit pending before another worker reclaims it |
+| `DELIVERY_BATCH_SIZE` / `DELIVERY_BLOCK_TIME` | 10 / 1s | `XREADGROUP` count and block duration |
 | `RELAY_MX_OVERRIDE` | empty | force all mail to one host, for development |
 | `RELAY_MAX_ATTEMPTS` | 3 | with 1m → 5m backoff, capped at 15m |
 
-The remaining `SMTP_*` and `RELAY_*` knobs are in `internal/config/smtpserver.go` and `internal/config/relay.go`.
+The remaining `SMTP_*`, `RELAY_*` and `DELIVERY_*` knobs are in `internal/config/smtpserver.go`, `internal/config/relay.go` and `internal/config/delivery.go`. Redis reuses the single `REDIS_URL` client — there is no second Redis configuration.
 

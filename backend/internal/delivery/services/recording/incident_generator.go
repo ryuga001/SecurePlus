@@ -5,7 +5,7 @@ import (
 
 	auditdto "dpdp-backend/internal/audit/dto/emailincident"
 	auditutils "dpdp-backend/internal/audit/utils"
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	evaluation "dpdp-backend/internal/delivery/dto/evaluation"
 )
 

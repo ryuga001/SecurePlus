@@ -16,6 +16,7 @@ type Config struct {
 	SMTP       SMTP
 	SMTPServer SMTPServer
 	Relay      Relay
+	Delivery   Delivery
 }
 
 type App struct {
@@ -38,6 +39,7 @@ func Load() *Config {
 		SMTP:       loadSMTP(),
 		SMTPServer: loadSMTPServer(),
 		Relay:      loadRelay(),
+		Delivery:   loadDelivery(),
 	}
 }
 

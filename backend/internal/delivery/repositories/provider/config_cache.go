@@ -11,7 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 

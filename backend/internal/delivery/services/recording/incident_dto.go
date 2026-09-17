@@ -1,7 +1,7 @@
 package recording
 
 import (
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	evaluation "dpdp-backend/internal/delivery/dto/evaluation"
 )
 

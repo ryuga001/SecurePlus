@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/repositories/provider"
 	"dpdp-backend/internal/delivery/services/screening"
 	deliveryutils "dpdp-backend/internal/delivery/utils"

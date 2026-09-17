@@ -9,7 +9,7 @@ import (
 
 	"github.com/emersion/go-msgauth/dkim"
 
-	"dpdp-backend/internal/delivery/dto/delivery"
+	"dpdp-backend/internal/delivery"
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 )
 

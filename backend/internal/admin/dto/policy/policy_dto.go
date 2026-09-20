@@ -53,15 +53,16 @@ type PolicyResponse struct {
 }
 
 type PolicyListItem struct {
-	ID                     int       `json:"id"`
-	PolicyName             string    `json:"policy_name"`
-	Type                   string    `json:"type"`
-	Action                 string    `json:"action"`
-	Active                 bool      `json:"active"`
-	DomainRestrictionMode  string    `json:"domain_restriction_mode"`
-	AttachmentRestrictMode string    `json:"attachment_restriction_mode"`
-	GroupCount             int       `json:"group_count"`
-	RuleCount              int       `json:"rule_count"`
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID                     int                   `json:"id"`
+	PolicyName             string                `json:"policy_name"`
+	Type                   string                `json:"type"`
+	Action                 string                `json:"action"`
+	Active                 bool                  `json:"active"`
+	DomainRestrictionMode  string                `json:"domain_restriction_mode"`
+	AttachmentRestrictMode string                `json:"attachment_restriction_mode"`
+	Groups                 []utils.ReferenceItem `json:"groups"`
+	GroupCount             int                   `json:"group_count"`
+	RuleCount              int                   `json:"rule_count"`
+	CreatedAt              time.Time             `json:"created_at"`
+	UpdatedAt              time.Time             `json:"updated_at"`
 }

@@ -97,6 +97,7 @@ func (h *PolicyHandler) list(c *gin.Context) {
 			Active:                 item.Policy.Active,
 			DomainRestrictionMode:  item.Policy.DomainRestriction.Mode,
 			AttachmentRestrictMode: item.Policy.AttachmentRestriction.Mode,
+			Groups:                 toReferences(item.Groups),
 			GroupCount:             item.GroupCount,
 			RuleCount:              item.RuleCount,
 			CreatedAt:              item.Policy.CreatedAt,

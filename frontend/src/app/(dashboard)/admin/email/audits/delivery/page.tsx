@@ -7,7 +7,7 @@ import Consolepage from "@/components/dashboard/pageThemes/consolepage";
 import { DataTable } from "@/components/data-table/data-table";
 import { StatusBadge } from "@/components/data-table/status-badge";
 import type { ColumnConfig, FilterConfig } from "@/components/data-table/types";
-import { DeliveryAuditDialog } from "@/components/email/audits/delivery-audit-dialog";
+import { DeliveryAuditDrawer } from "@/components/email/audits/delivery-audit-dialog";
 import {
   useListDeliveryAuditsQuery,
   type DeliveryAuditListItem,
@@ -131,7 +131,7 @@ export default function DeliveryAuditPage() {
             emptyMessage={d("empty")}
           />
 
-          <DeliveryAuditDialog
+          <DeliveryAuditDrawer
             correlationId={selected}
             onOpenChange={(open) => {
               if (!open) setSelected(null);

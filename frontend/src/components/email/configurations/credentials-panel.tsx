@@ -6,13 +6,8 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { apiErrorMessage } from "@/lib/api-error";
 import { copyText } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
-import {
-  useGenerateAccessTokenMutation,
-  useGenerateDkimKeyMutation,
-} from "@/store/api/email-configurations-api";
 
 function SecretValue({
   label,
@@ -52,7 +47,7 @@ function SecretValue({
     <div
       className={cn(
         "border p-3",
-        tone === "warning" && "border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20"
+        tone === "warning" && "border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20",
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -74,85 +69,54 @@ function SecretValue({
 }
 
 export function CredentialsPanel({
-  configurationId,
-  initialDkimPublicKey,
-  onSecretRevealed,
+  dkimPublicKey,
+  recordName,
+  accessToken,
+  expiresAt,
+  onGenerateDkim,
+  onGenerateAccessToken,
+  dkimPending,
+  tokenPending,
 }: {
-  configurationId: number | null;
-  initialDkimPublicKey?: string | null;
-  onSecretRevealed?: () => void;
+  dkimPublicKey: string;
+  recordName: string;
+  accessToken: string;
+  expiresAt: string;
+  onGenerateDkim: () => void;
+  onGenerateAccessToken: () => void;
+  dkimPending: boolean;
+  tokenPending: boolean;
 }) {
   const t = useTranslations("configurations");
-  const [dkimPublicKey, setDkimPublicKey] = React.useState(initialDkimPublicKey ?? "");
-  const [dkimPrivateKey, setDkimPrivateKey] = React.useState("");
-  const [recordName, setRecordName] = React.useState("");
-  const [accessToken, setAccessToken] = React.useState("");
-  const [expiresAt, setExpiresAt] = React.useState("");
-
-  const [generateDkimKey, { isLoading: dkimPending }] = useGenerateDkimKeyMutation();
-  const [generateAccessToken, { isLoading: tokenPending }] = useGenerateAccessTokenMutation();
-
-  const locked = configurationId === null;
-
-  async function onGenerateDkim() {
-    if (configurationId === null) return;
-
-    try {
-      const result = await generateDkimKey(configurationId).unwrap();
-      setDkimPublicKey(result.dkim_public_key);
-      setDkimPrivateKey(result.dkim_private_key);
-      setRecordName(result.record_name);
-      onSecretRevealed?.();
-      toast.success(t("dialog.dkimGenerated"));
-    } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not generate a DKIM key"));
-    }
-  }
-
-  async function onGenerateToken() {
-    if (configurationId === null) return;
-
-    try {
-      const result = await generateAccessToken(configurationId).unwrap();
-      setAccessToken(result.access_token);
-      setExpiresAt(result.expires_at);
-      onSecretRevealed?.();
-      toast.success(t("dialog.tokenGenerated"));
-    } catch (error) {
-      toast.error(apiErrorMessage(error, "Could not generate an access token"));
-    }
-  }
 
   return (
     <div className="flex flex-col gap-4 border-t pt-5">
       <div>
-        <h3 className="text-sm font-medium">Credentials</h3>
-        {locked ? (
-          <p className="mt-1 text-xs text-muted-foreground">
-            Save the configuration to enable key generation.
-          </p>
-        ) : null}
+        <h3 className="text-sm font-medium">{t("dialog.credentialsTitle")}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t("dialog.credentialsHint")}
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant="outline"
-          disabled={locked || dkimPending}
+          disabled={dkimPending}
           onClick={onGenerateDkim}
         >
           {dkimPending ? <Loader2 className="animate-spin" /> : <KeyRound />}
-          Generate DKIM
+          {t("dialog.generateDkim")}
         </Button>
 
         <Button
           type="button"
           variant="outline"
-          disabled={locked || tokenPending}
-          onClick={onGenerateToken}
+          disabled={tokenPending}
+          onClick={onGenerateAccessToken}
         >
           {tokenPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
-          Generate Access Token
+          {t("dialog.generateToken")}
         </Button>
       </div>
 
@@ -160,20 +124,7 @@ export function CredentialsPanel({
         <SecretValue
           label={t("dialog.dkimPublicKey")}
           value={dkimPublicKey}
-          hint={
-            recordName
-              ? `Publish this as a TXT record on ${recordName}.`
-              : "Publish this as a TXT record on your DNS."
-          }
-        />
-      ) : null}
-
-      {dkimPrivateKey ? (
-        <SecretValue
-          label={t("dialog.dkimPrivateKey")}
-          value={dkimPrivateKey}
-          tone="warning"
-          hint="Stored with the configuration and shown once. It signs your outbound mail — never publish it."
+          hint={recordName ? t("dialog.dkimRecordHint", { domain: recordName }) : t("dialog.dkimRecordHintGeneric")}
         />
       ) : null}
 
@@ -184,8 +135,8 @@ export function CredentialsPanel({
           tone="warning"
           hint={
             expiresAt
-              ? `Shown once only. Expires ${new Date(expiresAt).toLocaleString()}.`
-              : "Shown once only. Copy it now."
+              ? t("dialog.tokenExpiryHint", { date: new Date(expiresAt).toLocaleString() })
+              : t("dialog.tokenOnceHint")
           }
         />
       ) : null}

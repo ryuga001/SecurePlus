@@ -128,7 +128,7 @@ export function DataTable<Row>({
   rowActions = [],
   getRowId,
   onRowClick,
-  defaultPageSize = 25,
+  defaultPageSize = 10,
   defaultSort,
   emptyMessage,
   className,

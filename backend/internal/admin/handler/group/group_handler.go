@@ -64,7 +64,7 @@ func (h *GroupHandler) list(c *gin.Context) {
 
 	items := make([]dto.GroupResponse, 0, len(listing.Items))
 	for _, item := range listing.Items {
-		items = append(items, dto.FromGroup(item.Group, item.MemberCount))
+		items = append(items, dto.FromGroup(item.Group, item.MemberCount, toMemberResponses(item.Members)))
 	}
 
 	c.JSON(http.StatusOK, utils.ListResponse[dto.GroupResponse]{
@@ -87,7 +87,7 @@ func (h *GroupHandler) get(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.FromGroup(summary.Group, summary.MemberCount))
+	c.JSON(http.StatusOK, dto.FromGroup(summary.Group, summary.MemberCount, toMemberResponses(summary.Members)))
 }
 
 func (h *GroupHandler) create(c *gin.Context) {
@@ -102,13 +102,13 @@ func (h *GroupHandler) create(c *gin.Context) {
 		return
 	}
 
-	summary, err := h.svc.Create(c.Request.Context(), actor.CustomerID, service.GroupInput{Name: req.Name, Type: req.Type})
+	summary, err := h.svc.Create(c.Request.Context(), actor.CustomerID, service.GroupInput{Name: req.Name, Type: req.Type, MemberIDs: req.MemberIDs})
 	if err != nil {
 		utils.Respond(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, dto.FromGroup(summary.Group, summary.MemberCount))
+	c.JSON(http.StatusCreated, dto.FromGroup(summary.Group, summary.MemberCount, toMemberResponses(summary.Members)))
 }
 
 func (h *GroupHandler) update(c *gin.Context) {
@@ -123,13 +123,13 @@ func (h *GroupHandler) update(c *gin.Context) {
 		return
 	}
 
-	summary, err := h.svc.Update(c.Request.Context(), actor.CustomerID, id, service.GroupInput{Name: req.Name, Type: req.Type})
+	summary, err := h.svc.Update(c.Request.Context(), actor.CustomerID, id, service.GroupInput{Name: req.Name, Type: req.Type, MemberIDs: req.MemberIDs})
 	if err != nil {
 		utils.Respond(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.FromGroup(summary.Group, summary.MemberCount))
+	c.JSON(http.StatusOK, dto.FromGroup(summary.Group, summary.MemberCount, toMemberResponses(summary.Members)))
 }
 
 func (h *GroupHandler) remove(c *gin.Context) {
@@ -208,4 +208,18 @@ func (h *GroupHandler) removeMember(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func toMemberResponses(members []service.MemberSummary) []dto.MemberResponse {
+	out := make([]dto.MemberResponse, 0, len(members))
+
+	for _, member := range members {
+		out = append(out, dto.MemberResponse{
+			ID:    member.ID,
+			Name:  member.Name,
+			Email: member.Email,
+		})
+	}
+
+	return out
 }

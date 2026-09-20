@@ -44,8 +44,8 @@ export type PolicyListItem = {
   active: boolean;
   domain_restriction_mode: RestrictionMode;
   attachment_restriction_mode: RestrictionMode;
+  groups: PolicyReference[];
   group_count: number;
-  rule_count: number;
   created_at: string;
   updated_at: string;
 };

@@ -2,6 +2,7 @@ package emailprovider
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -39,6 +40,8 @@ func (h *EmailProviderHandler) RegisterRoutes(protected *gin.RouterGroup, guard 
 	group.DELETE("/:id", guard(PrivilegeProviderDelete), h.remove)
 	group.POST("/:id/dkim", guard(PrivilegeProviderEdit), h.dkim)
 	group.POST("/:id/access-token", guard(PrivilegeProviderEdit), h.accessToken)
+	group.POST("/pending/dkim", guard(PrivilegeProviderCreate), h.pendingDKIM)
+	group.POST("/pending/access-token", guard(PrivilegeProviderCreate), h.pendingAccessToken)
 }
 
 func (h *EmailProviderHandler) list(c *gin.Context) {
@@ -192,8 +195,67 @@ func (h *EmailProviderHandler) accessToken(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.AccessTokenResponse{AccessToken: token, ExpiresAt: expiresAt})
 }
 
+func (h *EmailProviderHandler) pendingDKIM(c *gin.Context) {
+	_, ok := utils.Actor(c)
+	if !ok {
+		return
+	}
+
+	var req dto.PendingDKIMRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c)
+		return
+	}
+
+	public, private, err := h.svc.GenerateDKIMPending(c.Request.Context())
+	if err != nil {
+		utils.Respond(c, err)
+		return
+	}
+
+	recordName := ""
+	if domain := strings.TrimSpace(req.Domain); domain != "" {
+		recordName = DKIMSelector + "._domainkey." + domain
+	}
+
+	c.JSON(http.StatusOK, dto.DKIMResponse{
+		Selector:       DKIMSelector,
+		RecordName:     recordName,
+		DKIMPublicKey:  public,
+		DKIMPrivateKey: private,
+	})
+}
+
+func (h *EmailProviderHandler) pendingAccessToken(c *gin.Context) {
+	actor, ok := utils.Actor(c)
+	if !ok {
+		return
+	}
+
+	var req dto.PendingAccessTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c)
+		return
+	}
+
+	token, expiresAt, err := h.svc.GenerateAccessTokenPending(c.Request.Context(), actor.CustomerID, req.Domain)
+	if err != nil {
+		utils.Respond(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.AccessTokenResponse{AccessToken: token, ExpiresAt: expiresAt})
+}
+
 func toConfigurationInput(req dto.ConfigurationRequest) service.ConfigurationInput {
-	return service.ConfigurationInput{Name: req.Name, Domain: req.Domain, Provider: req.Provider}
+	return service.ConfigurationInput{
+		Name:           req.Name,
+		Domain:         req.Domain,
+		Provider:       req.Provider,
+		DKIMPublicKey:  req.DKIMPublicKey,
+		DKIMPrivateKey: req.DKIMPrivateKey,
+		AccessToken:    req.AccessToken,
+	}
 }
 
 func toConfigurationResponse(row db.EmailProviderConfiguration) dto.ConfigurationResponse {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -12,11 +12,23 @@ import { DataTable } from "@/components/data-table/data-table";
 import type {
   ColumnConfig,
   FilterConfig,
-  RowAction,
   TableAction,
 } from "@/components/data-table/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { apiErrorMessage } from "@/lib/api-error";
-import { useDeleteRuleMutation, useListRulesQuery, type Rule } from "@/store/api/rules-api";
+import {
+  useDeleteRuleMutation,
+  useListRulesQuery,
+  type Rule,
+} from "@/store/api/rules-api";
 
 export default function RulesPage() {
   const t = useTranslations("rules");
@@ -26,7 +38,8 @@ export default function RulesPage() {
   const [editing, setEditing] = React.useState<Rule | null>(null);
   const [deleting, setDeleting] = React.useState<Rule | null>(null);
 
-  const [deleteRule, { isLoading: deletePending }] = useDeleteRuleMutation();
+  const [deleteRule, { isLoading: deletePending }] =
+    useDeleteRuleMutation();
 
   const filters: FilterConfig[] = [
     {
@@ -39,21 +52,72 @@ export default function RulesPage() {
   ];
 
   const columns: ColumnConfig<Rule>[] = [
-    { key: "rule_name", label: t("columns.name") },
+    {
+      key: "rule_name",
+      label: t("columns.name"),
+      render: (value) => (
+        <span className="font-medium text-foreground">{String(value)}</span>
+      ),
+    },
     {
       key: "type",
       label: t("columns.type"),
-      render: (value) => (value === "REGEX" ? t("type.regex") : t("type.keyword")),
-    },
-    {
-      key: "value",
-      label: t("columns.value"),
       render: (value) => (
-        <span className="block max-w-md truncate font-mono text-[0.8rem]">{String(value)}</span>
+        <Badge variant="secondary">
+          {value === "REGEX" ? t("type.regex") : t("type.keyword")}
+        </Badge>
       ),
     },
-    { key: "created_at", label: t("columns.createdAt"), type: "date" },
-    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
+    {
+      key: "updated_at",
+      label: t("columns.updatedAt"),
+      type: "datetime",
+      sortable: true,
+    },
+    {
+      key: "actions",
+      label: "",
+      align: "right",
+      render: (_, row) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={common("actions")}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <MoreHorizontal />
+              </Button>
+            }
+          />
+
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => {
+                setEditing(row);
+                setDialogOpen(true);
+              }}
+            >
+              <Pencil />
+              {common("edit")}
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setDeleting(row)}
+            >
+              <Trash2 />
+              {common("delete")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
   ];
 
   async function confirmDelete() {
@@ -81,26 +145,6 @@ export default function RulesPage() {
     },
   ];
 
-  const rowActions: RowAction<Rule>[] = [
-    {
-      key: "edit",
-      label: common("edit"),
-      icon: Pencil,
-      variant: "ghost",
-      onClick: (row) => {
-        setEditing(row);
-        setDialogOpen(true);
-      },
-    },
-    {
-      key: "delete",
-      label: common("delete"),
-      icon: Trash2,
-      variant: "destructive",
-      onClick: (row) => setDeleting(row),
-    },
-  ];
-
   return (
     <Consolepage
       heading={t("heading")}
@@ -112,7 +156,6 @@ export default function RulesPage() {
             columns={columns}
             filters={filters}
             actions={actions}
-            rowActions={rowActions}
             getRowId={(row) => row.id}
             emptyMessage={t("empty")}
           />
@@ -131,7 +174,11 @@ export default function RulesPage() {
             }}
             title={t("deleteTitle")}
             description={
-              deleting ? t("deleteDescription", { name: deleting.rule_name }) : undefined
+              deleting
+                ? t("deleteDescription", {
+                    name: deleting.rule_name,
+                  })
+                : undefined
             }
             confirmLabel={common("delete")}
             destructive

@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -9,13 +9,21 @@ import { PolicyDialog } from "@/components/admin/policy-dialog";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import Consolepage from "@/components/dashboard/pageThemes/consolepage";
 import { DataTable } from "@/components/data-table/data-table";
-import { StatusBadge } from "@/components/data-table/status-badge";
 import type {
   ColumnConfig,
   FilterConfig,
-  RowAction,
   TableAction,
 } from "@/components/data-table/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { apiErrorMessage } from "@/lib/api-error";
 import {
   useDeletePolicyMutation,
@@ -29,11 +37,13 @@ export default function PoliciesPage() {
   const status = useTranslations("status");
   const common = useTranslations("common");
 
-  const restrictionLabel = (value: unknown) => {
-    const key = String(value).toLowerCase();
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [editingId, setEditingId] = React.useState<number | null>(null);
+  const [deleting, setDeleting] = React.useState<PolicyListItem | null>(null);
 
-    return t.has(`restriction.${key}`) ? t(`restriction.${key}`) : String(value);
-  };
+  const [setStatus] = useSetPolicyStatusMutation();
+  const [deletePolicy, { isLoading: deletePending }] =
+    useDeletePolicyMutation();
 
   const filters: FilterConfig[] = [
     {
@@ -55,51 +65,14 @@ export default function PoliciesPage() {
     },
   ];
 
-  const columns: ColumnConfig<PolicyListItem>[] = [
-    { key: "policy_name", label: t("columns.name") },
-    {
-      key: "action",
-      label: t("columns.action"),
-      render: (value) => {
-        const key = String(value).toLowerCase();
-
-        return status.has(key) ? status(key) : String(value);
-      },
-    },
-    {
-      key: "active",
-      label: t("columns.status"),
-      render: (value) => <StatusBadge status={value ? "enabled" : "disabled"} />,
-    },
-    {
-      key: "domain_restriction_mode",
-      label: t("columns.domains"),
-      render: restrictionLabel,
-    },
-    {
-      key: "attachment_restriction_mode",
-      label: t("columns.attachments"),
-      render: restrictionLabel,
-    },
-    { key: "rule_count", label: t("columns.rules"), type: "number", align: "right" },
-    { key: "group_count", label: t("columns.groups"), type: "number", align: "right" },
-    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
-  ];
-
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [editingId, setEditingId] = React.useState<number | null>(null);
-  const [deleting, setDeleting] = React.useState<PolicyListItem | null>(null);
-
-  const [setStatus] = useSetPolicyStatusMutation();
-  const [deletePolicy, { isLoading: deletePending }] = useDeletePolicyMutation();
-
-  async function toggleStatus(row: PolicyListItem) {
+  async function toggleStatus(row: PolicyListItem, active: boolean) {
     try {
-      await setStatus({ id: row.id, active: !row.active }).unwrap();
+      await setStatus({ id: row.id, active }).unwrap();
+
       toast.success(
-        row.active
-          ? t("disabled", { name: row.policy_name })
-          : t("enabled", { name: row.policy_name })
+        active
+          ? t("enabled", { name: row.policy_name })
+          : t("disabled", { name: row.policy_name }),
       );
     } catch (error) {
       toast.error(apiErrorMessage(error, t("statusFailed")));
@@ -111,12 +84,143 @@ export default function PoliciesPage() {
 
     try {
       await deletePolicy(deleting.id).unwrap();
-      toast.success(t("deleted", { name: deleting.policy_name }));
+
+      toast.success(
+        t("deleted", {
+          name: deleting.policy_name,
+        }),
+      );
+
       setDeleting(null);
     } catch (error) {
       toast.error(apiErrorMessage(error, t("deleteFailed")));
     }
   }
+
+  const columns: ColumnConfig<PolicyListItem>[] = [
+    {
+      key: "policy_name",
+      label: t("columns.name"),
+      render: (value) => (
+        <span className="font-medium text-foreground">
+          {String(value)}
+        </span>
+      ),
+    },
+    {
+      key: "action",
+      label: t("columns.action"),
+      render: (value) => {
+        const key = String(value).toLowerCase();
+
+        return status.has(key) ? (
+          <Badge variant="secondary">{status(key)}</Badge>
+        ) : (
+          <Badge variant="secondary">{String(value)}</Badge>
+        );
+      },
+    },
+    {
+      key: "active",
+      label: t("columns.status"),
+      render: (_value, row) => (
+        <Switch
+          checked={row.active}
+          onCheckedChange={(checked) => toggleStatus(row, checked)}
+          aria-label={
+            row.active
+              ? t("disabled", { name: row.policy_name })
+              : t("enabled", { name: row.policy_name })
+          }
+        />
+      ),
+    },
+    {
+      key: "groups",
+      label: t("columns.groups"),
+      render: (_value, row) => {
+        const groups = row.groups ?? [];
+        const visible = groups.slice(0, 3);
+        const remaining = Math.max(
+          row.group_count - visible.length,
+          0,
+        );
+
+        if (visible.length === 0 && row.group_count === 0) {
+          return (
+            <span className="text-sm text-muted-foreground">
+              —
+            </span>
+          );
+        }
+
+        return (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            {visible.map((group) => (
+              <Badge
+                key={group.id}
+                variant="secondary"
+                className="max-w-32 truncate font-normal"
+                title={group.name}
+              >
+                {group.name}
+              </Badge>
+            ))}
+
+            {remaining > 0 ? (
+              <Badge variant="outline" className="font-medium">
+                +{remaining}
+              </Badge>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      key: "actions",
+      label: "",
+      align: "right",
+      render: (_value, row) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={common("actions")}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <MoreHorizontal />
+              </Button>
+            }
+          />
+
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => {
+                setEditingId(row.id);
+                setDialogOpen(true);
+              }}
+            >
+              <Pencil />
+              {common("edit")}
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setDeleting(row)}
+            >
+              <Trash2 />
+              {common("delete")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
 
   const actions: TableAction[] = [
     {
@@ -131,33 +235,6 @@ export default function PoliciesPage() {
     },
   ];
 
-  const rowActions: RowAction<PolicyListItem>[] = [
-    {
-      key: "status",
-      label: common("toggle"),
-      icon: Power,
-      variant: "ghost",
-      onClick: toggleStatus,
-    },
-    {
-      key: "edit",
-      label: common("edit"),
-      icon: Pencil,
-      variant: "ghost",
-      onClick: (row) => {
-        setEditingId(row.id);
-        setDialogOpen(true);
-      },
-    },
-    {
-      key: "delete",
-      label: common("delete"),
-      icon: Trash2,
-      variant: "destructive",
-      onClick: (row) => setDeleting(row),
-    },
-  ];
-
   return (
     <Consolepage
       heading={t("heading")}
@@ -169,7 +246,6 @@ export default function PoliciesPage() {
             columns={columns}
             filters={filters}
             actions={actions}
-            rowActions={rowActions}
             getRowId={(row) => row.id}
             emptyMessage={t("empty")}
           />
@@ -188,7 +264,11 @@ export default function PoliciesPage() {
             }}
             title={t("deleteTitle")}
             description={
-              deleting ? t("deleteDescription", { name: deleting.policy_name }) : undefined
+              deleting
+                ? t("deleteDescription", {
+                    name: deleting.policy_name,
+                  })
+                : undefined
             }
             confirmLabel={common("delete")}
             destructive

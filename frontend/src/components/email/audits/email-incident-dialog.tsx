@@ -4,8 +4,7 @@ import { useTranslations } from "next-intl";
 import { CircleAlert, Loader2 } from "lucide-react";
 
 import { StatusBadge } from "@/components/data-table/status-badge";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { DrawerWrapper } from "@/components/drawer/drawer";
 import { apiErrorMessage } from "@/lib/api-error";
 import { useGetEmailIncidentQuery, type EmailIncident } from "@/store/api/email-incidents-api";
 
@@ -185,7 +184,7 @@ function Details({ incident }: { incident: EmailIncident }) {
   );
 }
 
-export function EmailIncidentDialog({
+export function EmailIncidentDrawer({
   correlationId,
   onOpenChange,
 }: {
@@ -193,42 +192,42 @@ export function EmailIncidentDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations("audits.incidents.dialog");
-  const common = useTranslations("common");
 
-  const { data, isLoading, isError, error } = useGetEmailIncidentQuery(correlationId as string, {
-    skip: !correlationId,
-  });
+  const { data, isLoading, isError, error } = useGetEmailIncidentQuery(
+    correlationId as string,
+    {
+      skip: !correlationId,
+    },
+  );
 
   return (
-    <Dialog open={correlationId !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100vh-4rem)] max-w-3xl overflow-y-auto">
-        <DialogTitle>{t("title")}</DialogTitle>
-        <DialogDescription>{t("description")}</DialogDescription>
+    <DrawerWrapper
+      open={correlationId !== null}
+      title={t("title")}
+      description={t("description")}
+      onClose={() => onOpenChange(false)}
+    >
+      {isLoading ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+          <Loader2 className="size-6 animate-spin text-primary" />
 
-        {isLoading ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
-            <Loader2 className="size-6 animate-spin text-primary" />
-            <p className="text-sm">{t("loading")}</p>
-          </div>
-        ) : null}
-
-        {!isLoading && isError ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <CircleAlert className="size-6 text-destructive" />
-            <p className="max-w-md text-sm text-muted-foreground">
-              {apiErrorMessage(error, t("loadFailed"))}
-            </p>
-          </div>
-        ) : null}
-
-        {!isLoading && !isError && data ? <Details incident={data} /> : null}
-
-        <div className="mt-6 flex justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {common("close")}
-          </Button>
+          <p className="text-sm">{t("loading")}</p>
         </div>
-      </DialogContent>
-    </Dialog>
+      ) : null}
+
+      {!isLoading && isError ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <CircleAlert className="size-6 text-destructive" />
+
+          <p className="max-w-md text-sm text-muted-foreground">
+            {apiErrorMessage(error, t("loadFailed"))}
+          </p>
+        </div>
+      ) : null}
+
+      {!isLoading && !isError && data ? (
+        <Details incident={data} />
+      ) : null}
+    </DrawerWrapper>
   );
 }

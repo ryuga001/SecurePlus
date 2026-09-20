@@ -1,14 +1,29 @@
 "use client";
 
-import { ImageOff, Loader2, Search, Trash2, Upload } from "lucide-react";
+import {
+  BadgeCheck,
+  ImageOff,
+  Loader2,
+  Search,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-provider";
-import { Field, FormError } from "@/components/auth/auth-form";
+import { FormError } from "@/components/auth/auth-form";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -31,6 +46,10 @@ const LANGUAGES: { value: Language; label: string }[] = [
   { value: "JAPANESE", label: "日本語" },
   { value: "SPANISH", label: "Español" },
 ];
+
+const DEFAULT_THEME: Theme = "LIGHT";
+const DEFAULT_LANGUAGE: Language = "ENGLISH";
+const DEFAULT_TIMEZONE = "UTC";
 
 export function BrandingForm() {
   const { identity, loading, reload } = useAuth();
@@ -75,6 +94,11 @@ function BrandingFields({
 
   const busy = saving || uploading || removing;
 
+  const dirty =
+    theme !== branding.theme ||
+    language !== branding.language ||
+    timezone !== branding.timezone;
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(undefined);
@@ -86,6 +110,13 @@ function BrandingFields({
     } catch (cause) {
       setError(apiErrorMessage(cause, t("saveFailed")));
     }
+  }
+
+  function onResetDefaults() {
+    setError(undefined);
+    setTheme(DEFAULT_THEME);
+    setLanguage(DEFAULT_LANGUAGE);
+    setTimezone(DEFAULT_TIMEZONE);
   }
 
   async function onLogoSelected(event: React.ChangeEvent<HTMLInputElement>) {
@@ -123,94 +154,247 @@ function BrandingFields({
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex max-w-2xl flex-col gap-6">
+    <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <FormError message={error} />
 
-      <Field id="logo" label={t("logo")} hint={t("logoHint")}>
-        <div className="flex flex-wrap items-center gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("logoTitle")}</CardTitle>
+          <CardDescription>{t("logoDescription")}</CardDescription>
+          <CardAction>
+            <span className="inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs text-muted-foreground">
+              <BadgeCheck className="size-3.5" />
+              {t("publicBadge")}
+            </span>
+          </CardAction>
+        </CardHeader>
+
+        <CardContent className="flex flex-wrap items-center gap-5">
           <LogoPreview branding={branding} />
 
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInput}
-              id="logo"
-              type="file"
-              className="sr-only"
-              accept={ACCEPTED_LOGO_TYPES.join(",")}
-              disabled={busy}
-              onChange={onLogoSelected}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => fileInput.current?.click()}
-            >
-              {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              {uploading ? t("uploading") : t("uploadLogo")}
-            </Button>
-            {branding.logo_url ? (
-              <Button type="button" variant="outline" disabled={busy} onClick={onLogoRemoved}>
-                {removing ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-                {common("remove")}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </Field>
-
-      <fieldset className="flex flex-col gap-2" disabled={busy}>
-        <Label>{t("theme")}</Label>
-        <div className="flex flex-wrap gap-3">
-          {(
-            [
-              { value: "LIGHT", label: t("themeLight"), hint: t("themeLightHint") },
-              { value: "DARK", label: t("themeDark"), hint: t("themeDarkHint") },
-            ] as { value: Theme; label: string; hint: string }[]
-          ).map((option) => (
-            <label
-              key={option.value}
-              className={cn(
-                "flex cursor-pointer items-start gap-2.5 border px-4 py-3 text-sm transition-colors",
-                theme === option.value ? "border-primary bg-primary/8" : "hover:bg-muted/60"
-              )}
-            >
+          <div className="flex min-w-64 flex-col items-start gap-2">
+            <div className="flex items-center gap-2">
               <input
-                type="radio"
-                name="theme"
-                className="mt-0.5 size-4 accent-[var(--primary)]"
-                value={option.value}
-                checked={theme === option.value}
-                onChange={() => setTheme(option.value)}
+                ref={fileInput}
+                id="logo"
+                type="file"
+                className="sr-only"
+                accept={ACCEPTED_LOGO_TYPES.join(",")}
+                disabled={busy}
+                onChange={onLogoSelected}
               />
-              <span className="flex flex-col">
-                <span className="font-medium">{option.label}</span>
-                <span className="text-xs text-muted-foreground">{option.hint}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => fileInput.current?.click()}
+              >
+                {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                {uploading ? t("uploading") : t("uploadLogo")}
+              </Button>
+              {branding.logo_url ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={busy}
+                  onClick={onLogoRemoved}
+                >
+                  {removing ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                  {common("remove")}
+                </Button>
+              ) : null}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("logoFormats")}</p>
+          </div>
+        </CardContent>
+      </Card>
 
-      <Field id="language" label={t("language")}>
-        <Select
-          id="language"
-          value={language}
-          disabled={busy}
-          options={LANGUAGES}
-          onChange={(event) => setLanguage(event.target.value as Language)}
-        />
-      </Field>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("themeTitle")}</CardTitle>
+          <CardDescription>{t("themeDescription")}</CardDescription>
+        </CardHeader>
 
-      <TimezonePicker value={timezone} disabled={busy} onChange={setTimezone} />
+        <CardContent>
+          <fieldset className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                {
+                  value: "LIGHT",
+                  label: t("themeLight"),
+                  hint: t("themeLightHint"),
+                  dark: false,
+                },
+                {
+                  value: "DARK",
+                  label: t("themeDark"),
+                  hint: t("themeDarkHint"),
+                  dark: true,
+                },
+              ] as { value: Theme; label: string; hint: string; dark: boolean }[]
+            ).map((option) => {
+              const selected = theme === option.value;
 
-      <div className="flex justify-end border-t pt-4">
-        <Button type="submit" disabled={busy}>
-          {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-          {saving ? common("saving") : common("save")}
-        </Button>
+              return (
+                <label
+                  key={option.value}
+                  className={cn(
+                    "flex cursor-pointer flex-col border transition-colors",
+                    selected
+                      ? "border-primary ring-1 ring-primary"
+                      : "hover:bg-muted/60"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="theme"
+                    className="sr-only"
+                    value={option.value}
+                    checked={selected}
+                    disabled={busy}
+                    onChange={() => setTheme(option.value)}
+                  />
+                  <ThemePreview dark={option.dark} selected={selected} />
+                  <span className="flex items-center justify-between border-t px-4 py-3">
+                    <span className="flex flex-col">
+                      <span className="text-sm font-medium">{option.label}</span>
+                      <span className="text-xs text-muted-foreground">{option.hint}</span>
+                    </span>
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "flex size-4 items-center justify-center rounded-full border transition-colors",
+                        selected ? "border-primary bg-primary" : "border-border"
+                      )}
+                    >
+                      {selected ? <span className="size-1.5 rounded-full bg-primary-foreground" /> : null}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("localizationTitle")}</CardTitle>
+          <CardDescription>{t("localizationDescription")}</CardDescription>
+        </CardHeader>
+
+        <CardContent className="flex flex-col gap-6">
+          <LocalizationRow
+            id="language"
+            label={t("language")}
+            hint={t("languageHint")}
+          >
+            <Select
+              id="language"
+              value={language}
+              disabled={busy}
+              options={LANGUAGES}
+              onChange={(event) => setLanguage(event.target.value as Language)}
+            />
+          </LocalizationRow>
+
+          <LocalizationRow
+            id="timezone-search"
+            label={t("timezone")}
+            hint={t("timezoneHint")}
+          >
+            <TimezonePicker value={timezone} disabled={busy} onChange={setTimezone} />
+          </LocalizationRow>
+        </CardContent>
+      </Card>
+
+      <div
+        data-slot="settings-action-bar"
+        className="sticky bottom-0 -mx-6 -mb-6 flex flex-wrap items-center justify-between gap-3 border-t bg-card px-6 py-4"
+      >
+        <span
+          aria-live="polite"
+          className={cn(
+            "flex items-center gap-2 text-sm",
+            dirty ? "text-foreground" : "text-transparent"
+          )}
+        >
+          <span className={cn("size-2 rounded-full", dirty ? "bg-amber-500" : "bg-transparent")} />
+          {t("unsavedChanges")}
+        </span>
+
+        <span className="flex items-center gap-2">
+          <Button type="button" variant="ghost" disabled={busy} onClick={onResetDefaults}>
+            {t("resetDefaults")}
+          </Button>
+          <Button type="submit" disabled={!dirty || busy}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+            {saving ? common("saving") : t("saveChanges")}
+          </Button>
+        </span>
       </div>
     </form>
+  );
+}
+
+function LocalizationRow({
+  id,
+  label,
+  hint,
+  children,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-2 md:grid-cols-[minmax(0,220px)_1fr] md:items-start md:gap-8">
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={id}>{label}</Label>
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      </div>
+      <div className="md:max-w-xl">{children}</div>
+    </div>
+  );
+}
+
+function ThemePreview({ dark, selected }: { dark: boolean; selected: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "h-28 w-full overflow-hidden",
+        dark ? "bg-[#151922]" : "bg-[#f4f5f7]"
+      )}
+    >
+      <div className="flex h-full gap-2 p-2.5">
+        <div className={cn("flex w-16 shrink-0 flex-col gap-1.5 border p-1.5", dark ? "border-white/10 bg-[#0b0e14]" : "border-black/5 bg-white")}>
+          <span className={cn("h-1.5 w-full", selected ? "bg-[#6366f1]" : dark ? "bg-white/40" : "bg-zinc-300")} />
+          <span className={cn("h-1.5 w-4/5", dark ? "bg-white/25" : "bg-zinc-300")} />
+          <span className={cn("h-1.5 w-4/5", dark ? "bg-white/25" : "bg-zinc-300")} />
+          <span className={cn("h-1.5 w-4/5", dark ? "bg-white/25" : "bg-zinc-300")} />
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className={cn("h-1.5 w-8 shrink-0 rounded-full", selected ? "bg-[#6366f1]" : dark ? "bg-white/40" : "bg-zinc-400")} />
+            <span className={cn("h-1.5 w-10", dark ? "bg-white/20" : "bg-zinc-200")} />
+            <span className="ml-auto flex gap-1">
+              <span className={cn("size-1.5 rounded-full", dark ? "bg-white/25" : "bg-zinc-300")} />
+              <span className={cn("size-1.5 rounded-full", dark ? "bg-white/25" : "bg-zinc-300")} />
+            </span>
+          </div>
+          <div className={cn("flex gap-1.5 border p-1.5", dark ? "border-white/10 bg-[#0b0e14]" : "border-black/5 bg-white")}>
+            <span className={cn("h-4 w-8 shrink-0", selected ? "bg-[#6366f1]" : dark ? "bg-white/30" : "bg-zinc-300")} />
+            <span className="flex flex-1 flex-col gap-1">
+              <span className={cn("h-1.5 w-3/4", dark ? "bg-white/30" : "bg-zinc-300")} />
+              <span className={cn("h-1.5 w-1/2", dark ? "bg-white/15" : "bg-zinc-200")} />
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -227,14 +411,19 @@ function LogoPreview({ branding }: { branding: Branding }) {
   }
 
   return (
-    <Image
-      src={branding.logo_url}
-      alt={t("logoAlt")}
-      width={96}
-      height={96}
-      unoptimized
-      className="size-24 border object-contain p-2"
-    />
+    <div className="relative size-24 shrink-0 border bg-white p-2">
+      <Image
+        src={branding.logo_url}
+        alt={t("logoAlt")}
+        width={80}
+        height={80}
+        unoptimized
+        className="size-20 object-contain"
+      />
+      <span className="absolute -right-1.5 -bottom-1.5 flex size-5 items-center justify-center bg-primary text-primary-foreground">
+        <BadgeCheck className="size-3.5" />
+      </span>
+    </div>
   );
 }
 
@@ -257,23 +446,35 @@ function TimezonePicker({
     : options;
 
   const selected = options.find((option) => option.value === value);
+  const selectedLabel = selected?.label ?? value;
 
   return (
-    <Field id="timezone-search" label={t("timezone")} hint={selected?.label ?? value}>
-      <div className="flex flex-col gap-2">
-        <div className="relative">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            id="timezone-search"
-            className="h-9 pl-9"
-            placeholder={t("timezoneSearch")}
-            value={search}
-            disabled={disabled}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
+    <div className="flex flex-col gap-2">
+      <div className="relative">
+        <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          id="timezone-search"
+          className="pl-9"
+          placeholder={t("timezoneSearch")}
+          value={search}
+          disabled={disabled}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </div>
 
-        <div className="max-h-56 overflow-y-auto border">
+      <div className="border">
+        {selected ? (
+          <div className="flex items-center justify-between gap-3 border-b bg-muted/60 px-3 py-2">
+            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              {t("currentSelection")}
+            </span>
+            <span className="min-w-0 truncate text-sm font-medium" title={selectedLabel}>
+              {selectedLabel}
+            </span>
+          </div>
+        ) : null}
+
+        <div className="max-h-56 overflow-y-auto">
           {visible.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("noMatches")}</p>
           ) : (
@@ -300,17 +501,16 @@ function TimezonePicker({
           )}
         </div>
       </div>
-    </Field>
+    </div>
   );
 }
 
 function BrandingSkeleton() {
   return (
-    <div className="flex max-w-2xl animate-pulse flex-col gap-6">
-      <div className="h-24 w-24 bg-muted" />
-      <div className="h-11 w-full bg-muted" />
-      <div className="h-11 w-full bg-muted" />
-      <div className="h-56 w-full bg-muted" />
+    <div className="flex animate-pulse flex-col gap-6">
+      <div className="h-36 w-full border bg-muted/50" />
+      <div className="h-60 w-full border bg-muted/50" />
+      <div className="h-48 w-full border bg-muted/50" />
     </div>
   );
 }

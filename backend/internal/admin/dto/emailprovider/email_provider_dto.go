@@ -3,9 +3,12 @@ package emailprovider
 import "time"
 
 type ConfigurationRequest struct {
-	Name     string `json:"name" binding:"required,min=2,max=100"`
-	Domain   string `json:"domain" binding:"required,max=253"`
-	Provider string `json:"provider" binding:"required,max=20"`
+	Name           string  `json:"name" binding:"required,min=2,max=100"`
+	Domain         string  `json:"domain" binding:"required,max=253"`
+	Provider       string  `json:"provider" binding:"required,max=20"`
+	DKIMPublicKey  *string `json:"dkim_public_key"`
+	DKIMPrivateKey *string `json:"dkim_private_key"`
+	AccessToken    *string `json:"access_token"`
 }
 
 type ConfigurationResponse struct {
@@ -30,4 +33,12 @@ type DKIMResponse struct {
 type AccessTokenResponse struct {
 	AccessToken string    `json:"access_token"`
 	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+type PendingDKIMRequest struct {
+	Domain string `json:"domain"`
+}
+
+type PendingAccessTokenRequest struct {
+	Domain string `json:"domain" binding:"required"`
 }

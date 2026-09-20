@@ -23,6 +23,7 @@ type PolicySummary struct {
 	Policy     db.Policy
 	GroupCount int
 	RuleCount  int
+	Groups     []repo.PolicyReference
 }
 
 type PolicyListing struct {
@@ -31,6 +32,8 @@ type PolicyListing struct {
 	PageSize int
 	Total    int64
 }
+
+const policyGroupPreviewLimit = 3
 
 type PolicyService struct {
 	db   *gorm.DB
@@ -66,6 +69,7 @@ func (s *PolicyService) List(ctx context.Context, customerID int, params repo.Li
 
 	groupCounts := countByPolicy(groups)
 	ruleCounts := countByPolicy(rules)
+	groupPreviews := previewsByPolicy(groups, policyGroupPreviewLimit)
 
 	items := make([]PolicySummary, 0, len(rows))
 	for _, row := range rows {
@@ -73,6 +77,7 @@ func (s *PolicyService) List(ctx context.Context, customerID int, params repo.Li
 			Policy:     row,
 			GroupCount: groupCounts[row.ID],
 			RuleCount:  ruleCounts[row.ID],
+			Groups:     groupPreviews[row.ID],
 		})
 	}
 
@@ -295,6 +300,20 @@ func countByPolicy(rows []repo.PolicyReference) map[int]int {
 	}
 
 	return counts
+}
+
+func previewsByPolicy(rows []repo.PolicyReference, limit int) map[int][]repo.PolicyReference {
+	previews := make(map[int][]repo.PolicyReference)
+
+	for _, row := range rows {
+		items := previews[row.PolicyID]
+		if len(items) >= limit {
+			continue
+		}
+		previews[row.PolicyID] = append(items, row)
+	}
+
+	return previews
 }
 
 func policyError(err error, name string) error {

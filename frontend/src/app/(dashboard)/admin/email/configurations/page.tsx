@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -9,13 +9,20 @@ import { DataTable } from "@/components/data-table/data-table";
 import type {
   ColumnConfig,
   FilterConfig,
-  RowAction,
   TableAction,
 } from "@/components/data-table/types";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import Consolepage from "@/components/dashboard/pageThemes/consolepage";
-import { EmailConfigurationDialog } from "@/components/email/configurations/configuration-dialog";
+import { EmailConfigurationDrawer } from "@/components/email/configurations/configuration-drawer";
 import { providerLabel } from "@/components/email/configurations/provider-meta";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { apiErrorMessage } from "@/lib/api-error";
 import {
   useDeleteEmailConfigurationMutation,
@@ -35,22 +42,6 @@ export default function EmailConfigurationsPage() {
       placeholder: t("searchPlaceholder"),
       width: "w-72",
     },
-  ];
-
-  const columns: ColumnConfig<EmailConfiguration>[] = [
-    { key: "name", label: t("columns.name") },
-    {
-      key: "provider",
-      label: t("columns.provider"),
-      render: (value) => providerLabel(String(value)),
-    },
-    {
-      key: "domain",
-      label: t("columns.domain"),
-      render: (value) => <span className="font-mono text-[0.8rem]">{String(value)}</span>,
-    },
-    { key: "created_at", label: t("columns.createdAt"), type: "date" },
-    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
   ];
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -82,6 +73,62 @@ export default function EmailConfigurationsPage() {
     }
   }
 
+  const columns: ColumnConfig<EmailConfiguration>[] = [
+    { key: "name", label: t("columns.name") },
+    {
+      key: "provider",
+      label: t("columns.provider"),
+      render: (value) => providerLabel(String(value)),
+    },
+    {
+      key: "domain",
+      label: t("columns.domain"),
+      render: (value) => (
+        <span className="font-mono text-[0.8rem]">{String(value)}</span>
+      ),
+    },
+    { key: "updated_at", label: t("columns.updatedAt"), type: "date" },
+    {
+      key: "actions",
+      label: "",
+      align: "right",
+      render: (_value, row) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={common("actions")}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <MoreHorizontal />
+              </Button>
+            }
+          />
+
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openEdit(row)}>
+              <Pencil />
+              {common("edit")}
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setDeleting(row)}
+            >
+              <Trash2 />
+              {common("delete")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+
   const actions: TableAction[] = [
     {
       key: "add",
@@ -89,17 +136,6 @@ export default function EmailConfigurationsPage() {
       icon: Plus,
       variant: "default",
       onClick: openCreate,
-    },
-  ];
-
-  const rowActions: RowAction<EmailConfiguration>[] = [
-    { key: "edit", label: common("edit"), icon: Pencil, variant: "ghost", onClick: openEdit },
-    {
-      key: "delete",
-      label: common("delete"),
-      icon: Trash2,
-      variant: "destructive",
-      onClick: (row) => setDeleting(row),
     },
   ];
 
@@ -114,12 +150,11 @@ export default function EmailConfigurationsPage() {
             columns={columns}
             filters={filters}
             actions={actions}
-            rowActions={rowActions}
             getRowId={(row) => row.id}
             emptyMessage={t("empty")}
           />
 
-          <EmailConfigurationDialog
+          <EmailConfigurationDrawer
             key={editing ? `edit-${editing.id}` : "create"}
             open={dialogOpen}
             onOpenChange={setDialogOpen}

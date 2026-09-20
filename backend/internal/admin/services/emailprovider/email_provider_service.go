@@ -78,6 +78,25 @@ func (s *EmailProviderService) Create(ctx context.Context, customerID int, in Co
 		Provider:   input.Provider,
 	}
 
+	now := time.Now()
+
+	if input.DKIMPublicKey != nil {
+		key := *input.DKIMPublicKey
+		row.DKIMPublicKey = &key
+	}
+
+	if input.DKIMPrivateKey != nil {
+		key := *input.DKIMPrivateKey
+		row.DKIMPrivateKey = &key
+	}
+
+	if input.AccessToken != nil {
+		hash := auth.HashToken(*input.AccessToken)
+		expiresAt := now.Add(config.ProviderTokenTTL)
+		row.AccessTokenHash = &hash
+		row.AccessTokenExpiresAt = &expiresAt
+	}
+
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.WithTx(tx).Insert(ctx, &row); err != nil {
 			return err
@@ -109,11 +128,35 @@ func (s *EmailProviderService) Update(ctx context.Context, customerID, id int, i
 			return err
 		}
 
+		now := time.Now()
+
 		updates := map[string]any{
 			"name":       input.Name,
 			"domain":     input.Domain,
 			"provider":   input.Provider,
-			"updated_at": time.Now(),
+			"updated_at": now,
+		}
+
+		var (
+			dkimPublicKey  string
+			dkimPrivateKey string
+			expiresAt      time.Time
+		)
+
+		if input.DKIMPublicKey != nil {
+			dkimPublicKey = *input.DKIMPublicKey
+			updates["dkim_public_key"] = dkimPublicKey
+		}
+
+		if input.DKIMPrivateKey != nil {
+			dkimPrivateKey = *input.DKIMPrivateKey
+			updates["dkim_private_key"] = dkimPrivateKey
+		}
+
+		if input.AccessToken != nil {
+			updates["access_token_hash"] = auth.HashToken(*input.AccessToken)
+			expiresAt = now.Add(config.ProviderTokenTTL)
+			updates["access_token_expires_at"] = expiresAt
 		}
 
 		if _, err := repo.Update(ctx, customerID, id, updates); err != nil {
@@ -124,6 +167,18 @@ func (s *EmailProviderService) Update(ctx context.Context, customerID, id int, i
 		row.Name = input.Name
 		row.Domain = input.Domain
 		row.Provider = input.Provider
+
+		if input.DKIMPublicKey != nil {
+			row.DKIMPublicKey = &dkimPublicKey
+		}
+
+		if input.DKIMPrivateKey != nil {
+			row.DKIMPrivateKey = &dkimPrivateKey
+		}
+
+		if input.AccessToken != nil {
+			row.AccessTokenExpiresAt = &expiresAt
+		}
 
 		return s.cache(ctx, current.Domain, row)
 	})
@@ -183,6 +238,29 @@ func (s *EmailProviderService) GenerateDKIM(ctx context.Context, customerID, id 
 	row.DKIMPrivateKey = &pair.PrivateKeyPEM
 
 	return row, nil
+}
+
+func (s *EmailProviderService) GenerateDKIMPending(ctx context.Context) (string, string, error) {
+	pair, err := generateDKIMKeyPair()
+	if err != nil {
+		return "", "", err
+	}
+
+	return pair.PublicRecord, pair.PrivateKeyPEM, nil
+}
+
+func (s *EmailProviderService) GenerateAccessTokenPending(ctx context.Context, customerID int, domain string) (string, time.Time, error) {
+	secret, err := s.repo.TenantSecret(ctx, customerID)
+	if err != nil {
+		return "", time.Time{}, configurationError(err, "")
+	}
+
+	token, expiresAt, err := issueAccessToken(secret, s.cfg.Issuer, customerID, 0, domain, config.ProviderTokenTTL)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	return token, expiresAt, nil
 }
 
 func (s *EmailProviderService) GenerateAccessToken(ctx context.Context, customerID, id int) (string, time.Time, error) {
@@ -264,9 +342,12 @@ func configurationError(err error, domain string) error {
 }
 
 type ConfigurationInput struct {
-	Name     string
-	Domain   string
-	Provider string
+	Name           string
+	Domain         string
+	Provider       string
+	DKIMPublicKey  *string
+	DKIMPrivateKey *string
+	AccessToken    *string
 }
 
 func NormalizeDomain(domain string) string {
@@ -297,10 +378,26 @@ func NormalizeConfigurationInput(in ConfigurationInput) (ConfigurationInput, err
 	}
 
 	return ConfigurationInput{
-		Name:     utils.NormalizeName(in.Name),
-		Domain:   domain,
-		Provider: provider,
+		Name:           utils.NormalizeName(in.Name),
+		Domain:         domain,
+		Provider:       provider,
+		DKIMPublicKey:  normalizeSecret(in.DKIMPublicKey),
+		DKIMPrivateKey: normalizeSecret(in.DKIMPrivateKey),
+		AccessToken:    normalizeSecret(in.AccessToken),
 	}, nil
+}
+
+func normalizeSecret(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
 }
 
 const TokenType = "provider_access"
@@ -314,7 +411,12 @@ type AccessClaims struct {
 }
 
 func IssueAccessToken(secret, issuer string, row db.EmailProviderConfiguration, ttl time.Duration) (string, time.Time, error) {
-	if !ValidDomain(row.Domain) {
+	return issueAccessToken(secret, issuer, row.CustomerID, row.ID, row.Domain, ttl)
+}
+
+func issueAccessToken(secret, issuer string, customerID, configID int, domain string, ttl time.Duration) (string, time.Time, error) {
+	domain = NormalizeDomain(domain)
+	if !ValidDomain(domain) {
 		return "", time.Time{}, utils.ErrInvalidDomain
 	}
 
@@ -330,14 +432,14 @@ func IssueAccessToken(secret, issuer string, row db.EmailProviderConfiguration, 
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        id,
 			Issuer:    issuer,
-			Subject:   strconv.Itoa(row.ID),
+			Subject:   strconv.Itoa(configID),
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},
-		CustomerID: row.CustomerID,
-		ConfigID:   row.ID,
-		Domain:     row.Domain,
+		CustomerID: customerID,
+		ConfigID:   configID,
+		Domain:     domain,
 		Typ:        TokenType,
 	}
 

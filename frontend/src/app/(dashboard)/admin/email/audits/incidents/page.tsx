@@ -7,7 +7,7 @@ import Consolepage from "@/components/dashboard/pageThemes/consolepage";
 import { DataTable } from "@/components/data-table/data-table";
 import { StatusBadge } from "@/components/data-table/status-badge";
 import type { ColumnConfig, FilterConfig } from "@/components/data-table/types";
-import { EmailIncidentDialog } from "@/components/email/audits/email-incident-dialog";
+import { EmailIncidentDrawer } from "@/components/email/audits/email-incident-dialog";
 import {
   useListEmailIncidentsQuery,
   type EmailIncidentListItem,
@@ -91,28 +91,7 @@ export default function EmailIncidentsPage() {
           ) : null}
         </div>
       ),
-    },
-    {
-      key: "evidence",
-      label: i("columns.evidence"),
-      align: "right",
-      width: "10rem",
-      accessor: (row) => row.match_count + row.violation_count,
-      render: (_value, row) => (
-        <span className="text-muted-foreground">
-          {row.trigger === "RESTRICTION"
-            ? i("violations", { count: row.violation_count })
-            : i("matches", { count: row.match_count })}
-        </span>
-      ),
-    },
-    {
-      key: "withheld_count",
-      label: i("columns.withheld"),
-      type: "number",
-      align: "right",
-      width: "7rem",
-    },
+    }
   ];
 
   return (
@@ -131,7 +110,7 @@ export default function EmailIncidentsPage() {
             emptyMessage={i("empty")}
           />
 
-          <EmailIncidentDialog
+          <EmailIncidentDrawer
             correlationId={selected}
             onOpenChange={(open) => {
               if (!open) setSelected(null);

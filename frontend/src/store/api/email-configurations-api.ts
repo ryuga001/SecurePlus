@@ -20,6 +20,9 @@ export type EmailConfigurationInput = {
   name: string;
   domain: string;
   provider: EmailProvider;
+  dkim_public_key?: string | null;
+  dkim_private_key?: string | null;
+  access_token?: string | null;
 };
 
 export type UpdateEmailConfigurationArgs = EmailConfigurationInput & { id: number };
@@ -86,6 +89,14 @@ export const emailConfigurationsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `${BASE_URL}/${id}/access-token`, method: "POST" }),
       invalidatesTags: (result, error, id) => [{ type: "EmailConfiguration", id }],
     }),
+
+    generatePendingDkim: builder.mutation<DkimKeyResponse, { domain?: string }>({
+      query: (body) => ({ url: `${BASE_URL}/pending/dkim`, method: "POST", body }),
+    }),
+
+    generatePendingAccessToken: builder.mutation<AccessTokenResponse, { domain: string }>({
+      query: (body) => ({ url: `${BASE_URL}/pending/access-token`, method: "POST", body }),
+    }),
   }),
 });
 
@@ -97,4 +108,6 @@ export const {
   useDeleteEmailConfigurationMutation,
   useGenerateDkimKeyMutation,
   useGenerateAccessTokenMutation,
+  useGeneratePendingDkimMutation,
+  useGeneratePendingAccessTokenMutation,
 } = emailConfigurationsApi;

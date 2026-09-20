@@ -6,8 +6,8 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Field, FormError } from "@/components/auth/auth-form";
+import { DrawerWrapper } from "@/components/drawer/drawer";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +19,13 @@ import {
   type RuleType,
 } from "@/store/api/rules-api";
 
-function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void }) {
+function RuleForm({
+  rule,
+  onClose,
+}: {
+  rule: Rule | null;
+  onClose: () => void;
+}) {
   const t = useTranslations("rules");
   const common = useTranslations("common");
 
@@ -29,7 +35,9 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
   ];
 
   const [name, setName] = React.useState(rule?.rule_name ?? "");
-  const [type, setType] = React.useState<RuleType>(rule?.type ?? "KEYWORD");
+  const [type, setType] = React.useState<RuleType>(
+    rule?.type ?? "KEYWORD",
+  );
   const [value, setValue] = React.useState(rule?.value ?? "");
   const [error, setError] = React.useState("");
   const [valueInvalid, setValueInvalid] = React.useState(false);
@@ -42,20 +50,29 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const input = { rule_name: name.trim(), type, value };
+    const input = {
+      rule_name: name.trim(),
+      type,
+      value: value.trim(),
+    };
+
+    setError("");
+    setValueInvalid(false);
 
     if (!input.rule_name) {
       setError(t("dialog.nameRequired"));
       return;
     }
-    if (!input.value.trim()) {
+
+    if (!input.value) {
       setValueInvalid(true);
-      setError(type === "REGEX" ? t("dialog.patternRequired") : t("dialog.keywordRequired"));
+      setError(
+        type === "REGEX"
+          ? t("dialog.patternRequired")
+          : t("dialog.keywordRequired"),
+      );
       return;
     }
-
-    setError("");
-    setValueInvalid(false);
 
     try {
       if (rule) {
@@ -74,79 +91,90 @@ function RuleForm({ rule, onClose }: { rule: Rule | null; onClose: () => void })
   }
 
   return (
-    <>
-      <DialogTitle>{rule ? t("dialog.editTitle") : t("dialog.addTitle")}</DialogTitle>
-      <DialogDescription>
-        A rule matches message content by keyword or by regular expression.
-      </DialogDescription>
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+      <FormError message={error} />
 
-      <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-4">
-        <FormError message={error} />
+      <Field id="rule-name" label={t("dialog.name")}>
+        <Input
+          id="rule-name"
+          required
+          autoFocus
+          placeholder={t("dialog.namePlaceholder")}
+          value={name}
+          disabled={pending}
+          onChange={(event) => {
+            setName(event.target.value);
+            setError("");
+          }}
+        />
+      </Field>
 
-        <Field id="rule-name" label={t("dialog.name")}>
-          <Input
-            id="rule-name"
-            required
-            autoFocus
-            placeholder={t("dialog.namePlaceholder")}
-            value={name}
-            disabled={pending}
-            onChange={(event) => {
-              setName(event.target.value);
-              setError("");
-            }}
-          />
-        </Field>
+      <Field id="rule-type" label={t("dialog.matchType")}>
+        <Select
+          id="rule-type"
+          value={type}
+          options={TYPE_OPTIONS}
+          disabled={pending}
+          onChange={(event) => {
+            setType(event.target.value as RuleType);
+            setValueInvalid(false);
+            setError("");
+          }}
+        />
+      </Field>
 
-        <Field id="rule-type" label={t("dialog.matchType")}>
-          <Select
-            id="rule-type"
-            value={type}
-            options={TYPE_OPTIONS}
-            disabled={pending}
-            onChange={(event) => {
-              setType(event.target.value as RuleType);
-              setValueInvalid(false);
-              setError("");
-            }}
-          />
-        </Field>
-
-        <Field
+      <Field
+        id="rule-value"
+        label={
+          type === "REGEX"
+            ? t("dialog.pattern")
+            : t("dialog.keyword")
+        }
+        hint={
+          type === "REGEX"
+            ? t("dialog.patternHint")
+            : t("dialog.keywordHint")
+        }
+      >
+        <Textarea
           id="rule-value"
-          label={type === "REGEX" ? t("dialog.pattern") : t("dialog.keyword")}
-          hint={
-            type === "REGEX" ? t("dialog.patternHint") : t("dialog.keywordHint")
+          required
+          spellCheck={false}
+          className={type === "REGEX" ? "font-mono" : undefined}
+          placeholder={
+            type === "REGEX"
+              ? "\\d{16}"
+              : "confidential"
           }
-        >
-          <Textarea
-            id="rule-value"
-            required
-            spellCheck={false}
-            className={type === "REGEX" ? "font-mono" : undefined}
-            placeholder={type === "REGEX" ? "\\d{16}" : "confidential"}
-            value={value}
-            disabled={pending}
-            aria-invalid={valueInvalid || undefined}
-            onChange={(event) => {
-              setValue(event.target.value);
-              setValueInvalid(false);
-              setError("");
-            }}
-          />
-        </Field>
+          value={value}
+          disabled={pending}
+          aria-invalid={valueInvalid || undefined}
+          onChange={(event) => {
+            setValue(event.target.value);
+            setValueInvalid(false);
+            setError("");
+          }}
+        />
+      </Field>
 
-        <div className="flex justify-end gap-2 border-t pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
-            {common("cancel")}
-          </Button>
-          <Button type="submit" disabled={pending}>
-            {pending ? <Loader2 className="animate-spin" /> : null}
-            {rule ? t("dialog.saveChanges") : t("dialog.create")}
-          </Button>
-        </div>
-      </form>
-    </>
+      <div className="flex justify-end gap-2 border-t pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={pending}
+          onClick={onClose}
+        >
+          {common("cancel")}
+        </Button>
+
+        <Button type="submit" disabled={pending}>
+          {pending ? <Loader2 className="animate-spin" /> : null}
+          {rule
+            ? t("dialog.saveChanges")
+            : t("dialog.create")}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -159,11 +187,25 @@ export function RuleDialog({
   onOpenChange: (open: boolean) => void;
   rule?: Rule | null;
 }) {
+  const t = useTranslations("rules");
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100svh-4rem)] max-w-lg overflow-y-auto">
-        <RuleForm rule={rule ?? null} onClose={() => onOpenChange(false)} />
-      </DialogContent>
-    </Dialog>
+    <DrawerWrapper
+      open={open}
+      onClose={() => onOpenChange(false)}
+      title={
+        rule
+          ? t("dialog.editTitle")
+          : t("dialog.addTitle")
+      }
+      description="A rule matches message content by keyword or by regular expression."
+      width="lg"
+    >
+      <RuleForm
+        key={rule?.id ?? "create"}
+        rule={rule ?? null}
+        onClose={() => onOpenChange(false)}
+      />
+    </DrawerWrapper>
   );
 }

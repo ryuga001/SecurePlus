@@ -138,6 +138,81 @@ func (r *GroupRepository) FindEmailUser(ctx context.Context, customerID, emailUs
 	return row, err
 }
 
+func (r *GroupRepository) FindEmailUserIDs(ctx context.Context, customerID int, ids []int) ([]int, error) {
+	found := make([]int, 0, len(ids))
+
+	if len(ids) == 0 {
+		return found, nil
+	}
+
+	err := r.db.WithContext(ctx).
+		Model(&db.EmailUser{}).
+		Scopes(db.TenantScope(customerID)).
+		Where("id IN ?", ids).
+		Pluck("id", &found).Error
+
+	return found, err
+}
+
+func (r *GroupRepository) AddMembers(ctx context.Context, customerID, groupID int, ids []int) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	rows := make([]db.EmailUserGroupMapping, 0, len(ids))
+	for _, id := range ids {
+		rows = append(rows, db.EmailUserGroupMapping{
+			EmailUserID: id,
+			GroupID:     groupID,
+			CustomerID:  customerID,
+		})
+	}
+
+	return r.db.WithContext(ctx).Create(&rows).Error
+}
+
+func (r *GroupRepository) RemoveAllMembers(ctx context.Context, customerID, groupID int) error {
+	return r.db.WithContext(ctx).
+		Where("group_id = ? AND customer_id = ?", groupID, customerID).
+		Delete(&db.EmailUserGroupMapping{}).Error
+}
+
+type GroupMemberPreview struct {
+	GroupID   int    `gorm:"column:group_id"`
+	ID        int    `gorm:"column:id"`
+	FirstName string `gorm:"column:first_name"`
+	LastName  string `gorm:"column:last_name"`
+	Email     string `gorm:"column:email"`
+}
+
+func (r *GroupRepository) MemberPreviews(ctx context.Context, customerID int, groupIDs []int, limit int) ([]GroupMemberPreview, error) {
+	rows := make([]GroupMemberPreview, 0)
+
+	if len(groupIDs) == 0 {
+		return rows, nil
+	}
+
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT t.group_id, t.id, t.first_name, t.last_name, t.email
+		FROM (
+			SELECT
+				m.group_id,
+				u.id,
+				u.first_name,
+				u.last_name,
+				u.email,
+				ROW_NUMBER() OVER (PARTITION BY m.group_id ORDER BY u.email, u.id) AS rn
+			FROM email_user_group_mapping m
+			JOIN email_users u ON u.id = m.email_user_id AND u.customer_id = m.customer_id
+			WHERE m.customer_id = ? AND m.group_id IN (?)
+		) t
+		WHERE t.rn <= ?`,
+		customerID, groupIDs, limit,
+	).Scan(&rows).Error
+
+	return rows, err
+}
+
 func (r *GroupRepository) AddMember(ctx context.Context, customerID, groupID, emailUserID int) error {
 	row := db.EmailUserGroupMapping{
 		EmailUserID: emailUserID,

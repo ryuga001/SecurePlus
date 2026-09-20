@@ -148,7 +148,7 @@ func (h *EmailUserHandler) groups(c *gin.Context) {
 
 	items := make([]groupdto.GroupResponse, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, groupdto.FromGroup(row, 0))
+		items = append(items, groupdto.FromGroup(row, 0, make([]groupdto.MemberResponse, 0)))
 	}
 
 	c.JSON(http.StatusOK, utils.ListResponse[groupdto.GroupResponse]{

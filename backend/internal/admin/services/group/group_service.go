@@ -16,6 +16,13 @@ import (
 type GroupSummary struct {
 	Group       db.Group
 	MemberCount int
+	Members     []MemberSummary
+}
+
+type MemberSummary struct {
+	ID    int
+	Name  string
+	Email string
 }
 
 type GroupListing struct {
@@ -24,6 +31,8 @@ type GroupListing struct {
 	PageSize int
 	Total    int64
 }
+
+const memberPreviewLimit = 3
 
 type GroupService struct {
 	db   *gorm.DB
@@ -57,9 +66,23 @@ func (s *GroupService) List(ctx context.Context, customerID int, params repo.Lis
 		byGroup[count.GroupID] = int(count.Total)
 	}
 
+	previews, err := s.repo.MemberPreviews(ctx, customerID, ids, memberPreviewLimit)
+	if err != nil {
+		return GroupListing{}, err
+	}
+
+	byGroupPreview := make(map[int][]MemberSummary, len(ids))
+	for _, preview := range previews {
+		byGroupPreview[preview.GroupID] = append(byGroupPreview[preview.GroupID], fromMemberPreview(preview))
+	}
+
 	items := make([]GroupSummary, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, GroupSummary{Group: row, MemberCount: byGroup[row.ID]})
+		items = append(items, GroupSummary{
+			Group:       row,
+			MemberCount: byGroup[row.ID],
+			Members:     byGroupPreview[row.ID],
+		})
 	}
 
 	return GroupListing{Items: items, Page: page, PageSize: pageSize, Total: total}, nil
@@ -81,7 +104,16 @@ func (s *GroupService) Get(ctx context.Context, customerID, id int) (GroupSummar
 		members = int(counts[0].Total)
 	}
 
-	return GroupSummary{Group: row, MemberCount: members}, nil
+	previews, err := s.repo.MemberPreviews(ctx, customerID, []int{row.ID}, memberPreviewLimit)
+	if err != nil {
+		return GroupSummary{}, err
+	}
+
+	return GroupSummary{
+		Group:       row,
+		MemberCount: members,
+		Members:     fromMemberPreviews(previews),
+	}, nil
 }
 
 func (s *GroupService) Create(ctx context.Context, customerID int, in GroupInput) (GroupSummary, error) {
@@ -90,13 +122,28 @@ func (s *GroupService) Create(ctx context.Context, customerID int, in GroupInput
 		return GroupSummary{}, err
 	}
 
-	row := db.Group{CustomerID: customerID, Name: input.Name, Type: input.Type}
+	var summary GroupSummary
 
-	if err := s.repo.Insert(ctx, &row); err != nil {
-		return GroupSummary{}, groupError(err, input.Name)
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		r := s.repo.WithTx(tx)
+
+		row := db.Group{CustomerID: customerID, Name: input.Name, Type: input.Type}
+		if err := r.Insert(ctx, &row); err != nil {
+			return groupError(err, input.Name)
+		}
+
+		if err := s.replaceMembers(ctx, r, customerID, row.ID, in.MemberIDs); err != nil {
+			return err
+		}
+
+		summary = GroupSummary{Group: row}
+		return nil
+	})
+	if err != nil {
+		return GroupSummary{}, err
 	}
 
-	return GroupSummary{Group: row}, nil
+	return s.Get(ctx, customerID, summary.Group.ID)
 }
 
 func (s *GroupService) Update(ctx context.Context, customerID, id int, in GroupInput) (GroupSummary, error) {
@@ -107,15 +154,84 @@ func (s *GroupService) Update(ctx context.Context, customerID, id int, in GroupI
 
 	updates := map[string]any{"name": input.Name, "updated_at": time.Now()}
 
-	affected, err := s.repo.Update(ctx, customerID, id, updates)
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		r := s.repo.WithTx(tx)
+
+		affected, err := r.Update(ctx, customerID, id, updates)
+		if err != nil {
+			return groupError(err, input.Name)
+		}
+		if affected == 0 {
+			return utils.ErrGroupNotFound
+		}
+
+		return s.replaceMembers(ctx, r, customerID, id, in.MemberIDs)
+	})
 	if err != nil {
-		return GroupSummary{}, groupError(err, input.Name)
-	}
-	if affected == 0 {
-		return GroupSummary{}, utils.ErrGroupNotFound
+		return GroupSummary{}, err
 	}
 
 	return s.Get(ctx, customerID, id)
+}
+
+func (s *GroupService) replaceMembers(ctx context.Context, r *repo.GroupRepository, customerID, groupID int, memberIDs []int) error {
+	ids := uniqueIDs(memberIDs)
+
+	var existing []int
+	if len(ids) > 0 {
+		var err error
+		existing, err = r.FindEmailUserIDs(ctx, customerID, ids)
+		if err != nil {
+			return err
+		}
+		if len(existing) != len(ids) {
+			return utils.ErrUnknownEmailUser
+		}
+	}
+
+	if err := r.RemoveAllMembers(ctx, customerID, groupID); err != nil {
+		return err
+	}
+
+	return r.AddMembers(ctx, customerID, groupID, existing)
+}
+
+func uniqueIDs(ids []int) []int {
+	seen := make(map[int]struct{}, len(ids))
+	unique := make([]int, 0, len(ids))
+
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+
+	return unique
+}
+
+func fromMemberPreviews(previews []repo.GroupMemberPreview) []MemberSummary {
+	members := make([]MemberSummary, 0, len(previews))
+	for _, preview := range previews {
+		members = append(members, fromMemberPreview(preview))
+	}
+	return members
+}
+
+func fromMemberPreview(preview repo.GroupMemberPreview) MemberSummary {
+	return MemberSummary{
+		ID:    preview.ID,
+		Name:  memberDisplayName(preview),
+		Email: preview.Email,
+	}
+}
+
+func memberDisplayName(preview repo.GroupMemberPreview) string {
+	if name := strings.TrimSpace(preview.FirstName + " " + preview.LastName); name != "" {
+		return name
+	}
+	return preview.Email
 }
 
 func (s *GroupService) Delete(ctx context.Context, customerID, id int) error {
@@ -201,8 +317,9 @@ func groupError(err error, name string) error {
 }
 
 type GroupInput struct {
-	Name string
-	Type string
+	Name      string
+	Type      string
+	MemberIDs []int
 }
 
 func NormalizeGroupInput(in GroupInput) (GroupInput, error) {

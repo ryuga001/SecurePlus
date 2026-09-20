@@ -17,6 +17,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	dto "dpdp-backend/internal/admin/dto/emailprovider"
 	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
 	providersvc "dpdp-backend/internal/admin/services/emailprovider"
 	"dpdp-backend/internal/admin/utils"
@@ -376,6 +377,191 @@ func TestIntegrationHTTPConfigurationListAndDelete(t *testing.T) {
 
 	removed := do(t, router, http.MethodDelete, "/api/v1/admin/email/configurations/"+strconv.Itoa(row.ID), "")
 	expectStatus(t, removed, http.StatusNoContent)
+}
+
+func TestIntegrationHTTPConfigurationCreateAcceptsCredentials(t *testing.T) {
+	h := setup(t)
+	router := h.router(t)
+
+	const (
+		dkimRecord  = "v=DKIM1; k=rsa; p=secretkey"
+		dkimPrivate = "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----"
+		accessToken = "one-step-access-token"
+	)
+
+	body, err := json.Marshal(map[string]string{
+		"name":             "Corporate",
+		"domain":           "example.com",
+		"provider":         "gmail",
+		"dkim_public_key":  "  " + dkimRecord + "  ",
+		"dkim_private_key": "  " + dkimPrivate + "  ",
+		"access_token":     "  " + accessToken + "  ",
+	})
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+
+	recorder := do(t, router, http.MethodPost, "/api/v1/admin/email/configurations", string(body))
+
+	expectStatus(t, recorder, http.StatusCreated)
+
+	if strings.Contains(recorder.Body.String(), dkimPrivate) {
+		t.Fatal("create response must not expose the dkim private key")
+	}
+
+	var payload struct {
+		ID             int    `json:"id"`
+		Name           string `json:"name"`
+		DKIMPublicKey  string `json:"dkim_public_key"`
+		HasAccessToken bool   `json:"has_access_token"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if payload.Name != "Corporate" || payload.DKIMPublicKey != dkimRecord || !payload.HasAccessToken {
+		t.Fatalf("payload = %+v", payload)
+	}
+
+	var stored db.EmailProviderConfiguration
+	if err := h.database.Where("id = ?", payload.ID).Take(&stored).Error; err != nil {
+		t.Fatalf("row lookup failed: %v", err)
+	}
+	if stored.DKIMPublicKey == nil || *stored.DKIMPublicKey != dkimRecord {
+		t.Fatalf("stored dkim = %v", stored.DKIMPublicKey)
+	}
+	if stored.DKIMPrivateKey == nil || *stored.DKIMPrivateKey != dkimPrivate {
+		t.Fatalf("stored dkim private key = %v", stored.DKIMPrivateKey)
+	}
+	if stored.AccessTokenHash == nil || *stored.AccessTokenHash == accessToken || *stored.AccessTokenHash != auth.HashToken(accessToken) {
+		t.Fatalf("stored token hash = %v", stored.AccessTokenHash)
+	}
+	if stored.AccessTokenExpiresAt == nil {
+		t.Fatal("expiry must be set for a provided token")
+	}
+
+	fetched, err := h.providers.Get(context.Background(), h.tenant.ID, payload.ID)
+	if err != nil {
+		t.Fatalf("get failed: %v", err)
+	}
+	if fetched.DKIMPrivateKey != nil {
+		t.Fatal("read paths must not return the dkim private key")
+	}
+}
+
+func TestIntegrationConfigurationUpdateSetsCredentials(t *testing.T) {
+	h := setup(t)
+	row := h.configuration(t, h.tenant.ID, "Corporate", "example.com")
+
+	const dkimRecord = "v=DKIM1; k=rsa; p=abc123"
+	raw := dkimRecord
+
+	updated, err := h.providers.Update(context.Background(), h.tenant.ID, row.ID, providersvc.ConfigurationInput{
+		Name:          "Corporate",
+		Domain:        "example.com",
+		Provider:      utils.ProviderGmail,
+		DKIMPublicKey: &raw,
+	})
+	if err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+	if updated.DKIMPublicKey == nil || *updated.DKIMPublicKey != dkimRecord {
+		t.Fatalf("updated dkim = %v", updated.DKIMPublicKey)
+	}
+
+	var stored db.EmailProviderConfiguration
+	if err := h.database.Where("id = ?", row.ID).Take(&stored).Error; err != nil {
+		t.Fatalf("row lookup failed: %v", err)
+	}
+	if stored.DKIMPrivateKey != nil {
+		t.Fatal("a user-provided public key must not fabricate a private key")
+	}
+}
+
+func TestIntegrationHTTPGenerateDKIMPending(t *testing.T) {
+	h := setup(t)
+	router := h.router(t)
+
+	recorder := do(t, router, http.MethodPost, "/api/v1/admin/email/configurations/pending/dkim",
+		`{"domain":"example.com"}`)
+
+	expectStatus(t, recorder, http.StatusOK)
+
+	var payload dto.DKIMResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+
+	if payload.Selector != "dpdp" || payload.RecordName != "dpdp._domainkey.example.com" {
+		t.Fatalf("payload = %+v", payload)
+	}
+	if strings.TrimSpace(payload.DKIMPublicKey) == "" || strings.TrimSpace(payload.DKIMPrivateKey) == "" {
+		t.Fatal("pending generation must return a key pair")
+	}
+
+	public, err := base64.StdEncoding.DecodeString(
+		strings.TrimPrefix(strings.TrimSpace(payload.DKIMPublicKey), "v=DKIM1; k=rsa; p="),
+	)
+	if err != nil {
+		t.Fatalf("public key is not valid base64: %v", err)
+	}
+
+	if _, err := x509.ParsePKIXPublicKey(public); err != nil {
+		t.Fatalf("public key does not parse: %v", err)
+	}
+
+	block, _ := pem.Decode([]byte(payload.DKIMPrivateKey))
+	if block == nil {
+		t.Fatal("private key is not valid PEM")
+	}
+
+	var count int64
+	if err := h.database.Table("email_provider_configurations").Count(&count).Error; err != nil {
+		t.Fatalf("count failed: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("pre-save generation created %d configurations, want 0", count)
+	}
+}
+
+func TestIntegrationHTTPGenerateAccessTokenPending(t *testing.T) {
+	h := setup(t)
+	router := h.router(t)
+
+	recorder := do(t, router, http.MethodPost, "/api/v1/admin/email/configurations/pending/access-token",
+		`{"domain":"example.com"}`)
+
+	expectStatus(t, recorder, http.StatusOK)
+
+	var payload dto.AccessTokenResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+
+	remaining := time.Until(payload.ExpiresAt)
+	if remaining < config.ProviderTokenTTL-time.Hour || remaining > config.ProviderTokenTTL {
+		t.Fatalf("expiry %v is not one year out", remaining)
+	}
+
+	var customer db.Customer
+	if err := h.database.Where("id = ?", h.tenant.ID).Take(&customer).Error; err != nil {
+		t.Fatalf("secret lookup failed: %v", err)
+	}
+
+	claims, err := providersvc.ParseAccessToken(payload.AccessToken, customer.JWTSecret, "dpdp")
+	if err != nil {
+		t.Fatalf("issued token does not verify: %v", err)
+	}
+	if claims.Domain != "example.com" || claims.CustomerID != h.tenant.ID || claims.ConfigID != 0 {
+		t.Fatalf("claims = %+v", claims)
+	}
+
+	var count int64
+	if err := h.database.Table("email_provider_configurations").Count(&count).Error; err != nil {
+		t.Fatalf("count failed: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("pre-save generation created %d configurations, want 0", count)
+	}
 }
 
 func TestIntegrationMigrationSeedsProviderPrivileges(t *testing.T) {

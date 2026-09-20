@@ -13,7 +13,7 @@ export function ProviderStep({
   onSelect: (provider: EmailProvider) => void;
 }) {
   return (
-    <div className="mt-6 grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2">
       {providerOrder.map((provider) => {
         const meta = providerMeta[provider];
         const selected = value === provider;

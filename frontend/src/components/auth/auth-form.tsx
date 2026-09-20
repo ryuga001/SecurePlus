@@ -16,8 +16,8 @@ export function AuthHeading({
 }) {
   return (
     <div className="mb-6">
-      <h1 className="font-heading text-2xl font-semibold tracking-tight xl:text-3xl">{title}</h1>
-      <p className="mt-1.5 text-sm text-muted-foreground xl:text-base">{description}</p>
+      <h1 className="font-heading text-[28px] leading-9 font-semibold tracking-[-0.01em]">{title}</h1>
+      <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
     </div>
   );
 }
@@ -49,7 +49,7 @@ export function FormError({ message }: { message?: string }) {
   return (
     <div
       role="alert"
-      className="flex items-start gap-2.5 border border-destructive/25 bg-destructive/8 p-3 text-sm text-destructive"
+      className="flex items-start gap-2.5 border border-error-border bg-error-container p-3 text-sm text-error-text"
     >
       <AlertCircle className="mt-0.5 size-4 shrink-0" />
       <span>{message}</span>
@@ -73,7 +73,7 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    <div className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex items-baseline justify-between gap-2">
         <Label htmlFor={id}>{label}</Label>
         {action}
@@ -193,7 +193,7 @@ export function OtpInput({
           onChange={(event) => onSlotChange(index, event.target.value)}
           onKeyDown={(event) => onKeyDown(index, event)}
           onFocus={(event) => event.target.select()}
-          className="h-14 w-full min-w-0 border border-input bg-transparent text-center font-mono text-xl font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          className="h-10 w-full min-w-0 rounded-md border border-input bg-transparent text-center font-mono text-lg font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
         />
       ))}
     </div>

@@ -17,7 +17,7 @@ function Select({
     <select
       data-slot="select"
       className={cn(
-        "h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-3 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30",
+        "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground transition-colors shadow-none outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_2px_var(--primary-container)] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-50 aria-invalid:border-error",
         className
       )}
       {...props}

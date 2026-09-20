@@ -192,9 +192,9 @@ export function DataTable<Row>({
   const columnCount = columns.length + (visibleRowActions.length > 0 ? 1 : 0);
 
   return (
-    <div className={cn("flex flex-col border bg-card", className)}>
+    <div className={cn("flex flex-col border border-border bg-surface", className)}>
       {(filters.length > 0 || visibleActions.length > 0) && (
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b p-4">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border-subtle p-4">
           <TableFilters
             filters={filters}
             values={filterValues}
@@ -230,7 +230,7 @@ export function DataTable<Row>({
 
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b bg-muted/60">
+            <tr className="border-b border-border-subtle bg-surface-container-low">
               {columns.map((column) => {
                 const sorted = sort?.key === column.key;
                 const SortIcon = !sorted ? ArrowUpDown : sort?.direction === "asc" ? ArrowUp : ArrowDown;
@@ -241,7 +241,7 @@ export function DataTable<Row>({
                     scope="col"
                     style={column.width ? { width: column.width } : undefined}
                     className={cn(
-                      "px-4 py-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase",
+                      "h-10 px-3 text-xs leading-4 font-semibold text-text-tertiary",
                       column.align === "right" && "text-right",
                       column.align === "center" && "text-center",
                       !column.align && "text-left"
@@ -269,7 +269,7 @@ export function DataTable<Row>({
               {visibleRowActions.length > 0 ? (
                 <th
                   scope="col"
-                  className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                  className="h-10 px-3 text-right text-xs leading-4 font-semibold text-text-tertiary"
                 >
                   Actions
                 </th>
@@ -280,7 +280,7 @@ export function DataTable<Row>({
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={columnCount} className="px-4 py-16">
+                <td colSpan={columnCount} className="px-4 py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Loader2 className="size-6 animate-spin text-primary" />
                     <p className="text-sm">Loading records...</p>
@@ -291,7 +291,7 @@ export function DataTable<Row>({
 
             {!isLoading && isError ? (
               <tr>
-                <td colSpan={columnCount} className="px-4 py-16">
+                <td colSpan={columnCount} className="px-4 py-12">
                   <div className="flex flex-col items-center gap-3 text-center">
                     <CircleAlert className="size-6 text-destructive" />
                     <p className="text-sm font-medium">{t("couldNotLoad")}</p>
@@ -308,7 +308,7 @@ export function DataTable<Row>({
 
             {!isLoading && !isError && items.length === 0 ? (
               <tr>
-                <td colSpan={columnCount} className="px-4 py-16">
+                <td colSpan={columnCount} className="px-4 py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Inbox className="size-6" />
                     <p className="text-sm">{emptyMessage ?? t("noRecords")}</p>
@@ -323,9 +323,9 @@ export function DataTable<Row>({
                     key={getRowId ? getRowId(row, index) : index}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                     className={cn(
-                      "border-b last:border-b-0",
+                      "min-h-12 border-b border-border-subtle last:border-b-0",
                       onRowClick && "cursor-pointer",
-                      "hover:bg-muted/50"
+                      "hover:bg-surface-container-low"
                     )}
                   >
                     {columns.map((column) => {
@@ -337,7 +337,7 @@ export function DataTable<Row>({
                         <td
                           key={column.key}
                           className={cn(
-                            "px-4 py-3 align-middle",
+                            "px-3 py-3 align-middle text-sm leading-5",
                             column.align === "right" && "text-right",
                             column.align === "center" && "text-center"
                           )}
@@ -350,8 +350,8 @@ export function DataTable<Row>({
                     })}
 
                     {visibleRowActions.length > 0 ? (
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-1.5">
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex justify-end gap-1">
                           {visibleRowActions
                             .filter((action) => !action.hidden?.(row))
                             .map((action) => {
@@ -362,15 +362,16 @@ export function DataTable<Row>({
                                   key={action.key}
                                   type="button"
                                   variant={action.variant ?? "ghost"}
-                                  size="sm"
+                                  size="icon"
+                                  aria-label={action.label}
+                                  title={action.label}
                                   disabled={action.disabled?.(row)}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     action.onClick(row);
                                   }}
                                 >
-                                  {Icon ? <Icon /> : null}
-                                  {action.label}
+                                  {Icon ? <Icon className="size-4.5" /> : null}
                                 </Button>
                               );
                             })}

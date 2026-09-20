@@ -15,8 +15,8 @@ const Consolepage = ({ heading, subheading, actions, data, footer }: Consolepage
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">{heading}</h1>
-          {subheading ? <p className="mt-1 text-sm text-muted-foreground">{subheading}</p> : null}
+          <h1 className="font-heading text-[28px] leading-9 font-semibold tracking-[-0.01em]">{heading}</h1>
+          {subheading ? <p className="mt-1 text-sm leading-5 text-muted-foreground">{subheading}</p> : null}
         </div>
         {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
       </header>

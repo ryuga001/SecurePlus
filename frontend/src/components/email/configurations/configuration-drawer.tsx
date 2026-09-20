@@ -170,7 +170,7 @@ function ConfigurationDrawerBody({
   return (
     <form
       onSubmit={onSubmit}
-      className="flex min-h-0 flex-1 flex-col gap-5"
+      className="flex min-h-0 flex-1 flex-col gap-6"
     >
       <FormError message={error} />
 
@@ -188,7 +188,7 @@ function ConfigurationDrawerBody({
         />
       </div>
 
-      <div className="border-t pt-5">
+      <div className="border-t pt-6">
         <ConfigurationFields
           values={values}
           onChange={update}

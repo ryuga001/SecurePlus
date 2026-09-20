@@ -13,6 +13,7 @@ export type FilterConfig = {
   options?: FilterOption[];
   defaultValue?: FilterValue;
   width?: string;
+  showLabel?: boolean;
 };
 
 export type DateRangeValue = { from?: string; to?: string };

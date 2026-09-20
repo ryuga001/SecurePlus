@@ -42,7 +42,7 @@ export function CheckboxList({
         <div className="relative">
           <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="h-9 pl-9"
+            className="pl-9"
             placeholder={searchPlaceholder}
             value={search}
             disabled={disabled}
@@ -64,8 +64,8 @@ export function CheckboxList({
               <label
                 key={option.id}
                 className={cn(
-                  "flex cursor-pointer items-center gap-2.5 border-b px-3 py-2.5 text-sm last:border-b-0",
-                  checked ? "bg-primary/8" : "hover:bg-muted/60"
+                  "flex cursor-pointer items-center gap-2.5 border-b border-border-subtle px-3 py-2.5 text-sm last:border-b-0",
+                  checked ? "bg-primary-container/50" : "hover:bg-surface-container-low"
                 )}
               >
                 <input

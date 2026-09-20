@@ -47,7 +47,7 @@ function SecretValue({
     <div
       className={cn(
         "border p-3",
-        tone === "warning" && "border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20",
+        tone === "warning" && "border-warning-container bg-warning-container/50",
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -90,7 +90,7 @@ export function CredentialsPanel({
   const t = useTranslations("configurations");
 
   return (
-    <div className="flex flex-col gap-4 border-t pt-5">
+    <div className="flex flex-col gap-4 border-t pt-6">
       <div>
         <h3 className="text-sm font-medium">{t("dialog.credentialsTitle")}</h3>
         <p className="mt-1 text-xs text-muted-foreground">

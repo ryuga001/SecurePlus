@@ -2,45 +2,40 @@
 
 import { useTranslations } from "next-intl";
 
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
-const tones: Record<string, string> = {
-  active: "border-emerald-600/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
-  enabled: "border-emerald-600/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
-  success: "border-emerald-600/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
-  pending: "border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-  processing: "border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-  quarantine: "border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-  redact: "border-violet-500/30 bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400",
-  audit: "border-primary/30 bg-primary/8 text-primary",
-  invoked: "border-emerald-600/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
-  flagged: "border-destructive/30 bg-destructive/8 text-destructive",
-  restriction: "border-destructive/30 bg-destructive/8 text-destructive",
-  content: "border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-  pass: "border-emerald-600/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
-  warning: "border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-  invited: "border-primary/30 bg-primary/8 text-primary",
-  info: "border-primary/30 bg-primary/8 text-primary",
-  disabled: "border-border bg-muted text-muted-foreground",
-  inactive: "border-border bg-muted text-muted-foreground",
-  blocked: "border-destructive/30 bg-destructive/8 text-destructive",
-  failed: "border-destructive/30 bg-destructive/8 text-destructive",
-  error: "border-destructive/30 bg-destructive/8 text-destructive",
+const toneVariant: Record<string, "success" | "warning" | "info" | "destructive" | "neutral"> = {
+  active: "success",
+  enabled: "success",
+  success: "success",
+  pending: "warning",
+  processing: "warning",
+  quarantine: "warning",
+  content: "warning",
+  warning: "warning",
+  disabled: "neutral",
+  inactive: "neutral",
+  pass: "success",
+  invoked: "success",
+  invited: "info",
+  info: "info",
+  audit: "info",
+  redact: "info",
+  flagged: "destructive",
+  restriction: "destructive",
+  blocked: "destructive",
+  failed: "destructive",
+  error: "destructive",
 };
 
 export function StatusBadge({ status }: { status: string }) {
   const t = useTranslations("status");
   const key = status?.toLowerCase?.() ?? "";
-  const tone = tones[key] ?? "border-border bg-muted text-muted-foreground";
+  const variant = toneVariant[key] ?? "neutral";
 
   return (
-    <span
-      className={cn(
-        "inline-flex items-center border px-2 py-0.5 text-xs font-medium capitalize",
-        tone
-      )}
-    >
+    <Badge variant={variant} className="capitalize">
       {t.has(key) ? t(key) : status}
-    </span>
+    </Badge>
   );
 }

@@ -108,7 +108,7 @@ function EmailUserForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <FormError message={error} />
       <Field id="user-first-name" label={t("dialog.firstName")}>
         <Input

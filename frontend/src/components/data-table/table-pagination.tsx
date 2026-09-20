@@ -32,14 +32,14 @@ export function TablePagination({
   const canNext = knownTotal ? page < (lastPage as number) : rowCount === pageSize;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 border-t px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border-subtle px-4 py-3">
       <div className="flex items-center gap-2.5">
         <label htmlFor="page-size" className="text-sm text-muted-foreground">
           {t("rowsPerPage")}
         </label>
         <select
           id="page-size"
-          className="h-9 border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="h-8 w-20 rounded-md border border-input bg-surface px-2 text-[0.8125rem] text-foreground outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_2px_var(--primary-container)]"
           value={pageSize}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
         >

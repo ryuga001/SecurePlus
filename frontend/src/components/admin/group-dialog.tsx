@@ -142,7 +142,7 @@ function GroupForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="flex flex-col gap-5"
+      className="flex flex-col gap-4"
     >
       <FormError message={error} />
 

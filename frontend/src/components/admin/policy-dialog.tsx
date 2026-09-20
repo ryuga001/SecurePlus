@@ -279,8 +279,8 @@ function DomainRestriction({
         : t("dialog.hintNone");
 
   return (
-    <div className="overflow-hidden rounded-xl border">
-      <div className="flex items-start justify-between gap-4 border-b px-4 py-3">
+    <div className="overflow-hidden rounded-lg border">
+      <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
         <div>
           <h3 className="text-sm font-semibold">
             {t("dialog.domainRestriction")}
@@ -295,7 +295,7 @@ function DomainRestriction({
         ) : null}
       </div>
 
-      <div className="grid gap-4 p-4 md:grid-cols-[14rem_minmax(0,1fr)]">
+      <div className="grid gap-4 p-5 md:grid-cols-[14rem_minmax(0,1fr)]">
         <RestrictionModeSelector
           value={mode}
           disabled={disabled}
@@ -408,8 +408,8 @@ function AttachmentRestriction({
         : t("dialog.hintNone");
 
   return (
-    <div className="overflow-hidden rounded-xl border">
-      <div className="flex items-start justify-between gap-4 border-b px-4 py-3">
+    <div className="overflow-hidden rounded-lg border">
+      <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
         <div>
           <h3 className="text-sm font-semibold">
             {t("dialog.attachmentRestriction")}
@@ -424,7 +424,7 @@ function AttachmentRestriction({
         ) : null}
       </div>
 
-      <div className="grid gap-4 p-4 md:grid-cols-[14rem_minmax(0,1fr)]">
+      <div className="grid gap-4 p-5 md:grid-cols-[14rem_minmax(0,1fr)]">
         <RestrictionModeSelector
           value={mode}
           disabled={disabled}
@@ -786,8 +786,8 @@ function PolicyForm({
           </TabsTrigger>
         </TabsList>
 
-        <div className="min-h-0 flex-1 overflow-y-auto py-5">
-          <TabsContent value="general" className="mt-0 space-y-5">
+        <div className="min-h-0 flex-1 overflow-y-auto py-6">
+          <TabsContent value="general" className="mt-0 space-y-4">
             <Field id="policy-name" label={t("dialog.name")}>
               <Input
                 id="policy-name"
@@ -834,7 +834,7 @@ function PolicyForm({
               </RadioGroup>
             </Field>
 
-            <div className="rounded-lg border bg-muted/30 p-4">
+            <div className="rounded-lg border bg-surface-container-low p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium">
@@ -855,7 +855,7 @@ function PolicyForm({
             </div>
           </TabsContent>
 
-          <TabsContent value="restrictions" className="mt-0 space-y-5">
+          <TabsContent value="restrictions" className="mt-0 space-y-6">
             <DomainRestriction
               mode={domainMode}
               domains={domains}

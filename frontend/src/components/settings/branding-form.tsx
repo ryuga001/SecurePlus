@@ -196,7 +196,7 @@ function BrandingFields({
                 <Button
                   type="button"
                   variant="outline"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="text-error-text hover:bg-error-container hover:text-error-text"
                   disabled={busy}
                   onClick={onLogoRemoved}
                 >
@@ -311,7 +311,7 @@ function BrandingFields({
 
       <div
         data-slot="settings-action-bar"
-        className="sticky bottom-0 -mx-6 -mb-6 flex flex-wrap items-center justify-between gap-3 border-t bg-card px-6 py-4"
+        className="sticky bottom-0 -mx-6 -mb-6 flex min-h-16 flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-6 py-4 shadow-[0_-2px_8px_rgba(15,23,42,0.08)]"
       >
         <span
           aria-live="polite"
@@ -371,14 +371,14 @@ function ThemePreview({ dark, selected }: { dark: boolean; selected: boolean }) 
     >
       <div className="flex h-full gap-2 p-2.5">
         <div className={cn("flex w-16 shrink-0 flex-col gap-1.5 border p-1.5", dark ? "border-white/10 bg-[#0b0e14]" : "border-black/5 bg-white")}>
-          <span className={cn("h-1.5 w-full", selected ? "bg-[#6366f1]" : dark ? "bg-white/40" : "bg-zinc-300")} />
+          <span className={cn("h-1.5 w-full rounded-sm", selected ? "bg-primary" : dark ? "bg-white/40" : "bg-zinc-300")} />
           <span className={cn("h-1.5 w-4/5", dark ? "bg-white/25" : "bg-zinc-300")} />
           <span className={cn("h-1.5 w-4/5", dark ? "bg-white/25" : "bg-zinc-300")} />
           <span className={cn("h-1.5 w-4/5", dark ? "bg-white/25" : "bg-zinc-300")} />
         </div>
         <div className="flex flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
-            <span className={cn("h-1.5 w-8 shrink-0 rounded-full", selected ? "bg-[#6366f1]" : dark ? "bg-white/40" : "bg-zinc-400")} />
+            <span className={cn("h-1.5 w-8 shrink-0 rounded-full", selected ? "bg-primary" : dark ? "bg-white/40" : "bg-zinc-400")} />
             <span className={cn("h-1.5 w-10", dark ? "bg-white/20" : "bg-zinc-200")} />
             <span className="ml-auto flex gap-1">
               <span className={cn("size-1.5 rounded-full", dark ? "bg-white/25" : "bg-zinc-300")} />
@@ -386,7 +386,7 @@ function ThemePreview({ dark, selected }: { dark: boolean; selected: boolean }) 
             </span>
           </div>
           <div className={cn("flex gap-1.5 border p-1.5", dark ? "border-white/10 bg-[#0b0e14]" : "border-black/5 bg-white")}>
-            <span className={cn("h-4 w-8 shrink-0", selected ? "bg-[#6366f1]" : dark ? "bg-white/30" : "bg-zinc-300")} />
+            <span className={cn("h-4 w-8 shrink-0 rounded-sm", selected ? "bg-primary" : dark ? "bg-white/30" : "bg-zinc-300")} />
             <span className="flex flex-1 flex-col gap-1">
               <span className={cn("h-1.5 w-3/4", dark ? "bg-white/30" : "bg-zinc-300")} />
               <span className={cn("h-1.5 w-1/2", dark ? "bg-white/15" : "bg-zinc-200")} />

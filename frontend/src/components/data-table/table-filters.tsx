@@ -8,7 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-import type { DateRangeValue, FilterConfig, FilterState, FilterValue } from "./types";
+import type {
+  DateRangeValue,
+  FilterConfig,
+  FilterState,
+  FilterValue,
+} from "./types";
 
 function asText(value: FilterValue) {
   return typeof value === "string" ? value : "";
@@ -46,13 +51,18 @@ export function TableFilters({
         const value = values[filter.key];
 
         return (
-          <div key={filter.key} className={cn("flex flex-col gap-1.5", filter.width ?? "w-52")}>
-            <label
-              htmlFor={`filter-${filter.key}`}
-              className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
-            >
-              {filter.label}
-            </label>
+          <div
+            key={filter.key}
+            className={cn("flex flex-col gap-1.5", filter.width ?? "w-52")}
+          >
+            {filter.showLabel ? (
+              <label
+                htmlFor={`filter-${filter.key}`}
+                className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+              >
+                {filter.label}
+              </label>
+            ) : null}
 
             {filter.type === "text" ? (
               <div className="relative">
@@ -61,7 +71,8 @@ export function TableFilters({
                   id={`filter-${filter.key}`}
                   className="pl-9"
                   placeholder={
-                    filter.placeholder ?? t("searchFilter", { label: filter.label.toLowerCase() })
+                    filter.placeholder ??
+                    t("searchFilter", { label: filter.label.toLowerCase() })
                   }
                   value={asText(value)}
                   onChange={(event) => onChange(filter.key, event.target.value)}
@@ -95,7 +106,10 @@ export function TableFilters({
                   type="date"
                   value={asRange(value).from ?? ""}
                   onChange={(event) =>
-                    onChange(filter.key, { ...asRange(value), from: event.target.value })
+                    onChange(filter.key, {
+                      ...asRange(value),
+                      from: event.target.value,
+                    })
                   }
                 />
                 <span className="text-sm text-muted-foreground">to</span>
@@ -103,7 +117,10 @@ export function TableFilters({
                   type="date"
                   value={asRange(value).to ?? ""}
                   onChange={(event) =>
-                    onChange(filter.key, { ...asRange(value), to: event.target.value })
+                    onChange(filter.key, {
+                      ...asRange(value),
+                      to: event.target.value,
+                    })
                   }
                 />
               </div>
@@ -116,7 +133,9 @@ export function TableFilters({
                   type="checkbox"
                   className="size-4 accent-[var(--primary)]"
                   checked={value === true}
-                  onChange={(event) => onChange(filter.key, event.target.checked)}
+                  onChange={(event) =>
+                    onChange(filter.key, event.target.checked)
+                  }
                 />
                 {filter.placeholder ?? filter.label}
               </label>
@@ -126,7 +145,13 @@ export function TableFilters({
       })}
 
       {active ? (
-        <Button type="button" variant="ghost" size="sm" className="h-11" onClick={onClear}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-11"
+          onClick={onClear}
+        >
           <X />
           {t("clear")}
         </Button>

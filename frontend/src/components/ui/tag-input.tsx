@@ -54,7 +54,7 @@ export function TagInput({
             }
           }}
         />
-        <Button type="button" variant="secondary" className="h-11 shrink-0" disabled={disabled} onClick={add}>
+        <Button type="button" variant="secondary" className="shrink-0" disabled={disabled} onClick={add}>
           <Plus />
           {addLabel}
         </Button>
@@ -67,7 +67,7 @@ export function TagInput({
           {values.map((value) => (
             <span
               key={value}
-              className="inline-flex items-center gap-1.5 border bg-muted/60 py-1 pr-1 pl-2.5 font-mono text-xs"
+              className="inline-flex h-5.5 items-center gap-1.5 rounded-md border border-border bg-surface-container py-1 pr-1 pl-2.5 font-mono text-xs"
             >
               {value}
               <button
@@ -75,7 +75,7 @@ export function TagInput({
                 aria-label={`Remove ${value}`}
                 disabled={disabled}
                 onClick={() => remove(value)}
-                className="text-muted-foreground transition-colors hover:text-destructive"
+                className="text-text-secondary transition-colors hover:text-destructive"
               >
                 <X className="size-3.5" />
               </button>

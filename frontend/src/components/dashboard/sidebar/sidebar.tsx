@@ -42,14 +42,19 @@ function NavLink({
       href={node.routePath ?? "#"}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2.5 border-l-2 px-4 py-2.5 text-sm transition-colors",
-        nested && "py-2 pl-11 text-[0.85rem]",
+        "flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+        nested && "min-h-9 pl-10 text-[0.8125rem] font-normal",
         active
-          ? "border-l-primary bg-primary/8 font-medium text-primary"
-          : "border-l-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+          ? "bg-primary-container text-on-primary-container"
+          : "text-text-tertiary hover:bg-surface-container-high hover:text-foreground"
       )}
     >
-      {Icon ? <Icon className="size-4.5 shrink-0" /> : null}
+      {Icon ? (
+        <Icon
+          className={cn("size-[18px] shrink-0", active ? "text-primary" : "")}
+          strokeWidth={1.75}
+        />
+      ) : null}
       <span className="truncate">{t(node.labelKey)}</span>
     </Link>
   );
@@ -68,19 +73,22 @@ function NavGroup({ node, pathname }: { node: RouteNode; pathname: string }) {
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         className={cn(
-          "flex w-full items-center gap-2.5 border-l-2 border-l-transparent px-4 py-2.5 text-sm transition-colors",
+          "flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
           active
-            ? "font-medium text-foreground"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            ? "bg-primary-container text-on-primary-container"
+            : "text-text-tertiary hover:bg-surface-container-high hover:text-foreground"
         )}
       >
-        {Icon ? <Icon className="size-4.5 shrink-0" /> : null}
+        {Icon ? <Icon className="size-[18px] shrink-0" strokeWidth={1.75} /> : null}
         <span className="flex-1 truncate text-left">{t(node.labelKey)}</span>
-        <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          className={cn("size-4 transition-transform", open && "rotate-180")}
+          strokeWidth={1.75}
+        />
       </button>
 
       {open ? (
-        <div className="flex flex-col">
+        <div className="mt-1 flex flex-col">
           {Object.entries(node.children ?? {}).map(([key, child]) =>
             isGroup(child) ? (
               <NavGroup key={key} node={child} pathname={pathname} />
@@ -110,31 +118,36 @@ const Sidebar = () => {
     router.replace("/login");
   }
 
+  const items = Object.entries(routes as RouteMap).filter(([, node]) => !node.hidden);
+
   return (
-    <aside className="flex h-svh w-64 shrink-0 flex-col overflow-hidden border-r bg-sidebar">
-      <Link href="/dashboard" className="flex shrink-0 items-center gap-3 border-b px-4 py-4">
+    <aside className="flex h-svh w-60 shrink-0 flex-col overflow-hidden border-r bg-sidebar">
+      <Link
+        href="/dashboard"
+        className="flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-4"
+      >
         {logoUrl ? (
           <Image
             key={logoUrl}
             src={logoUrl}
             alt={orgName}
-            width={36}
-            height={36}
+            width={32}
+            height={32}
             unoptimized
-            className="size-9 shrink-0 object-contain"
+            className="size-8 shrink-0 object-contain"
             onError={() => setFailedLogo(brandingLogo)}
           />
         ) : (
-          <span className="flex size-9 shrink-0 items-center justify-center bg-primary">
-            <ShieldCheck className="size-5 text-primary-foreground" />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary-container">
+            <ShieldCheck className="size-[18px] text-primary" strokeWidth={1.75} />
           </span>
         )}
-        <span className="truncate text-lg font-semibold tracking-tight">{orgName}</span>
+        <span className="truncate text-base font-semibold tracking-tight">{orgName}</span>
       </Link>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto py-3">
-        {Object.entries(routes as RouteMap).map(([key, node]) =>
-          node.hidden ? null : isGroup(node) ? (
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+        {items.map(([key, node]) =>
+          isGroup(node) ? (
             <NavGroup key={key} node={node} pathname={pathname} />
           ) : (
             <NavLink key={key} node={node} pathname={pathname} />
@@ -142,18 +155,18 @@ const Sidebar = () => {
         )}
       </nav>
 
-      <div className="shrink-0 border-t p-3">
+      <div className="shrink-0 border-t border-sidebar-border p-3 pb-4">
         {identity ? (
-          <div className="mb-2 px-1">
-            <p className="truncate text-sm font-medium">
+          <div className="mb-2.5 px-2 pt-2">
+            <p className="truncate text-sm font-medium leading-5">
               {identity.user.first_name} {identity.user.last_name}
             </p>
-            <p className="truncate text-xs text-muted-foreground">{identity.user.email}</p>
+            <p className="truncate text-xs leading-4 text-text-tertiary">{identity.user.email}</p>
           </div>
         ) : null}
 
         <Button variant="outline" className="w-full justify-start" onClick={onSignOut}>
-          <LogOut />
+          <LogOut strokeWidth={1.75} />
           {t("signOut")}
         </Button>
       </div>

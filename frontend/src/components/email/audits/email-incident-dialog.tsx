@@ -11,7 +11,7 @@ import { useGetEmailIncidentQuery, type EmailIncident } from "@/store/api/email-
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="text-xs font-medium tracking-wide text-text-tertiary uppercase">{label}</p>
       <div className="mt-1 truncate text-sm">
         {value === "" || value === undefined ? "—" : value}
       </div>
@@ -30,7 +30,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">
+    <th className="px-3 py-2 text-left text-xs font-semibold text-text-tertiary uppercase">
       {children}
     </th>
   );
@@ -41,7 +41,7 @@ function Details({ incident }: { incident: EmailIncident }) {
   const restriction = incident.trigger === "RESTRICTION";
 
   return (
-    <div className="mt-5 flex flex-col gap-5">
+    <div className="mt-6 flex flex-col gap-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Field label={t("decision")} value={<StatusBadge status={incident.decision} />} />
         <Field label={t("trigger")} value={<StatusBadge status={incident.trigger} />} />
@@ -70,11 +70,11 @@ function Details({ incident }: { incident: EmailIncident }) {
       </div>
 
       {incident.action_status === "FAILED" ? (
-        <div className="border border-destructive/30 bg-destructive/8 p-4">
-          <p className="text-sm font-semibold text-destructive">
+        <div className="border border-error-border bg-error-container p-4">
+          <p className="text-sm font-semibold text-error-text">
             {t("executorFailed", { action: incident.action_invoked })}
           </p>
-          <p className="mt-1 text-sm break-words text-destructive/90">
+          <p className="mt-1 text-sm break-words text-error-text">
             {incident.action_error || t("noReason")}
           </p>
         </div>
@@ -85,7 +85,7 @@ function Details({ incident }: { incident: EmailIncident }) {
           <div className="overflow-x-auto border">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b bg-muted/60">
+                <tr className="border-b bg-surface-container-low">
                   <Th>{t("address")}</Th>
                   <Th>{t("domain")}</Th>
                   <Th>{t("policy")}</Th>
@@ -117,7 +117,7 @@ function Details({ incident }: { incident: EmailIncident }) {
             <div className="overflow-x-auto border">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-b bg-muted/60">
+                  <tr className="border-b bg-surface-container-low">
                     <Th>{t("kind")}</Th>
                     <Th>{t("mode")}</Th>
                     <Th>{t("value")}</Th>
@@ -148,7 +148,7 @@ function Details({ incident }: { incident: EmailIncident }) {
             <div className="overflow-x-auto border">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-b bg-muted/60">
+                  <tr className="border-b bg-surface-container-low">
                     <Th>{t("rule")}</Th>
                     <Th>{t("type")}</Th>
                     <Th>{t("configured")}</Th>
@@ -217,7 +217,7 @@ export function EmailIncidentDrawer({
 
       {!isLoading && isError ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <CircleAlert className="size-6 text-destructive" />
+          <CircleAlert className="size-6 text-error-text" />
 
           <p className="max-w-md text-sm text-muted-foreground">
             {apiErrorMessage(error, t("loadFailed"))}

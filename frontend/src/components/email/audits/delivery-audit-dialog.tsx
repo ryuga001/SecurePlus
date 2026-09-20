@@ -11,7 +11,7 @@ import { useGetDeliveryAuditQuery, type DeliveryAudit } from "@/store/api/delive
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="text-xs font-medium tracking-wide text-text-tertiary uppercase">{label}</p>
       <div className="mt-1 truncate text-sm">{value === "" || value === undefined ? "—" : value}</div>
     </div>
   );
@@ -42,7 +42,7 @@ function Details({ audit }: { audit: DeliveryAudit }) {
   const t = useTranslations("audits.delivery.dialog");
 
   return (
-    <div className="mt-5 flex flex-col gap-5">
+    <div className="mt-6 flex flex-col gap-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Field label={t("status")} value={<StatusBadge status={audit.status} />} />
         <Field label={t("received")} value={new Date(audit.created_at).toLocaleString()} />
@@ -71,12 +71,12 @@ function Details({ audit }: { audit: DeliveryAudit }) {
       </div>
 
       {audit.failure ? (
-        <div className="border border-destructive/30 bg-destructive/8 p-4">
-          <p className="text-sm font-semibold text-destructive">
+        <div className="border border-error-border bg-error-container p-4">
+          <p className="text-sm font-semibold text-error-text">
             {t("failureTitle", { type: audit.failure.type })}
             {audit.failure.smtp_code > 0 ? ` · SMTP ${audit.failure.smtp_code}` : ""}
           </p>
-          <p className="mt-1 text-sm break-words text-destructive/90">
+          <p className="mt-1 text-sm break-words text-error-text">
             {audit.failure.reason || t("noReason")}
           </p>
         </div>
@@ -86,17 +86,17 @@ function Details({ audit }: { audit: DeliveryAudit }) {
         <div className="overflow-x-auto border">
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="border-b bg-muted/60 text-left">
-                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+              <tr className="border-b bg-surface-container-low text-left">
+                <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                   {t("address")}
                 </th>
-                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                   {t("status")}
                 </th>
-                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                   {t("code")}
                 </th>
-                <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                   {t("detail")}
                 </th>
               </tr>
@@ -128,23 +128,23 @@ function Details({ audit }: { audit: DeliveryAudit }) {
           <div className="overflow-x-auto border">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b bg-muted/60 text-left">
-                  <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                <tr className="border-b bg-surface-container-low text-left">
+                  <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                     #
                   </th>
-                  <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                  <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                     {t("mxHost")}
                   </th>
-                  <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                  <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                     {t("tls")}
                   </th>
-                  <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                  <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                     {t("code")}
                   </th>
-                  <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                  <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                     {t("took")}
                   </th>
-                  <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                  <th className="px-3 py-2 text-xs font-semibold text-text-tertiary uppercase">
                     {t("detail")}
                   </th>
                 </tr>
@@ -206,7 +206,7 @@ export function DeliveryAuditDrawer({
 
       {!isLoading && isError ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <CircleAlert className="size-6 text-destructive" />
+          <CircleAlert className="size-6 text-error-text" />
 
           <p className="max-w-md text-sm text-muted-foreground">
             {apiErrorMessage(error, t("loadFailed"))}

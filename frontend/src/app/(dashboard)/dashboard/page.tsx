@@ -21,10 +21,10 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">
+        <h1 className="font-heading text-[28px] leading-9 font-semibold tracking-[-0.01em]">
           {t("welcome", { name: identity.user.first_name })}
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">
           {t("signedInTo", { org: identity.customer.org_name })}
         </p>
       </div>

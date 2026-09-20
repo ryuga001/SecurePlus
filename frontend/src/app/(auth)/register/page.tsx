@@ -191,7 +191,7 @@ export default function RegisterPage() {
                 className={verified ? "pr-10 disabled:opacity-100" : undefined}
               />
               {verified ? (
-                <CheckCircle2 className="absolute top-1/2 right-3 size-4.5 -translate-y-1/2 text-emerald-600" />
+                <CheckCircle2 className="absolute top-1/2 right-3 size-4.5 -translate-y-1/2 text-success-text" />
               ) : null}
             </div>
 
@@ -200,7 +200,7 @@ export default function RegisterPage() {
                 type="button"
                 variant="secondary"
                 size="lg"
-                className="h-11 shrink-0"
+                className="shrink-0"
                 onClick={sendCode}
                 disabled={!email || sending}
               >

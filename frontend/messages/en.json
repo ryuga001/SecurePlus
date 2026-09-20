@@ -96,7 +96,7 @@
       "type": "Type",
       "value": "Matches",
       "createdAt": "Created At",
-      "updatedAt": "Updated At"
+      "updatedAt": "Last Modified"
     },
     "type": {
       "regex": "Regular expression",
@@ -136,7 +136,7 @@
       "name": "Group Name",
       "members": "Members",
       "createdAt": "Created At",
-      "updatedAt": "Updated At"
+      "updatedAt": "Last Modified"
     },
     "deleteTitle": "Delete group",
     "deleteDescription": "{name} will be detached from every policy that targets it, and its {count} memberships will be removed. This cannot be undone.",
@@ -145,7 +145,7 @@
     "dialog": {
       "editTitle": "Edit group",
       "addTitle": "Add group",
-      "name": "Group name",
+      "name": "User name",
       "namePlaceholder": "Finance",
       "members": "Members",
       "searchUsers": "Search users",
@@ -176,7 +176,7 @@
       "name": "Name",
       "email": "Email",
       "createdAt": "Created At",
-      "updatedAt": "Updated At"
+      "updatedAt": "Last Modified"
     },
     "deleteTitle": "Delete user",
     "deleteDescription": "{email} will be removed from every group they belong to. This cannot be undone.",
@@ -208,7 +208,7 @@
       "name": "Configuration Name",
       "provider": "Provider",
       "domain": "Domain",
-      "updatedAt": "Updated At"
+      "updatedAt": "Last Modified"
     },
     "deleteTitle": "Delete configuration",
     "deleteDescription": "{name} ({domain}) will stop sending and its credentials will be revoked. This cannot be undone.",
@@ -266,7 +266,7 @@
       "type": "Type",
       "members": "Members",
       "lastModified": "Last Modified",
-      "updatedAt": "Updated At"
+      "updatedAt": "Last Modified"
     },
     "tabs": {
       "general": "General",

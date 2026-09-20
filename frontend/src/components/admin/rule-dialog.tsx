@@ -91,7 +91,7 @@ function RuleForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <FormError message={error} />
 
       <Field id="rule-name" label={t("dialog.name")}>

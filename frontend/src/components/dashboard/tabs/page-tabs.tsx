@@ -40,7 +40,7 @@ const PageTabs = () => {
   if (tabs.length === 0) return null;
 
   return (
-    <div className="flex gap-1 border-b">
+    <div className="flex gap-8 border-b">
       {tabs.map(([key, tab]) => {
         const active = owns(pathname, tab);
         const Icon = tab.icon;
@@ -51,10 +51,10 @@ const PageTabs = () => {
             href={tab.routePath as string}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm transition-colors",
+              "-mb-px flex items-center gap-2 border-b-2 px-1 py-3 text-sm leading-5 transition-colors",
               active
-                ? "border-b-primary font-medium text-primary"
-                : "border-b-transparent text-muted-foreground hover:text-foreground"
+                ? "border-b-primary font-semibold text-primary"
+                : "border-b-transparent font-medium text-text-secondary hover:text-foreground"
             )}
           >
             {Icon ? <Icon className="size-4" /> : null}

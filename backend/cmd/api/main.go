@@ -15,18 +15,21 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
+	alerthandler "dpdp-backend/internal/admin/handler/alert"
 	brandinghandler "dpdp-backend/internal/admin/handler/branding"
 	providerhandler "dpdp-backend/internal/admin/handler/emailprovider"
 	userhandler "dpdp-backend/internal/admin/handler/emailuser"
 	grouphandler "dpdp-backend/internal/admin/handler/group"
 	policyhandler "dpdp-backend/internal/admin/handler/policy"
 	rulehandler "dpdp-backend/internal/admin/handler/rule"
+	alertrepo "dpdp-backend/internal/admin/repositories/alert"
 	brandingrepo "dpdp-backend/internal/admin/repositories/branding"
 	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
 	userrepo "dpdp-backend/internal/admin/repositories/emailuser"
 	grouprepo "dpdp-backend/internal/admin/repositories/group"
 	policyrepo "dpdp-backend/internal/admin/repositories/policy"
 	rulerepo "dpdp-backend/internal/admin/repositories/rule"
+	alertsvc "dpdp-backend/internal/admin/services/alert"
 	brandingsvc "dpdp-backend/internal/admin/services/branding"
 	providersvc "dpdp-backend/internal/admin/services/emailprovider"
 	usersvc "dpdp-backend/internal/admin/services/emailuser"
@@ -48,6 +51,7 @@ import (
 	policysetrepo "dpdp-backend/internal/delivery/repositories/policyset"
 	"dpdp-backend/internal/delivery/repositories/provider"
 	"dpdp-backend/internal/delivery/services/adjudication"
+	"dpdp-backend/internal/delivery/services/alerting"
 	"dpdp-backend/internal/delivery/services/inspection"
 	deliverypolicy "dpdp-backend/internal/delivery/services/policy"
 	"dpdp-backend/internal/delivery/services/recording"
@@ -56,6 +60,7 @@ import (
 	deliveryutils "dpdp-backend/internal/delivery/utils"
 	"dpdp-backend/internal/middleware"
 	"dpdp-backend/internal/notification"
+	notificationworker "dpdp-backend/internal/notification/worker"
 	"dpdp-backend/internal/storage"
 )
 
@@ -113,6 +118,29 @@ func main() {
 	notifier := notification.NewService(database, cfg.SMTP)
 	store := auth.NewStore(rdb)
 
+	notificationQueue := notificationworker.NewNotificationQueue(rdb, cfg.Notification)
+	if err := notificationQueue.EnsureGroup(startupCtx); err != nil {
+		slog.Error("notification consumer group creation failed", "error", err)
+		os.Exit(1)
+	}
+
+	notificationWorkers := notificationworker.NewWorkerPool(
+		notificationQueue,
+		notificationworker.NewNotificationProcessor(notifier),
+		cfg.Notification,
+	)
+
+	templateRepository := templaterepo.NewEmailTemplateRepository(database)
+	alertService := alertsvc.NewAlertService(database, alertrepo.NewAlertRepository(database))
+
+	breachAlerts := alerting.New(alerting.Options{
+		Alerts:      alertLookup{service: alertService},
+		Queue:       notificationQueue,
+		Orgs:        templateRepository,
+		FrontendURL: cfg.App.FrontendBaseURL,
+		Timeout:     cfg.Notification.PublishTimeout,
+	})
+
 	brandingService := brandingsvc.NewBrandingService(
 		brandingrepo.NewBrandingRepository(database),
 		objectStore,
@@ -134,7 +162,7 @@ func main() {
 	mailRelay := transmission.NewRelay(cfg.Relay)
 
 	blockNotice := adjudication.NewBlockNoticeService(
-		templaterepo.NewEmailTemplateRepository(database),
+		templateRepository,
 		signingConfigs,
 		mailRelay,
 	)
@@ -151,6 +179,7 @@ func main() {
 		Content:     inspection.NewContentEngine(inspection.DefaultMatcherFactory()),
 		Actions:     adjudication.DefaultActionFactory(blockNotice),
 		Incidents:   recording.NewIncidentGenerator(incidents),
+		Alerts:      breachAlerts,
 		FailsClosed: deliveryutils.FailClosed,
 	})
 
@@ -200,6 +229,7 @@ func main() {
 	groupHandler := grouphandler.NewGroupHandler(
 		groupsvc.NewGroupService(database, grouprepo.NewGroupRepository(database)),
 	)
+	alertHandler := alerthandler.NewAlertHandler(alertService)
 	auditHandler := audithandler.NewDeliveryAuditHandler(recorder)
 	incidentHandler := incidenthandler.NewEmailIncidentHandler(incidents)
 
@@ -243,6 +273,7 @@ func main() {
 	ruleHandler.RegisterRoutes(protected, guard)
 	emailUserHandler.RegisterRoutes(protected, guard)
 	groupHandler.RegisterRoutes(protected, guard)
+	alertHandler.RegisterRoutes(protected, guard)
 	brandingHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
 	incidentHandler.RegisterRoutes(protected, guard)
@@ -269,6 +300,7 @@ func main() {
 	defer stopWorkers()
 
 	workers.Start(workerCtx)
+	notificationWorkers.Start(workerCtx)
 
 	var servers sync.WaitGroup
 
@@ -318,6 +350,7 @@ func main() {
 
 	go func() {
 		workers.Wait()
+		notificationWorkers.Wait()
 		close(drained)
 	}()
 
@@ -327,4 +360,30 @@ func main() {
 	case <-shutdownCtx.Done():
 		slog.Warn("shutdown deadline reached with deliveries in flight")
 	}
+}
+
+type alertLookup struct {
+	service *alertsvc.AlertService
+}
+
+func (l alertLookup) RealTimeEmailAlerts(
+	ctx context.Context,
+	customerID int,
+	policyIDs []int,
+) ([]alerting.Alert, error) {
+	rows, err := l.service.RealTimeEmailAlerts(ctx, customerID, policyIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	alerts := make([]alerting.Alert, 0, len(rows))
+	for _, row := range rows {
+		alerts = append(alerts, alerting.Alert{
+			ID:         row.ID,
+			Name:       row.Name,
+			Recipients: []string(row.Target),
+		})
+	}
+
+	return alerts, nil
 }

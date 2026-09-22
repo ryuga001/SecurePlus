@@ -14,12 +14,17 @@ import (
 	"dpdp-backend/internal/delivery/utils"
 )
 
+type AlertRaiser interface {
+	Raise(ctx context.Context, message delivery.EmailMessage, result dto.EvaluationResult, subject string)
+}
+
 type Options struct {
 	Parser      func(raw []byte) (dto.ParsedMessage, error)
 	Cache       dto.PolicyCache
 	Content     *inspection.ContentEngine
 	Actions     *adjudication.ActionFactory
 	Incidents   *recording.IncidentGenerator
+	Alerts      AlertRaiser
 	FailsClosed bool
 }
 
@@ -160,6 +165,10 @@ func (s *ScreeningService) report(ctx context.Context, message delivery.EmailMes
 		}
 
 		return nil
+	}
+
+	if s.opts.Alerts != nil {
+		s.opts.Alerts.Raise(ctx, message, result, subject)
 	}
 
 	executor, ok := s.opts.Actions.For(result.EffectiveAction)

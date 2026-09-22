@@ -1,4 +1,6 @@
 import {
+    AlertCircle,
+    Building2,
     FileText,
     LayoutDashboard,
     Mail,
@@ -22,6 +24,7 @@ export type RouteNode = {
     icon?: LucideIcon;
     privileges: readonly string[];
     hidden?: boolean;
+    defaultOpen?: boolean;
     children?: Record<string, RouteNode>;
 };
 
@@ -39,6 +42,7 @@ export const routes = {
         labelKey: "emailProtection",
         icon: Mail,
         privileges: [],
+        defaultOpen: true,
         children: {
             configurations: {
                 labelKey: "configurations",
@@ -89,47 +93,61 @@ export const routes = {
                         privileges: ["admin.email.audit.view"],
                     },
                 },
+            },
+            alerts: {
+                labelKey: "alert",
+                routePath: "/admin/email/alert",
+                icon: AlertCircle,
+                privileges: ["admin.email.alert.view"],
             }
         },
     },
-    admin_console: {
-        labelKey: "adminConsole",
-        routePath: "/admin/console",
-        icon: ScrollText,
+    administration: {
+        labelKey: "administration",
+        icon: Building2,
         privileges: [],
+        defaultOpen: true,
         children: {
-            user_roles: {
-                labelKey: "userRoles",
-                routePath: "/admin/console/user-roles",
-                icon: Users,
+            admin_console: {
+                labelKey: "adminConsole",
+                routePath: "/admin/console",
+                icon: ScrollText,
                 privileges: [],
+                children: {
+                    user_roles: {
+                        labelKey: "userRoles",
+                        routePath: "/admin/console/user-roles",
+                        icon: Users,
+                        privileges: [],
+                    },
+                    user_management: {
+                        labelKey: "userManagement",
+                        routePath: "/admin/console/user-management",
+                        icon: Users,
+                        privileges: [],
+                    },
+                }
             },
-            user_management: {
-                labelKey: "userManagement",
-                routePath: "/admin/console/user-management",
-                icon: Users,
+            settings: {
+                labelKey: "settings",
+                routePath: "/admin/settings",
+                icon: Settings,
                 privileges: [],
+                children: {
+                    profile: {
+                        labelKey: "profile",
+                        routePath: "/admin/settings/profile",
+                        icon: UserRound,
+                        privileges: [],
+                    },
+                    branding: {
+                        labelKey: "branding",
+                        routePath: "/admin/settings/branding",
+                        icon: Palette,
+                        privileges: ["admin.branding.edit"],
+                    },
+                }
             },
-        }
-    },
-    settings: {
-        labelKey: "settings",
-        routePath: "/admin/settings",
-        icon: Settings,
-        privileges: [],
-        children: {
-            profile: {
-                labelKey: "profile",
-                routePath: "/admin/settings/profile",
-                icon: UserRound,
-                privileges: [],
-            },
-            branding: {
-                labelKey: "branding",
-                routePath: "/admin/settings/branding",
-                icon: Palette,
-                privileges: ["admin.branding.edit"],
-            },
-        }
+        },
     },
 } as const satisfies RouteMap;

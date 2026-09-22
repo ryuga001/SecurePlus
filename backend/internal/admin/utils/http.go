@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"dpdp-backend/internal/middleware"
 )
@@ -90,6 +91,30 @@ func PathID(c *gin.Context, name string) (int, bool) {
 	return id, true
 }
 
+func ActorAndUUID(c *gin.Context) (middleware.Actor, string, bool) {
+	actor, ok := Actor(c)
+	if !ok {
+		return middleware.Actor{}, "", false
+	}
+
+	id, ok := PathUUID(c, "id")
+	if !ok {
+		return middleware.Actor{}, "", false
+	}
+
+	return actor, id, true
+}
+
+func PathUUID(c *gin.Context, name string) (string, bool) {
+	parsed, err := uuid.Parse(c.Param(name))
+	if err != nil {
+		Fail(c, http.StatusBadRequest, CodeValidation, MsgInvalidIdentifier)
+		return "", false
+	}
+
+	return parsed.String(), true
+}
+
 func Respond(c *gin.Context, err error) {
 	status, code := statusFor(err)
 
@@ -109,6 +134,8 @@ func statusFor(err error) (int, string) {
 		return http.StatusUnauthorized, CodeUnauthenticated
 	case errors.Is(err, ErrUnavailable):
 		return http.StatusServiceUnavailable, CodeUnavailable
+	case errors.Is(err, ErrSMSNotSupported):
+		return http.StatusNotImplemented, CodeUnsupportedNotification
 
 	case errors.Is(err, ErrConfigurationNotFound),
 		errors.Is(err, ErrPolicyNotFound),
@@ -116,6 +143,7 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrGroupNotFound),
 		errors.Is(err, ErrEmailUserNotFound),
 		errors.Is(err, ErrMappingNotFound),
+		errors.Is(err, ErrAlertNotFound),
 		errors.Is(err, ErrBrandingNotFound):
 		return http.StatusNotFound, CodeNotFound
 
@@ -131,6 +159,10 @@ func statusFor(err error) (int, string) {
 		return http.StatusConflict, CodeEmailTaken
 	case errors.Is(err, ErrMappingExists):
 		return http.StatusConflict, CodeMappingExists
+	case errors.Is(err, ErrAlertNameTaken):
+		return http.StatusConflict, CodeAlertNameTaken
+	case errors.Is(err, ErrSystemAlertImmutable):
+		return http.StatusConflict, CodeSystemAlertImmutable
 
 	case errors.Is(err, ErrInvalidDomain):
 		return http.StatusBadRequest, CodeInvalidDomain
@@ -144,6 +176,12 @@ func statusFor(err error) (int, string) {
 		return http.StatusBadRequest, CodeInvalidGroupType
 	case errors.Is(err, ErrInvalidEmail):
 		return http.StatusBadRequest, CodeInvalidEmail
+	case errors.Is(err, ErrInvalidTarget):
+		return http.StatusBadRequest, CodeInvalidTarget
+	case errors.Is(err, ErrInvalidScheduleType):
+		return http.StatusBadRequest, CodeInvalidScheduleType
+	case errors.Is(err, ErrInvalidNotificationType):
+		return http.StatusBadRequest, CodeInvalidNotificationType
 
 	case errors.Is(err, ErrUnknownGroup):
 		return http.StatusBadRequest, CodeGroupNotFound
@@ -151,6 +189,8 @@ func statusFor(err error) (int, string) {
 		return http.StatusBadRequest, CodeRuleNotFound
 	case errors.Is(err, ErrUnknownEmailUser):
 		return http.StatusBadRequest, CodeEmailUserNotFound
+	case errors.Is(err, ErrUnknownPolicy):
+		return http.StatusBadRequest, CodePolicyNotFound
 
 	case errors.Is(err, ErrInvalidTheme):
 		return http.StatusBadRequest, CodeInvalidTheme
@@ -173,6 +213,9 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrRuleValueNeeded),
 		errors.Is(err, ErrGroupNameNeeded),
 		errors.Is(err, ErrNameNeeded),
+		errors.Is(err, ErrAlertNameNeeded),
+		errors.Is(err, ErrPoliciesNeeded),
+		errors.Is(err, ErrTargetsNeeded),
 		errors.Is(err, ErrTooManyItems):
 		return http.StatusBadRequest, CodeValidation
 	}

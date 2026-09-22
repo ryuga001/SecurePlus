@@ -49,6 +49,18 @@ var (
 	ErrMappingNotFound  = errors.New(MsgMappingNotFound)
 	ErrTooManyItems     = errors.New(MsgTooManyItems)
 
+	ErrAlertNotFound           = errors.New(MsgAlertNotFound)
+	ErrAlertNameTaken          = errors.New(MsgAlertNameTaken)
+	ErrAlertNameNeeded         = errors.New(MsgAlertNameNeeded)
+	ErrPoliciesNeeded          = errors.New(MsgPoliciesNeeded)
+	ErrUnknownPolicy           = errors.New(MsgUnknownPolicy)
+	ErrTargetsNeeded           = errors.New(MsgTargetsNeeded)
+	ErrInvalidTarget           = errors.New(MsgInvalidTarget)
+	ErrInvalidScheduleType     = errors.New(MsgInvalidScheduleType)
+	ErrInvalidNotificationType = errors.New(MsgInvalidNotificationType)
+	ErrSMSNotSupported         = errors.New(MsgSMSNotSupported)
+	ErrSystemAlertImmutable    = errors.New(MsgSystemAlertImmutable)
+
 	ErrBrandingNotFound = errors.New(MsgBrandingNotFound)
 	ErrInvalidTheme     = errors.New(MsgInvalidTheme)
 	ErrInvalidLanguage  = errors.New(MsgInvalidLanguage)

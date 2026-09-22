@@ -20,19 +20,39 @@ const (
 	TemplateWelcome           = "welcome"
 	TemplatePasswordReset     = "password_reset"
 	TemplatePasswordChanged   = "password_changed"
+	TemplatePolicyBreachAlert = "policy_breach_alert"
 )
 
-var ErrTemplateNotFound = errors.New("email template not found")
+const MessageTypeEmail = "EMAIL"
+
+var (
+	ErrTemplateNotFound  = errors.New("email template not found")
+	ErrRecipientNotFound = errors.New("notification recipient not found")
+)
 
 type Email struct {
 	CustomerID int
 	Template   string
-	To         string
+	To         []string
 	Vars       map[string]string
 }
 
 type Sender interface {
 	Send(ctx context.Context, e Email) error
+}
+
+type NotificationMessage struct {
+	CustomerID    int
+	MessageType   string
+	TemplateTitle string
+	To            []string
+	Body          map[string]string
+	CorrelationID string
+	AlertID       string
+}
+
+type Queue interface {
+	Publish(ctx context.Context, msg NotificationMessage) error
 }
 
 type Service struct {
@@ -88,4 +108,25 @@ func renderSubject(subject string, vars map[string]string) string {
 	}
 
 	return strings.NewReplacer(pairs...).Replace(subject)
+}
+
+func (s *Service) AdminEmail(ctx context.Context, customerID int) (string, error) {
+	var user db.DashboardUser
+
+	err := s.db.WithContext(ctx).
+		Model(&db.DashboardUser{}).
+		Joins("JOIN roles ON roles.id = dashboard_users.role_id").
+		Where("dashboard_users.customer_id = ? AND roles.type IN ?",
+			customerID, []string{db.RoleTypeAdmin, db.RoleTypeSuperAdmin}).
+		Order("dashboard_users.id ASC").
+		Take(&user).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", ErrRecipientNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return user.Email, nil
 }

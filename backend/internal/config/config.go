@@ -7,16 +7,17 @@ import (
 )
 
 type Config struct {
-	App        App
-	Auth       Auth
-	Postgres   Postgres
-	Redis      Redis
-	Mongo      Mongo
-	Storage    Storage
-	SMTP       SMTP
-	SMTPServer SMTPServer
-	Relay      Relay
-	Delivery   Delivery
+	App          App
+	Auth         Auth
+	Postgres     Postgres
+	Redis        Redis
+	Mongo        Mongo
+	Storage      Storage
+	SMTP         SMTP
+	SMTPServer   SMTPServer
+	Relay        Relay
+	Delivery     Delivery
+	Notification Notification
 }
 
 type App struct {
@@ -30,16 +31,17 @@ func Load() *Config {
 	godotenv.Load()
 
 	return &Config{
-		App:        loadApp(),
-		Auth:       loadAuth(),
-		Postgres:   loadPostgres(),
-		Redis:      loadRedis(),
-		Mongo:      loadMongo(),
-		Storage:    loadStorage(),
-		SMTP:       loadSMTP(),
-		SMTPServer: loadSMTPServer(),
-		Relay:      loadRelay(),
-		Delivery:   loadDelivery(),
+		App:          loadApp(),
+		Auth:         loadAuth(),
+		Postgres:     loadPostgres(),
+		Redis:        loadRedis(),
+		Mongo:        loadMongo(),
+		Storage:      loadStorage(),
+		SMTP:         loadSMTP(),
+		SMTPServer:   loadSMTPServer(),
+		Relay:        loadRelay(),
+		Delivery:     loadDelivery(),
+		Notification: loadNotification(),
 	}
 }
 

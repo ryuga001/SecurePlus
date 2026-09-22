@@ -30,6 +30,17 @@ const (
 )
 
 const (
+	ScheduleTypeRealTime = "REAL_TIME"
+	ScheduleTypeCustom   = "CUSTOM"
+
+	NotificationTypeEmail = "EMAIL"
+	NotificationTypeSMS   = "SMS"
+
+	AlertTypeSystem      = "SYSTEM"
+	AlertTypeApplication = "APPLICATION"
+)
+
+const (
 	ThemeLight = "LIGHT"
 	ThemeDark  = "DARK"
 

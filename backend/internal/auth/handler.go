@@ -82,6 +82,10 @@ type errorResponse struct {
 	Message string `json:"message"`
 }
 
+type privilegesResponse struct {
+	Privileges []string `json:"privileges"`
+}
+
 type Handler struct {
 	svc *Service
 	cfg config.Auth
@@ -104,6 +108,7 @@ func (h *Handler) RegisterRoutes(public, refresh, protected *gin.RouterGroup) {
 	refresh.POST("/auth/refresh", h.refresh)
 
 	protected.GET("/me", h.me)
+	protected.GET("/me/privileges", h.privileges)
 	protected.POST("/auth/logout", h.logout)
 }
 
@@ -358,6 +363,27 @@ func (h *Handler) me(c *gin.Context) {
 		IdentitySnapshot: snapshot,
 		CSRFToken:        CSRFToken(h.cfg.CSRFSecret, claims.ID),
 	})
+}
+
+func (h *Handler) privileges(c *gin.Context) {
+	claims, ok := ClaimsFrom(c)
+	if !ok {
+		respond(c, ErrInvalidToken)
+		return
+	}
+
+	if claims.RoleID == nil {
+		c.JSON(http.StatusOK, privilegesResponse{Privileges: []string{}})
+		return
+	}
+
+	names, err := h.svc.Privileges(c.Request.Context(), *claims.RoleID)
+	if err != nil {
+		respond(c, ErrUnavailable)
+		return
+	}
+
+	c.JSON(http.StatusOK, privilegesResponse{Privileges: names})
 }
 
 func badRequest(c *gin.Context) {

@@ -6,7 +6,7 @@ import (
 	"github.com/wneessen/go-mail"
 )
 
-func (s *Service) deliver(ctx context.Context, to, subject, body string) error {
+func (s *Service) deliver(ctx context.Context, to []string, subject, body string) error {
 	options := []mail.Option{
 		mail.WithPort(s.smtp.Port),
 		mail.WithTLSPolicy(mail.NoTLS),
@@ -33,7 +33,7 @@ func (s *Service) deliver(ctx context.Context, to, subject, body string) error {
 	if err := message.FromFormat(s.smtp.FromName, s.smtp.FromEmail); err != nil {
 		return err
 	}
-	if err := message.To(to); err != nil {
+	if err := message.To(to...); err != nil {
 		return err
 	}
 

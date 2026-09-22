@@ -242,7 +242,7 @@ func (s *Service) sendVerification(ctx context.Context, key string) error {
 	err = s.notifier.Send(ctx, notification.Email{
 		CustomerID: notification.PlatformCustomerID,
 		Template:   notification.TemplateEmailVerification,
-		To:         key,
+		To:         []string{key},
 		Vars: map[string]string{
 			"name":           key,
 			"otp":            code,
@@ -339,7 +339,7 @@ func (s *Service) CompleteRegistration(ctx context.Context, req CompleteRequest)
 	s.notify(ctx, notification.Email{
 		CustomerID: user.CustomerID,
 		Template:   notification.TemplateWelcome,
-		To:         user.Email,
+		To:         []string{user.Email},
 		Vars: map[string]string{
 			"name":      user.FirstName,
 			"org_name":  req.OrgName,
@@ -460,7 +460,7 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) (time.Durati
 	err = s.notifier.Send(ctx, notification.Email{
 		CustomerID: user.CustomerID,
 		Template:   notification.TemplatePasswordReset,
-		To:         user.Email,
+		To:         []string{user.Email},
 		Vars: map[string]string{
 			"name":           user.FirstName,
 			"otp":            code,
@@ -529,7 +529,7 @@ func (s *Service) ResetPassword(ctx context.Context, email, code, password strin
 		s.notify(ctx, notification.Email{
 			CustomerID: user.CustomerID,
 			Template:   notification.TemplatePasswordChanged,
-			To:         user.Email,
+			To:         []string{user.Email},
 			Vars:       map[string]string{"name": user.FirstName},
 		})
 	}

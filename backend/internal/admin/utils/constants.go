@@ -48,6 +48,18 @@ const (
 	MsgMappingNotFound  = "this assignment does not exist"
 	MsgTooManyItems     = "too many items selected"
 
+	MsgAlertNotFound           = "alert not found"
+	MsgAlertNameTaken          = "an alert with this name already exists"
+	MsgAlertNameNeeded         = "alert name must be between 2 and 100 characters"
+	MsgPoliciesNeeded          = "select at least one policy"
+	MsgUnknownPolicy           = "one or more selected policies are not available"
+	MsgTargetsNeeded           = "add at least one recipient"
+	MsgInvalidTarget           = "recipient list contains an invalid email address"
+	MsgInvalidScheduleType     = "schedule must be REAL_TIME or CUSTOM"
+	MsgInvalidNotificationType = "notification type must be EMAIL or SMS"
+	MsgSMSNotSupported         = "SMS alerts are not supported yet, choose EMAIL"
+	MsgSystemAlertImmutable    = "system alerts cannot be modified or deleted"
+
 	MsgBrandingNotFound = "branding settings are not available"
 	MsgInvalidTheme     = "choose either LIGHT or DARK"
 	MsgInvalidLanguage  = "choose either ENGLISH, JAPANESE or SPANISH"
@@ -86,6 +98,14 @@ const (
 	CodeRuleNotFound      = "rule_not_found"
 	CodeEmailUserNotFound = "email_user_not_found"
 	CodeMappingExists     = "mapping_exists"
+
+	CodeAlertNameTaken            = "alert_name_taken"
+	CodePolicyNotFound            = "policy_not_found"
+	CodeInvalidTarget             = "invalid_target"
+	CodeInvalidScheduleType       = "invalid_schedule_type"
+	CodeInvalidNotificationType   = "invalid_notification_type"
+	CodeUnsupportedNotification   = "unsupported_notification_type"
+	CodeSystemAlertImmutable      = "system_alert_immutable"
 
 	CodeInvalidTheme    = "invalid_theme"
 	CodeInvalidLanguage = "invalid_language"

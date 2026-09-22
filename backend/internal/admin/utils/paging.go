@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"net/mail"
 	"regexp"
 	"slices"
 	"strings"
@@ -9,6 +10,7 @@ import (
 const (
 	minDomainLength = 4
 	maxDomainLength = 253
+	maxEmailLength  = 254
 )
 
 var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
@@ -31,6 +33,31 @@ func ValidDomain(domain string) bool {
 	}
 
 	return domainPattern.MatchString(domain)
+}
+
+func NormalizeEmail(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+
+	if value == "" || len(value) > maxEmailLength {
+		return ""
+	}
+	if strings.ContainsAny(value, " \t\r\n<>,;\"") {
+		return ""
+	}
+
+	at := strings.LastIndex(value, "@")
+	if at <= 0 || at == len(value)-1 {
+		return ""
+	}
+
+	if _, err := mail.ParseAddress(value); err != nil {
+		return ""
+	}
+	if !ValidDomain(value[at+1:]) {
+		return ""
+	}
+
+	return value
 }
 
 func NormalizePaging(page, pageSize int) (int, int) {

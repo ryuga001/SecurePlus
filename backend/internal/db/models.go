@@ -219,3 +219,63 @@ type CustomerBranding struct {
 }
 
 func (CustomerBranding) TableName() string { return "customer_branding" }
+
+type StringList []string
+
+func (l StringList) Value() (driver.Value, error) {
+	if l == nil {
+		l = StringList{}
+	}
+
+	return json.Marshal([]string(l))
+}
+
+func (l *StringList) Scan(value any) error {
+	if value == nil {
+		*l = StringList{}
+		return nil
+	}
+
+	var raw []byte
+
+	switch typed := value.(type) {
+	case []byte:
+		raw = typed
+	case string:
+		raw = []byte(typed)
+	default:
+		return errors.New("string list column must be jsonb")
+	}
+
+	if err := json.Unmarshal(raw, (*[]string)(l)); err != nil {
+		return err
+	}
+
+	if *l == nil {
+		*l = StringList{}
+	}
+
+	return nil
+}
+
+type Alert struct {
+	ID               string     `gorm:"column:id;type:uuid;primaryKey"`
+	CustomerID       int        `gorm:"column:customer_id"`
+	Name             string     `gorm:"column:name"`
+	ScheduleType     string     `gorm:"column:schedule_type"`
+	NotificationType string     `gorm:"column:notification_type"`
+	Target           StringList `gorm:"column:target;type:jsonb"`
+	AlertType        string     `gorm:"column:alert_type"`
+	CreatedAt        time.Time  `gorm:"column:created_at"`
+	UpdatedAt        time.Time  `gorm:"column:updated_at"`
+}
+
+func (Alert) TableName() string { return "alerts" }
+
+type AlertPolicyMapping struct {
+	AlertID    string `gorm:"column:alert_id;type:uuid;primaryKey"`
+	PolicyID   int    `gorm:"column:policy_id;primaryKey"`
+	CustomerID int    `gorm:"column:customer_id"`
+}
+
+func (AlertPolicyMapping) TableName() string { return "alert_policy_mapping" }

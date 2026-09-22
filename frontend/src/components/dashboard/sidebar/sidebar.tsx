@@ -62,7 +62,7 @@ function NavLink({
 
 function NavGroup({ node, pathname }: { node: RouteNode; pathname: string }) {
   const active = isActive(pathname, node);
-  const [open, setOpen] = useState(active);
+  const [open, setOpen] = useState(active || node.defaultOpen === true);
   const Icon = node.icon;
   const t = useTranslations("nav");
 

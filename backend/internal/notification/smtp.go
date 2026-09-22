@@ -4,9 +4,19 @@ import (
 	"context"
 
 	"github.com/wneessen/go-mail"
+
+	"dpdp-backend/internal/config"
 )
 
-func (s *Service) deliver(ctx context.Context, to []string, subject, body string) error {
+type SMTPSender struct {
+	smtp config.SMTP
+}
+
+func NewSMTPSender(cfg config.SMTP) *SMTPSender {
+	return &SMTPSender{smtp: cfg}
+}
+
+func (s *SMTPSender) Send(ctx context.Context, msg Message) error {
 	options := []mail.Option{
 		mail.WithPort(s.smtp.Port),
 		mail.WithTLSPolicy(mail.NoTLS),
@@ -33,12 +43,12 @@ func (s *Service) deliver(ctx context.Context, to []string, subject, body string
 	if err := message.FromFormat(s.smtp.FromName, s.smtp.FromEmail); err != nil {
 		return err
 	}
-	if err := message.To(to...); err != nil {
+	if err := message.To(msg.To...); err != nil {
 		return err
 	}
 
-	message.Subject(subject)
-	message.SetBodyString(mail.TypeTextHTML, body)
+	message.Subject(msg.Subject)
+	message.SetBodyString(mail.TypeTextHTML, msg.HTML)
 
 	return client.DialAndSendWithContext(ctx, message)
 }

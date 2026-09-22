@@ -56,12 +56,12 @@ type Queue interface {
 }
 
 type Service struct {
-	db   *gorm.DB
-	smtp config.SMTP
+	db        *gorm.DB
+	transport Transport
 }
 
 func NewService(database *gorm.DB, smtp config.SMTP) *Service {
-	return &Service{db: database, smtp: smtp}
+	return &Service{db: database, transport: newTransport(smtp)}
 }
 
 func (s *Service) Send(ctx context.Context, e Email) error {
@@ -70,7 +70,11 @@ func (s *Service) Send(ctx context.Context, e Email) error {
 		return err
 	}
 
-	return s.deliver(ctx, e.To, renderSubject(template.Subject, e.Vars), renderBody(template.Body, e.Vars))
+	return s.transport.Send(ctx, Message{
+		To:      e.To,
+		Subject: renderSubject(template.Subject, e.Vars),
+		HTML:    renderBody(template.Body, e.Vars),
+	})
 }
 
 func (s *Service) resolve(ctx context.Context, customerID int, name string) (db.EmailTemplate, error) {

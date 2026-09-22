@@ -115,6 +115,11 @@ func main() {
 
 	objectStore := storage.New(s3Client, cfg.Storage.Bucket)
 
+	if err := cfg.SMTP.Validate(); err != nil {
+		slog.Error("email transport configuration invalid", "error", err)
+		os.Exit(1)
+	}
+
 	notifier := notification.NewService(database, cfg.SMTP)
 	store := auth.NewStore(rdb)
 

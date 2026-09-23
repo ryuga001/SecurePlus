@@ -30,6 +30,27 @@ const (
 )
 
 const (
+	ConfigurationTypeEntra        = "MICROSOFT_ENTRA_ACCOUNT"
+	ConfigurationTypeAzureStorage = "AZURE_STORAGE_ACCOUNT"
+	ConfigurationTypeGoogleSA     = "GOOGLE_SERVICE_ACCOUNT"
+	ConfigurationTypeAWSIAM       = "AWS_IAM"
+
+	SourceTypeSharePoint  = "SHARE_POINT"
+	SourceTypeOneDrive    = "ONE_DRIVE"
+	SourceTypeAzureBlob   = "AZURE_BLOB"
+	SourceTypeGoogleDrive = "GOOGLE_DRIVE"
+	SourceTypeAWSS3       = "AWS_S3"
+
+	DiscoveryStatusActive   = "ACTIVE"
+	DiscoveryStatusInactive = "INACTIVE"
+
+	AzureAuthModeServicePrincipal = "SERVICE_PRINCIPAL"
+
+	GoogleAccessModeDelegation  = "DOMAIN_WIDE_DELEGATION"
+	GoogleAccessModeSharedDrive = "SHARED_DRIVE"
+)
+
+const (
 	ScheduleTypeRealTime = "REAL_TIME"
 	ScheduleTypeCustom   = "CUSTOM"
 

@@ -61,6 +61,7 @@ export function Field({
   id,
   label,
   hint,
+  error,
   action,
   className,
   children,
@@ -68,6 +69,7 @@ export function Field({
   id: string;
   label: string;
   hint?: string;
+  error?: string;
   action?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
@@ -79,7 +81,13 @@ export function Field({
         {action}
       </div>
       {children}
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {error ? (
+        <p id={`${id}-error`} role="alert" className="text-xs text-error-text">
+          {error}
+        </p>
+      ) : hint ? (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }

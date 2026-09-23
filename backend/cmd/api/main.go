@@ -17,6 +17,7 @@ import (
 
 	alerthandler "dpdp-backend/internal/admin/handler/alert"
 	brandinghandler "dpdp-backend/internal/admin/handler/branding"
+	discoveryhandler "dpdp-backend/internal/admin/handler/datadiscovery"
 	providerhandler "dpdp-backend/internal/admin/handler/emailprovider"
 	userhandler "dpdp-backend/internal/admin/handler/emailuser"
 	grouphandler "dpdp-backend/internal/admin/handler/group"
@@ -24,6 +25,7 @@ import (
 	rulehandler "dpdp-backend/internal/admin/handler/rule"
 	alertrepo "dpdp-backend/internal/admin/repositories/alert"
 	brandingrepo "dpdp-backend/internal/admin/repositories/branding"
+	discoveryrepo "dpdp-backend/internal/admin/repositories/datadiscovery"
 	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
 	userrepo "dpdp-backend/internal/admin/repositories/emailuser"
 	grouprepo "dpdp-backend/internal/admin/repositories/group"
@@ -31,6 +33,7 @@ import (
 	rulerepo "dpdp-backend/internal/admin/repositories/rule"
 	alertsvc "dpdp-backend/internal/admin/services/alert"
 	brandingsvc "dpdp-backend/internal/admin/services/branding"
+	discoverysvc "dpdp-backend/internal/admin/services/datadiscovery"
 	providersvc "dpdp-backend/internal/admin/services/emailprovider"
 	usersvc "dpdp-backend/internal/admin/services/emailuser"
 	groupsvc "dpdp-backend/internal/admin/services/group"
@@ -44,6 +47,9 @@ import (
 	incidentsvc "dpdp-backend/internal/audit/services/emailincident"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
+	appcrypto "dpdp-backend/internal/crypto"
+	discoveryprovider "dpdp-backend/internal/datadiscovery/provider"
+	"dpdp-backend/internal/datadiscovery/strategy"
 	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/handler/rest"
 	"dpdp-backend/internal/delivery/handler/smtp"
@@ -117,6 +123,17 @@ func main() {
 
 	if err := cfg.SMTP.Validate(); err != nil {
 		slog.Error("email transport configuration invalid", "error", err)
+		os.Exit(1)
+	}
+
+	if err := cfg.DataDiscovery.Validate(); err != nil {
+		slog.Error("data discovery configuration invalid", "error", err)
+		os.Exit(1)
+	}
+
+	secretBox, err := appcrypto.NewSecretBox(cfg.DataDiscovery.MasterKey, cfg.DataDiscovery.KeyVersion)
+	if err != nil {
+		slog.Error("data discovery credential encryption unavailable", "error", err)
 		os.Exit(1)
 	}
 
@@ -235,6 +252,25 @@ func main() {
 		groupsvc.NewGroupService(database, grouprepo.NewGroupRepository(database)),
 	)
 	alertHandler := alerthandler.NewAlertHandler(alertService)
+
+	providerClient := discoveryprovider.NewClient(cfg.DataDiscovery.TestTimeout)
+
+	discoveryConfigurationHandler := discoveryhandler.NewConfigurationHandler(
+		discoverysvc.NewConfigurationService(
+			database,
+			discoveryrepo.NewConfigurationRepository(database),
+			strategy.DefaultConfigurationRegistry(providerClient),
+			secretBox,
+			cfg.DataDiscovery.TestTimeout,
+		),
+	)
+	discoveryPolicyHandler := discoveryhandler.NewPolicyHandler(
+		discoverysvc.NewPolicyService(
+			database,
+			discoveryrepo.NewPolicyRepository(database),
+			strategy.DefaultPolicyRegistry(),
+		),
+	)
 	auditHandler := audithandler.NewDeliveryAuditHandler(recorder)
 	incidentHandler := incidenthandler.NewEmailIncidentHandler(incidents)
 
@@ -279,6 +315,8 @@ func main() {
 	emailUserHandler.RegisterRoutes(protected, guard)
 	groupHandler.RegisterRoutes(protected, guard)
 	alertHandler.RegisterRoutes(protected, guard)
+	discoveryConfigurationHandler.RegisterRoutes(protected, guard)
+	discoveryPolicyHandler.RegisterRoutes(protected, guard)
 	brandingHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
 	incidentHandler.RegisterRoutes(protected, guard)

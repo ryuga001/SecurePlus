@@ -144,6 +144,8 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrEmailUserNotFound),
 		errors.Is(err, ErrMappingNotFound),
 		errors.Is(err, ErrAlertNotFound),
+		errors.Is(err, ErrDiscoveryConfigNotFound),
+		errors.Is(err, ErrDiscoveryPolicyNotFound),
 		errors.Is(err, ErrBrandingNotFound):
 		return http.StatusNotFound, CodeNotFound
 
@@ -163,6 +165,17 @@ func statusFor(err error) (int, string) {
 		return http.StatusConflict, CodeAlertNameTaken
 	case errors.Is(err, ErrSystemAlertImmutable):
 		return http.StatusConflict, CodeSystemAlertImmutable
+	case errors.Is(err, ErrDiscoveryConfigNameTaken):
+		return http.StatusConflict, CodeDiscoveryConfigNameTaken
+	case errors.Is(err, ErrDiscoveryPolicyNameTaken):
+		return http.StatusConflict, CodeDiscoveryPolicyNameTaken
+	case errors.Is(err, ErrDiscoveryConfigInUse):
+		return http.StatusConflict, CodeConfigurationInUse
+	case errors.Is(err, ErrConfigurationTypeImmutable):
+		return http.StatusConflict, CodeConfigurationTypeImmutable
+
+	case errors.Is(err, ErrProviderUnavailable):
+		return http.StatusBadGateway, CodeProviderUnavailable
 
 	case errors.Is(err, ErrInvalidDomain):
 		return http.StatusBadRequest, CodeInvalidDomain
@@ -191,6 +204,23 @@ func statusFor(err error) (int, string) {
 		return http.StatusBadRequest, CodeEmailUserNotFound
 	case errors.Is(err, ErrUnknownPolicy):
 		return http.StatusBadRequest, CodePolicyNotFound
+	case errors.Is(err, ErrUnknownConfiguration):
+		return http.StatusBadRequest, CodeDiscoveryConfigNotFound
+	case errors.Is(err, ErrUnknownFileType):
+		return http.StatusBadRequest, CodeFileTypeNotFound
+
+	case errors.Is(err, ErrInvalidConfigurationType):
+		return http.StatusBadRequest, CodeInvalidConfigurationType
+	case errors.Is(err, ErrInvalidSourceType):
+		return http.StatusBadRequest, CodeInvalidSourceType
+	case errors.Is(err, ErrIncompatibleSource):
+		return http.StatusBadRequest, CodeIncompatibleSource
+	case errors.Is(err, ErrInvalidServiceAccountKey):
+		return http.StatusBadRequest, CodeInvalidServiceAccountKey
+	case errors.Is(err, ErrConnectionFailed):
+		return http.StatusBadRequest, CodeConnectionFailed
+	case errors.Is(err, ErrInvalidDiscoveryTarget):
+		return http.StatusBadRequest, CodeInvalidDiscoveryTarget
 
 	case errors.Is(err, ErrInvalidTheme):
 		return http.StatusBadRequest, CodeInvalidTheme
@@ -216,6 +246,10 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrAlertNameNeeded),
 		errors.Is(err, ErrPoliciesNeeded),
 		errors.Is(err, ErrTargetsNeeded),
+		errors.Is(err, ErrDiscoveryNameNeeded),
+		errors.Is(err, ErrConfigFieldNeeded),
+		errors.Is(err, ErrSecretNeeded),
+		errors.Is(err, ErrDiscoveryTargetsNeeded),
 		errors.Is(err, ErrTooManyItems):
 		return http.StatusBadRequest, CodeValidation
 	}

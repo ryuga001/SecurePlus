@@ -1,11 +1,15 @@
 import {
     AlertCircle,
     Building2,
+    ChartNoAxesCombined,
     FileText,
     LayoutDashboard,
     Mail,
     Palette,
+    PlugZap,
+    Radar,
     Regex,
+    ScanSearch,
     ScrollText,
     Send,
     Settings,
@@ -100,6 +104,38 @@ export const routes = {
                 icon: AlertCircle,
                 privileges: ["admin.email.alert.view"],
             }
+        },
+    },
+    dataDiscovery: {
+        labelKey: "dataDiscovery",
+        routePath: "/admin/data-discovery",
+        icon: Radar,
+        privileges: ["admin.discovery.configuration.view"],
+        children: {
+            dd_configurations: {
+                labelKey: "discoverySources",
+                routePath: "/admin/data-discovery/configurations",
+                icon: PlugZap,
+                privileges: ["admin.discovery.configuration.view"],
+            },
+            dd_policies: {
+                labelKey: "discoveryPolicies",
+                routePath: "/admin/data-discovery/policies",
+                icon: ShieldCheck,
+                privileges: ["admin.discovery.policy.view"],
+            },
+            dd_scans: {
+                labelKey: "discoveryScans",
+                routePath: "/admin/data-discovery/scans",
+                icon: ScanSearch,
+                privileges: ["admin.discovery.policy.view"],
+            },
+            dd_analysis: {
+                labelKey: "discoveryAnalysis",
+                routePath: "/admin/data-discovery/analysis",
+                icon: ChartNoAxesCombined,
+                privileges: ["admin.discovery.policy.view"],
+            },
         },
     },
     administration: {

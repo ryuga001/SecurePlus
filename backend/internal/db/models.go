@@ -279,3 +279,110 @@ type AlertPolicyMapping struct {
 }
 
 func (AlertPolicyMapping) TableName() string { return "alert_policy_mapping" }
+
+type StringMap map[string]string
+
+func (m StringMap) Value() (driver.Value, error) {
+	if m == nil {
+		m = StringMap{}
+	}
+
+	return json.Marshal(map[string]string(m))
+}
+
+func (m *StringMap) Scan(value any) error {
+	if value == nil {
+		*m = StringMap{}
+		return nil
+	}
+
+	var raw []byte
+
+	switch typed := value.(type) {
+	case []byte:
+		raw = typed
+	case string:
+		raw = []byte(typed)
+	default:
+		return errors.New("string map column must be jsonb")
+	}
+
+	if err := json.Unmarshal(raw, (*map[string]string)(m)); err != nil {
+		return err
+	}
+
+	if *m == nil {
+		*m = StringMap{}
+	}
+
+	return nil
+}
+
+type DataDiscoverySourceCapability struct {
+	ConfigurationType string `gorm:"column:configuration_type;primaryKey"`
+	SourceType        string `gorm:"column:source_type;primaryKey"`
+	Label             string `gorm:"column:label"`
+	Active            bool   `gorm:"column:active"`
+}
+
+func (DataDiscoverySourceCapability) TableName() string {
+	return "data_discovery_source_capabilities"
+}
+
+type DataDiscoveryConfiguration struct {
+	ID                int       `gorm:"column:id;primaryKey"`
+	CustomerID        int       `gorm:"column:customer_id"`
+	Name              string    `gorm:"column:name"`
+	Description       *string   `gorm:"column:description"`
+	ConfigurationType string    `gorm:"column:configuration_type"`
+	Config            StringMap `gorm:"column:config;type:jsonb"`
+	Status            string    `gorm:"column:status"`
+	LastTestedAt      time.Time `gorm:"column:last_tested_at"`
+	CreatedAt         time.Time `gorm:"column:created_at"`
+	UpdatedAt         time.Time `gorm:"column:updated_at"`
+}
+
+func (DataDiscoveryConfiguration) TableName() string {
+	return "data_discovery_configurations"
+}
+
+type DataDiscoveryCredential struct {
+	ID              int       `gorm:"column:id;primaryKey"`
+	CustomerID      int       `gorm:"column:customer_id"`
+	ConfigurationID int       `gorm:"column:configuration_id"`
+	Secret          []byte    `gorm:"column:secret;type:bytea" json:"-"`
+	KeyVersion      int       `gorm:"column:key_version"`
+	CreatedAt       time.Time `gorm:"column:created_at"`
+	UpdatedAt       time.Time `gorm:"column:updated_at"`
+}
+
+func (DataDiscoveryCredential) TableName() string {
+	return "data_discovery_credentials"
+}
+
+type DataDiscoveryPolicy struct {
+	ID                int        `gorm:"column:id;primaryKey"`
+	CustomerID        int        `gorm:"column:customer_id"`
+	Name              string     `gorm:"column:name"`
+	Description       *string    `gorm:"column:description"`
+	ConfigurationID   int        `gorm:"column:configuration_id"`
+	ConfigurationType string     `gorm:"column:configuration_type"`
+	SourceType        string     `gorm:"column:source_type"`
+	TargetList        StringList `gorm:"column:target_list;type:jsonb"`
+	FileTypes         StringList `gorm:"column:file_types;type:jsonb"`
+	Status            string     `gorm:"column:status"`
+	CreatedAt         time.Time  `gorm:"column:created_at"`
+	UpdatedAt         time.Time  `gorm:"column:updated_at"`
+}
+
+func (DataDiscoveryPolicy) TableName() string { return "data_discovery_policies" }
+
+type DataDiscoveryPolicyRuleMapping struct {
+	PolicyID   int `gorm:"column:policy_id;primaryKey"`
+	RuleID     int `gorm:"column:rule_id;primaryKey"`
+	CustomerID int `gorm:"column:customer_id"`
+}
+
+func (DataDiscoveryPolicyRuleMapping) TableName() string {
+	return "data_discovery_policy_rule_mapping"
+}

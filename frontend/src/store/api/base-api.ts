@@ -24,6 +24,8 @@ export const baseApi = createApi({
     "AuditLog",
     "EmailIncident",
     "Alert",
+    "DiscoveryConfiguration",
+    "DiscoveryPolicy",
     "Branding",
   ],
   endpoints: () => ({}),

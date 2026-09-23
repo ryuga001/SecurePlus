@@ -61,6 +61,27 @@ var (
 	ErrSMSNotSupported         = errors.New(MsgSMSNotSupported)
 	ErrSystemAlertImmutable    = errors.New(MsgSystemAlertImmutable)
 
+	ErrDiscoveryNameNeeded        = errors.New(MsgDiscoveryNameNeeded)
+	ErrDiscoveryConfigNotFound    = errors.New(MsgDiscoveryConfigNotFound)
+	ErrDiscoveryConfigNameTaken   = errors.New(MsgDiscoveryConfigNameTaken)
+	ErrDiscoveryConfigInUse       = errors.New(MsgDiscoveryConfigInUse)
+	ErrConfigurationTypeImmutable = errors.New(MsgConfigurationTypeImmutable)
+	ErrInvalidConfigurationType   = errors.New(MsgInvalidConfigurationType)
+	ErrInvalidSourceType          = errors.New(MsgInvalidSourceType)
+	ErrIncompatibleSource         = errors.New(MsgIncompatibleSource)
+	ErrConfigFieldNeeded          = errors.New(MsgConfigFieldNeeded)
+	ErrSecretNeeded               = errors.New(MsgSecretNeeded)
+	ErrInvalidServiceAccountKey   = errors.New(MsgInvalidServiceAccountKey)
+	ErrConnectionFailed           = errors.New(MsgConnectionFailed)
+	ErrProviderUnavailable        = errors.New(MsgProviderUnavailable)
+	ErrUnknownConfiguration       = errors.New(MsgUnknownConfiguration)
+	ErrDiscoveryPolicyNotFound    = errors.New(MsgDiscoveryPolicyNotFound)
+	ErrDiscoveryPolicyNameTaken   = errors.New(MsgDiscoveryPolicyNameTaken)
+	ErrDiscoveryTargetsNeeded     = errors.New(MsgDiscoveryTargetsNeeded)
+	ErrInvalidDiscoveryTarget     = errors.New(MsgInvalidDiscoveryTarget)
+	ErrUnknownFileType            = errors.New(MsgUnknownFileType)
+	ErrCredentialUnavailable      = errors.New(MsgCredentialUnavailable)
+
 	ErrBrandingNotFound = errors.New(MsgBrandingNotFound)
 	ErrInvalidTheme     = errors.New(MsgInvalidTheme)
 	ErrInvalidLanguage  = errors.New(MsgInvalidLanguage)
@@ -70,6 +91,10 @@ var (
 
 func Taken(sentinel error, value string) error {
 	return fmt.Errorf("%w (%s)", sentinel, value)
+}
+
+func ConnectionFailed(reason string) error {
+	return fmt.Errorf("%w (%s)", ErrConnectionFailed, reason)
 }
 
 func InvalidRegex(cause error) error {

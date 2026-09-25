@@ -70,6 +70,7 @@ func sharePointStrategy() PolicyStrategy {
 		sourceType:        db.SourceTypeSharePoint,
 		configurationType: db.ConfigurationTypeEntra,
 		normalize:         normalizePath,
+		connect:           connectSharePoint,
 	}
 }
 
@@ -78,6 +79,7 @@ func oneDriveStrategy() PolicyStrategy {
 		sourceType:        db.SourceTypeOneDrive,
 		configurationType: db.ConfigurationTypeEntra,
 		normalize:         normalizePath,
+		connect:           connectOneDrive,
 	}
 }
 
@@ -95,6 +97,7 @@ func googleDriveStrategy() PolicyStrategy {
 		sourceType:        db.SourceTypeGoogleDrive,
 		configurationType: db.ConfigurationTypeGoogleSA,
 		normalize:         normalizePath,
+		connect:           connectGoogleDrive,
 	}
 }
 
@@ -103,6 +106,7 @@ func awsS3Strategy() PolicyStrategy {
 		sourceType:        db.SourceTypeAWSS3,
 		configurationType: db.ConfigurationTypeAWSIAM,
 		normalize:         normalizeBucketPath,
+		connect:           connectAWSS3,
 	}
 }
 
@@ -120,12 +124,14 @@ func normalizePath(raw string) string {
 }
 
 func normalizeBucketPath(raw string) string {
-	value := strings.ToLower(normalizePath(raw))
+	value := normalizePath(raw)
 	if value == "" {
 		return ""
 	}
 
-	bucket, _, _ := strings.Cut(strings.TrimPrefix(value, "/"), "/")
+	bucket, prefix, hasPrefix := strings.Cut(strings.TrimPrefix(value, "/"), "/")
+	bucket = strings.ToLower(bucket)
+
 	if len(bucket) < 3 || len(bucket) > 63 {
 		return ""
 	}
@@ -136,7 +142,11 @@ func normalizeBucketPath(raw string) string {
 		}
 	}
 
-	return value
+	if !hasPrefix || prefix == "" {
+		return bucket
+	}
+
+	return bucket + "/" + prefix
 }
 
 func normalizeContainerPath(raw string) string {

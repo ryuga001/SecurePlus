@@ -35,14 +35,23 @@ func (c *Client) GoogleToken(
 	ctx context.Context,
 	clientEmail, subject, tokenURI, privateKeyPEM string,
 ) (string, error) {
+	token, err := c.GoogleAccessToken(ctx, clientEmail, subject, tokenURI, privateKeyPEM)
+
+	return token.Value, err
+}
+
+func (c *Client) GoogleAccessToken(
+	ctx context.Context,
+	clientEmail, subject, tokenURI, privateKeyPEM string,
+) (Token, error) {
 	endpoint, err := TrustedTokenURI(tokenURI)
 	if err != nil {
-		return "", err
+		return Token{}, err
 	}
 
 	key, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(privateKeyPEM))
 	if err != nil {
-		return "", err
+		return Token{}, err
 	}
 
 	now := time.Now()
@@ -61,14 +70,14 @@ func (c *Client) GoogleToken(
 
 	assertion, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(key)
 	if err != nil {
-		return "", err
+		return Token{}, err
 	}
 
 	form := url.Values{}
 	form.Set("grant_type", GoogleGrantType)
 	form.Set("assertion", assertion)
 
-	return c.postForm(ctx, ProviderGoogle, StageToken, endpoint, form.Encode())
+	return c.postFormToken(ctx, ProviderGoogle, StageToken, endpoint, form.Encode())
 }
 
 func (c *Client) GoogleDriveAbout(ctx context.Context, token string) error {

@@ -199,8 +199,8 @@ func TestIntegrationScanCreateRules(t *testing.T) {
 
 	aws := f.configuration(t, db.ConfigurationTypeAWSIAM, db.StringMap{"accessKeyId": "AKIAABCDEFGHIJKLMNOP", "region": "ap-south-1"})
 	s3 := f.policy(t, "S3", db.DiscoveryStatusActive, aws, db.SourceTypeAWSS3, "bucket-one")
-	if _, err := f.service.Create(ctx, f.customer.ID, 5, s3.ID); !errors.Is(err, utils.ErrSourceNotScannable) {
-		t.Fatalf("unsupported source error = %v", err)
+	if created, err := f.service.Create(ctx, f.customer.ID, 5, s3.ID); err != nil || created.Scan.Status != db.ScanStatusPending {
+		t.Fatalf("s3 scan = %+v err = %v", created.Scan, err)
 	}
 
 	if _, err := f.service.Create(ctx, f.customer.ID, 5, 999999); !errors.Is(err, utils.ErrDiscoveryPolicyNotFound) {

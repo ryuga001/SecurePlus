@@ -40,6 +40,10 @@ func (c *Client) EntraToken(ctx context.Context, tenantID, clientID, clientSecre
 	return c.microsoftToken(ctx, ProviderEntra, tenantID, clientID, clientSecret, GraphScope)
 }
 
+func (c *Client) EntraAccessToken(ctx context.Context, tenantID, clientID, clientSecret string) (Token, error) {
+	return c.microsoftAccessToken(ctx, ProviderEntra, tenantID, clientID, clientSecret, GraphScope)
+}
+
 func (c *Client) AzureStorageToken(ctx context.Context, tenantID, clientID, clientSecret string) (string, error) {
 	return c.microsoftToken(ctx, ProviderAzureStorage, tenantID, clientID, clientSecret, AzureStorageScope)
 }

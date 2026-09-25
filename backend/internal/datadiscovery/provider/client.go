@@ -159,7 +159,34 @@ func parseSafeDetail(raw []byte) safeDetail {
 		return safeDetail{code: nested.Error.Code}
 	}
 
+	var google struct {
+		Error struct {
+			Errors []struct {
+				Reason string `json:"reason"`
+			} `json:"errors"`
+			Status string `json:"status"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(raw, &google); err == nil {
+		if len(google.Error.Errors) > 0 && google.Error.Errors[0].Reason != "" {
+			return safeDetail{code: google.Error.Errors[0].Reason}
+		}
+
+		if google.Error.Status != "" {
+			return safeDetail{code: google.Error.Status}
+		}
+	}
+
 	return safeDetail{}
+}
+
+var rateLimitCodes = map[string]bool{
+	"ServerBusy":            true,
+	"rateLimitExceeded":     true,
+	"userRateLimitExceeded": true,
+	"RESOURCE_EXHAUSTED":    true,
+	"activityLimitReached":  true,
 }
 
 type tokenResponse struct {
@@ -249,7 +276,7 @@ func (c *Client) stream(
 	failure.requestID = firstNonEmpty(failure.requestID, response.Header.Get("x-ms-request-id"))
 	failure.retryAfter = retryAfter(response.Header.Get("Retry-After"))
 
-	if response.StatusCode == http.StatusServiceUnavailable && failure.code == "ServerBusy" {
+	if rateLimitCodes[failure.code] {
 		failure.Reason = ReasonRateLimited
 	}
 

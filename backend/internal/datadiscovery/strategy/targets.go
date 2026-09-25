@@ -1,10 +1,12 @@
 package strategy
 
 import (
+	"context"
 	"slices"
 	"strings"
 
 	"dpdp-backend/internal/admin/utils"
+	"dpdp-backend/internal/datadiscovery/provider"
 	"dpdp-backend/internal/db"
 )
 
@@ -14,10 +16,25 @@ type targetStrategy struct {
 	sourceType        string
 	configurationType string
 	normalize         func(raw string) string
+	connect           connectFunc
 }
 
 func (s targetStrategy) SourceType() string        { return s.sourceType }
 func (s targetStrategy) ConfigurationType() string { return s.configurationType }
+func (s targetStrategy) Scannable() bool           { return s.connect != nil }
+
+func (s targetStrategy) Connect(
+	ctx context.Context,
+	client *provider.Client,
+	config db.StringMap,
+	credential []byte,
+) (Source, error) {
+	if s.connect == nil {
+		return nil, ErrSourceUnsupported
+	}
+
+	return s.connect(ctx, client, config, credential)
+}
 
 func (s targetStrategy) NormalizeTargets(targets []string) ([]string, error) {
 	seen := make(map[string]bool, len(targets))
@@ -69,6 +86,7 @@ func azureBlobStrategy() PolicyStrategy {
 		sourceType:        db.SourceTypeAzureBlob,
 		configurationType: db.ConfigurationTypeAzureStorage,
 		normalize:         normalizeContainerPath,
+		connect:           connectAzureBlob,
 	}
 }
 
@@ -122,12 +140,14 @@ func normalizeBucketPath(raw string) string {
 }
 
 func normalizeContainerPath(raw string) string {
-	value := strings.ToLower(normalizePath(raw))
+	value := normalizePath(raw)
 	if value == "" {
 		return ""
 	}
 
-	container, _, _ := strings.Cut(strings.TrimPrefix(value, "/"), "/")
+	container, prefix, hasPrefix := strings.Cut(strings.TrimPrefix(value, "/"), "/")
+	container = strings.ToLower(container)
+
 	if len(container) < 3 || len(container) > 63 {
 		return ""
 	}
@@ -138,5 +158,9 @@ func normalizeContainerPath(raw string) string {
 		}
 	}
 
-	return value
+	if !hasPrefix || prefix == "" {
+		return container
+	}
+
+	return container + "/" + prefix
 }

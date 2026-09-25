@@ -148,6 +148,8 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrDiscoveryPolicyNotFound),
 		errors.Is(err, ErrBrandingNotFound):
 		return http.StatusNotFound, CodeNotFound
+	case errors.Is(err, ErrDiscoveryScanNotFound):
+		return http.StatusNotFound, CodeDiscoveryScanNotFound
 
 	case errors.Is(err, ErrDomainTaken):
 		return http.StatusConflict, CodeDomainTaken
@@ -173,6 +175,12 @@ func statusFor(err error) (int, string) {
 		return http.StatusConflict, CodeConfigurationInUse
 	case errors.Is(err, ErrConfigurationTypeImmutable):
 		return http.StatusConflict, CodeConfigurationTypeImmutable
+	case errors.Is(err, ErrDiscoveryScanActive):
+		return http.StatusConflict, CodeDiscoveryScanActive
+	case errors.Is(err, ErrDiscoveryPolicyInactive):
+		return http.StatusConflict, CodeDiscoveryPolicyInactive
+	case errors.Is(err, ErrSourceNotScannable):
+		return http.StatusBadRequest, CodeSourceNotScannable
 
 	case errors.Is(err, ErrProviderUnavailable):
 		return http.StatusBadGateway, CodeProviderUnavailable

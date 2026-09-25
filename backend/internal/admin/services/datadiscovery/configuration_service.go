@@ -309,7 +309,7 @@ func (s *ConfigurationService) resolveUpdate(
 
 	for _, key := range selected.ConnectionKeys() {
 		if current.Config[key] != config[key] {
-			stored, err := s.openCredential(ctx, customerID, id)
+			stored, err := s.OpenCredential(ctx, customerID, id)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -398,7 +398,7 @@ func (s *ConfigurationService) Test(ctx context.Context, customerID int, in Test
 		return err
 	}
 
-	credential, err := s.openCredential(ctx, customerID, in.ConfigurationID)
+	credential, err := s.OpenCredential(ctx, customerID, in.ConfigurationID)
 	if err != nil {
 		return err
 	}
@@ -449,7 +449,7 @@ func (s *ConfigurationService) test(
 	return utils.ConnectionFailed(providerErr.Reason)
 }
 
-func (s *ConfigurationService) openCredential(
+func (s *ConfigurationService) OpenCredential(
 	ctx context.Context,
 	customerID, configurationID int,
 ) ([]byte, error) {

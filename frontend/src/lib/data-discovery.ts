@@ -32,6 +32,51 @@ export const DISCOVERY_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 
 export type DiscoveryStatus = (typeof DISCOVERY_STATUSES)[number];
 
+export const SCANNABLE_SOURCE_TYPES: readonly SourceType[] = ["AZURE_BLOB"];
+
+export const SCAN_STATUSES = ["PENDING", "RUNNING", "PARTIAL", "COMPLETED", "FAILED"] as const;
+
+export type ScanStatus = (typeof SCAN_STATUSES)[number];
+
+export const FILE_RESULT_STATUSES = ["SUCCEEDED", "FAILED"] as const;
+
+export type FileResultStatus = (typeof FILE_RESULT_STATUSES)[number];
+
+export const SCAN_POLL_INTERVAL = 5000;
+
+export function isScanActive(status: ScanStatus | string | undefined) {
+  return status === "PENDING" || status === "RUNNING";
+}
+
+export function formatBytes(size: number) {
+  if (!Number.isFinite(size) || size < 0) return "—";
+  if (size < 1024) return `${size} B`;
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = size / 1024;
+  let unit = 0;
+
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+
+  return `${value.toFixed(value < 10 ? 2 : 1)} ${units[unit]}`;
+}
+
+export function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)} s`;
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${Math.round(seconds % 60)}s`;
+
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
 export type FieldKind = "text" | "secret" | "gcpServiceAccountKey";
 
 export type FieldDescriptor = {

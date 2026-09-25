@@ -13,16 +13,23 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
+  preload: true,
+  fallback: ["system-ui", "sans-serif"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
   display: "swap",
+  preload: true,
+  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
 });
 
 export const metadata: Metadata = {
-  title: "SecurePlus",
+  title: {
+    default: "SecurePlus",
+    template: "%s | SecurePlus",
+  },
   description: "SecurePlus security dashboard",
 };
 
@@ -31,9 +38,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full bg-background font-sans antialiased text-foreground">
         <StoreProvider>
           <AuthProvider>
             <IntlProvider>
@@ -41,6 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </IntlProvider>
           </AuthProvider>
         </StoreProvider>
+
         <Toaster position="top-right" />
       </body>
     </html>

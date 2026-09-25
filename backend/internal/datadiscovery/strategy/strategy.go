@@ -49,6 +49,8 @@ type PolicyStrategy interface {
 	SourceType() string
 	ConfigurationType() string
 	NormalizeTargets(targets []string) ([]string, error)
+	Scannable() bool
+	Connect(ctx context.Context, client *provider.Client, config db.StringMap, credential []byte) (Source, error)
 }
 
 type ConfigurationRegistry struct {

@@ -239,6 +239,24 @@ func (r *PolicyRepository) RulesFor(
 	return rows, err
 }
 
+func (r *PolicyRepository) RuleDefinitionsFor(
+	ctx context.Context,
+	customerID, policyID int,
+) ([]db.Rule, error) {
+	rows := make([]db.Rule, 0)
+
+	err := r.db.WithContext(ctx).
+		Table("data_discovery_policy_rule_mapping AS m").
+		Select("r.id, r.customer_id, r.rule_name, r.type, r.value, r.created_at, r.updated_at").
+		Joins("JOIN rules AS r ON r.id = m.rule_id AND r.customer_id = m.customer_id").
+		Scopes(db.TenantScopeOn("m", customerID)).
+		Where("m.policy_id = ?", policyID).
+		Order("r.id ASC").
+		Scan(&rows).Error
+
+	return rows, err
+}
+
 func (r *PolicyRepository) ConfigurationsFor(
 	ctx context.Context,
 	customerID int,

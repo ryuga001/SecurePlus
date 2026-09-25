@@ -15,6 +15,15 @@ func (c *Client) microsoftToken(
 	ctx context.Context,
 	provider, tenantID, clientID, clientSecret, scope string,
 ) (string, error) {
+	token, err := c.microsoftAccessToken(ctx, provider, tenantID, clientID, clientSecret, scope)
+
+	return token.Value, err
+}
+
+func (c *Client) microsoftAccessToken(
+	ctx context.Context,
+	provider, tenantID, clientID, clientSecret, scope string,
+) (Token, error) {
 	form := url.Values{}
 	form.Set("grant_type", "client_credentials")
 	form.Set("client_id", clientID)
@@ -24,7 +33,7 @@ func (c *Client) microsoftToken(
 
 	endpoint := fmt.Sprintf(EntraTokenURLFormat, url.PathEscape(tenantID))
 
-	return c.postForm(ctx, provider, StageToken, endpoint, body)
+	return c.postFormToken(ctx, provider, StageToken, endpoint, body)
 }
 
 func (c *Client) EntraToken(ctx context.Context, tenantID, clientID, clientSecret string) (string, error) {
@@ -33,6 +42,13 @@ func (c *Client) EntraToken(ctx context.Context, tenantID, clientID, clientSecre
 
 func (c *Client) AzureStorageToken(ctx context.Context, tenantID, clientID, clientSecret string) (string, error) {
 	return c.microsoftToken(ctx, ProviderAzureStorage, tenantID, clientID, clientSecret, AzureStorageScope)
+}
+
+func (c *Client) AzureStorageAccessToken(
+	ctx context.Context,
+	tenantID, clientID, clientSecret string,
+) (Token, error) {
+	return c.microsoftAccessToken(ctx, ProviderAzureStorage, tenantID, clientID, clientSecret, AzureStorageScope)
 }
 
 func (c *Client) AzureListContainers(ctx context.Context, storageAccount, token string) error {

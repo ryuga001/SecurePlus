@@ -95,6 +95,7 @@ type CompiledSet struct {
 
 type Automaton interface {
 	Find(text string) []AutomatonHit
+	Scan(state int, text []byte, hit func(pattern, end int)) int
 }
 
 type AutomatonHit struct {

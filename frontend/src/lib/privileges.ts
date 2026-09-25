@@ -20,6 +20,11 @@ export const DISCOVERY_POLICY_PRIVILEGES = {
   delete: "admin.discovery.policy.delete",
 } as const;
 
+export const DISCOVERY_SCAN_PRIVILEGES = {
+  view: "admin.discovery.scan.view",
+  create: "admin.discovery.scan.create",
+} as const;
+
 export function hasPrivilege(granted: readonly string[] | undefined, required: string) {
   return granted?.includes(required) ?? false;
 }

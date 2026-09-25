@@ -386,3 +386,136 @@ type DataDiscoveryPolicyRuleMapping struct {
 func (DataDiscoveryPolicyRuleMapping) TableName() string {
 	return "data_discovery_policy_rule_mapping"
 }
+
+type ScanCounters struct {
+	TotalTargets     int   `gorm:"column:total_targets" json:"total_targets"`
+	CompletedTargets int   `gorm:"column:completed_targets" json:"completed_targets"`
+	FailedTargets    int   `gorm:"column:failed_targets" json:"failed_targets"`
+	FilesDiscovered  int64 `gorm:"column:files_discovered" json:"files_discovered"`
+	FilesSupported   int64 `gorm:"column:files_supported" json:"files_supported"`
+	FilesSkipped     int64 `gorm:"column:files_skipped" json:"files_skipped"`
+	FilesProcessed   int64 `gorm:"column:files_processed" json:"files_processed"`
+	FilesSucceeded   int64 `gorm:"column:files_succeeded" json:"files_succeeded"`
+	FilesFailed      int64 `gorm:"column:files_failed" json:"files_failed"`
+	FindingsTotal    int64 `gorm:"column:findings_total" json:"findings_total"`
+	BytesProcessed   int64 `gorm:"column:bytes_processed" json:"bytes_processed"`
+}
+
+func (c ScanCounters) Columns() map[string]any {
+	return map[string]any{
+		"total_targets":     c.TotalTargets,
+		"completed_targets": c.CompletedTargets,
+		"failed_targets":    c.FailedTargets,
+		"files_discovered":  c.FilesDiscovered,
+		"files_supported":   c.FilesSupported,
+		"files_skipped":     c.FilesSkipped,
+		"files_processed":   c.FilesProcessed,
+		"files_succeeded":   c.FilesSucceeded,
+		"files_failed":      c.FilesFailed,
+		"findings_total":    c.FindingsTotal,
+		"bytes_processed":   c.BytesProcessed,
+	}
+}
+
+type DataDiscoveryScan struct {
+	ID          int64      `gorm:"column:id;primaryKey"`
+	CustomerID  int        `gorm:"column:customer_id"`
+	PolicyID    int        `gorm:"column:policy_id"`
+	RequestedBy *int       `gorm:"column:requested_by"`
+	Status      string     `gorm:"column:status"`
+	ErrorCode   *string    `gorm:"column:error_code"`
+	StartedAt   *time.Time `gorm:"column:started_at"`
+	FinishedAt  *time.Time `gorm:"column:finished_at"`
+	CreatedAt   time.Time  `gorm:"column:created_at"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at"`
+
+	ScanCounters `gorm:"embedded"`
+}
+
+func (DataDiscoveryScan) TableName() string { return "data_discovery_scans" }
+
+type DataDiscoveryScanTarget struct {
+	ScanID          int64      `gorm:"column:scan_id;primaryKey"`
+	Position        int        `gorm:"column:position;primaryKey"`
+	CustomerID      int        `gorm:"column:customer_id"`
+	Target          string     `gorm:"column:target"`
+	Status          string     `gorm:"column:status"`
+	ErrorCode       *string    `gorm:"column:error_code"`
+	FilesDiscovered int64      `gorm:"column:files_discovered"`
+	FilesSkipped    int64      `gorm:"column:files_skipped"`
+	FilesSucceeded  int64      `gorm:"column:files_succeeded"`
+	FilesFailed     int64      `gorm:"column:files_failed"`
+	FindingsTotal   int64      `gorm:"column:findings_total"`
+	StartedAt       *time.Time `gorm:"column:started_at"`
+	FinishedAt      *time.Time `gorm:"column:finished_at"`
+}
+
+func (DataDiscoveryScanTarget) TableName() string { return "data_discovery_scan_targets" }
+
+type FileFinding struct {
+	RuleID   int     `json:"rule_id"`
+	RuleName string  `json:"rule_name"`
+	RuleType string  `json:"rule_type"`
+	Count    int64   `json:"count"`
+	Offsets  []int64 `json:"offsets"`
+}
+
+type FileFindings []FileFinding
+
+func (f FileFindings) Value() (driver.Value, error) {
+	if f == nil {
+		f = FileFindings{}
+	}
+
+	return json.Marshal([]FileFinding(f))
+}
+
+func (f *FileFindings) Scan(value any) error {
+	if value == nil {
+		*f = FileFindings{}
+		return nil
+	}
+
+	var raw []byte
+
+	switch typed := value.(type) {
+	case []byte:
+		raw = typed
+	case string:
+		raw = []byte(typed)
+	default:
+		return errors.New("file findings column must be jsonb")
+	}
+
+	if err := json.Unmarshal(raw, (*[]FileFinding)(f)); err != nil {
+		return err
+	}
+
+	if *f == nil {
+		*f = FileFindings{}
+	}
+
+	return nil
+}
+
+type DataDiscoveryFileResult struct {
+	ID             int64        `gorm:"column:id;primaryKey"`
+	ScanID         int64        `gorm:"column:scan_id"`
+	CustomerID     int          `gorm:"column:customer_id"`
+	TargetPosition int          `gorm:"column:target_position"`
+	FileKey        string       `gorm:"column:file_key"`
+	FileName       string       `gorm:"column:file_name"`
+	Extension      string       `gorm:"column:extension"`
+	MIMEType       string       `gorm:"column:mime_type"`
+	SizeBytes      int64        `gorm:"column:size_bytes"`
+	ModifiedAt     *time.Time   `gorm:"column:modified_at"`
+	Status         string       `gorm:"column:status"`
+	ErrorCode      *string      `gorm:"column:error_code"`
+	FindingsTotal  int64        `gorm:"column:findings_total"`
+	Findings       FileFindings `gorm:"column:findings;type:jsonb"`
+	BytesProcessed int64        `gorm:"column:bytes_processed"`
+	DurationMS     int64        `gorm:"column:duration_ms"`
+	ProcessedAt    time.Time    `gorm:"column:processed_at"`
+}
+
+func (DataDiscoveryFileResult) TableName() string { return "data_discovery_file_results" }

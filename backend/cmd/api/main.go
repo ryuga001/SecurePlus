@@ -49,6 +49,7 @@ import (
 	"dpdp-backend/internal/config"
 	appcrypto "dpdp-backend/internal/crypto"
 	discoveryprovider "dpdp-backend/internal/datadiscovery/provider"
+	discoveryscanner "dpdp-backend/internal/datadiscovery/scanner"
 	"dpdp-backend/internal/datadiscovery/strategy"
 	"dpdp-backend/internal/delivery"
 	"dpdp-backend/internal/delivery/handler/rest"
@@ -255,22 +256,48 @@ func main() {
 
 	providerClient := discoveryprovider.NewClient(cfg.DataDiscovery.TestTimeout)
 
-	discoveryConfigurationHandler := discoveryhandler.NewConfigurationHandler(
-		discoverysvc.NewConfigurationService(
-			database,
-			discoveryrepo.NewConfigurationRepository(database),
-			strategy.DefaultConfigurationRegistry(providerClient),
-			secretBox,
-			cfg.DataDiscovery.TestTimeout,
-		),
+	policyRegistry := strategy.DefaultPolicyRegistry()
+
+	discoveryConfigurationService := discoverysvc.NewConfigurationService(
+		database,
+		discoveryrepo.NewConfigurationRepository(database),
+		strategy.DefaultConfigurationRegistry(providerClient),
+		secretBox,
+		cfg.DataDiscovery.TestTimeout,
 	)
+	discoveryConfigurationHandler := discoveryhandler.NewConfigurationHandler(discoveryConfigurationService)
 	discoveryPolicyHandler := discoveryhandler.NewPolicyHandler(
 		discoverysvc.NewPolicyService(
 			database,
 			discoveryrepo.NewPolicyRepository(database),
-			strategy.DefaultPolicyRegistry(),
+			policyRegistry,
 		),
 	)
+
+	discoveryScanService := discoverysvc.NewScanService(
+		database,
+		discoveryrepo.NewScanRepository(database),
+		discoveryrepo.NewPolicyRepository(database),
+		discoveryConfigurationService,
+		policyRegistry,
+	)
+	discoveryScanHandler := discoveryhandler.NewScanHandler(discoveryScanService)
+
+	scanner := discoveryscanner.New(discoveryscanner.Options{
+		Store: discoveryScanService,
+		Connect: discoveryscanner.RegistryConnector(
+			policyRegistry,
+			discoveryprovider.NewStreamingClient(cfg.DataDiscovery.TestTimeout),
+		),
+		Processors: discoveryscanner.DefaultProcessors(
+			discoveryscanner.DefaultLimits(cfg.DataDiscovery.SpoolDir, cfg.DataDiscovery.MaxSpoolBytes),
+		),
+		QueueCapacity:    cfg.DataDiscovery.QueueCapacity,
+		ChunkBytes:       cfg.DataDiscovery.ChunkBytes,
+		EvaluatorWorkers: cfg.DataDiscovery.EvaluatorWorkers,
+		FileTimeout:      cfg.DataDiscovery.FileTimeout,
+		SpoolDir:         cfg.DataDiscovery.SpoolDir,
+	})
 	auditHandler := audithandler.NewDeliveryAuditHandler(recorder)
 	incidentHandler := incidenthandler.NewEmailIncidentHandler(incidents)
 
@@ -317,6 +344,7 @@ func main() {
 	alertHandler.RegisterRoutes(protected, guard)
 	discoveryConfigurationHandler.RegisterRoutes(protected, guard)
 	discoveryPolicyHandler.RegisterRoutes(protected, guard)
+	discoveryScanHandler.RegisterRoutes(protected, guard)
 	brandingHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
 	incidentHandler.RegisterRoutes(protected, guard)
@@ -344,6 +372,10 @@ func main() {
 
 	workers.Start(workerCtx)
 	notificationWorkers.Start(workerCtx)
+
+	if cfg.DataDiscovery.ScannerEnabled {
+		scanner.Start(workerCtx)
+	}
 
 	var servers sync.WaitGroup
 
@@ -394,14 +426,15 @@ func main() {
 	go func() {
 		workers.Wait()
 		notificationWorkers.Wait()
+		scanner.Wait()
 		close(drained)
 	}()
 
 	select {
 	case <-drained:
-		slog.Info("in-flight deliveries finished")
+		slog.Info("in-flight deliveries and scans finished")
 	case <-shutdownCtx.Done():
-		slog.Warn("shutdown deadline reached with deliveries in flight")
+		slog.Warn("shutdown deadline reached with deliveries or scans in flight")
 	}
 }
 

@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	StageToken = "token"
-	StageProbe = "probe"
+	StageToken    = "token"
+	StageProbe    = "probe"
+	StageList     = "list"
+	StageDownload = "download"
 
 	ReasonAuthFailed       = "AUTH_FAILED"
 	ReasonPermissionDenied = "PERMISSION_DENIED"
@@ -22,6 +24,8 @@ const (
 	ReasonUnknown          = "UNKNOWN"
 
 	errorBodyMaxSize = 4096
+
+	defaultTokenLifetime = 30 * time.Minute
 )
 
 type Doer interface {
@@ -41,22 +45,40 @@ func NewClientWith(doer Doer, timeout time.Duration) *Client {
 	return &Client{http: doer, timeout: timeout}
 }
 
+func NewStreamingClient(headerTimeout time.Duration) *Client {
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: headerTimeout,
+		IdleConnTimeout:       90 * time.Second,
+		MaxIdleConnsPerHost:   4,
+	}
+
+	return &Client{http: &http.Client{Transport: transport}, timeout: headerTimeout}
+}
+
 type Error struct {
 	Provider   string
 	Stage      string
 	Reason     string
 	HTTPStatus int
 
-	code      string
-	requestID string
+	code       string
+	requestID  string
+	retryAfter time.Duration
 }
 
 func (e *Error) Error() string {
 	return e.Provider + " " + e.Stage + " failed: " + e.Reason
 }
 
-func (e *Error) Code() string      { return e.code }
-func (e *Error) RequestID() string { return e.requestID }
+func (e *Error) Code() string              { return e.code }
+func (e *Error) RequestID() string         { return e.requestID }
+func (e *Error) RetryAfter() time.Duration { return e.retryAfter }
+
+func (e *Error) Transient() bool {
+	return e.Reason == ReasonRateLimited || e.Reason == ReasonUnavailable
+}
 
 func newError(provider, stage string, status int, transportErr error, safe safeDetail) *Error {
 	return &Error{
@@ -145,34 +167,112 @@ type tokenResponse struct {
 	ExpiresIn   int    `json:"expires_in"`
 }
 
+type Token struct {
+	Value     string
+	ExpiresAt time.Time
+}
+
 func (c *Client) postForm(ctx context.Context, provider, stage, endpoint, body string) (string, error) {
+	token, err := c.postFormToken(ctx, provider, stage, endpoint, body)
+
+	return token.Value, err
+}
+
+func (c *Client) postFormToken(ctx context.Context, provider, stage, endpoint, body string) (Token, error) {
 	request, err := http.NewRequestWithContext(
 		ctx, http.MethodPost, endpoint, strings.NewReader(body))
 	if err != nil {
-		return "", err
+		return Token{}, err
 	}
 
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Accept", "application/json")
 
+	issued := time.Now()
+
 	response, err := c.http.Do(request)
 	if err != nil {
-		return "", newError(provider, stage, 0, err, safeDetail{})
+		return Token{}, newError(provider, stage, 0, err, safeDetail{})
 	}
 	defer response.Body.Close()
 
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, errorBodyMaxSize))
 
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return "", newError(provider, stage, response.StatusCode, nil, parseSafeDetail(raw))
+		return Token{}, newError(provider, stage, response.StatusCode, nil, parseSafeDetail(raw))
 	}
 
 	var token tokenResponse
 	if err := json.Unmarshal(raw, &token); err != nil || token.AccessToken == "" {
-		return "", newError(provider, stage, response.StatusCode, nil, safeDetail{code: "malformed_token_response"})
+		return Token{}, newError(provider, stage, response.StatusCode, nil, safeDetail{code: "malformed_token_response"})
 	}
 
-	return token.AccessToken, nil
+	lifetime := time.Duration(token.ExpiresIn) * time.Second
+	if lifetime <= 0 {
+		lifetime = defaultTokenLifetime
+	}
+
+	return Token{Value: token.AccessToken, ExpiresAt: issued.Add(lifetime)}, nil
+}
+
+func (c *Client) stream(
+	ctx context.Context,
+	provider, stage, endpoint, bearer string,
+	headers map[string]string,
+) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	request.Header.Set("Authorization", "Bearer "+bearer)
+
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
+
+	response, err := c.http.Do(request)
+	if err != nil {
+		return nil, newError(provider, stage, 0, err, safeDetail{})
+	}
+
+	if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
+		return response, nil
+	}
+
+	defer response.Body.Close()
+
+	raw, _ := io.ReadAll(io.LimitReader(response.Body, errorBodyMaxSize))
+
+	failure := newError(provider, stage, response.StatusCode, nil, parseSafeDetail(raw))
+	failure.code = firstNonEmpty(failure.code, response.Header.Get("x-ms-error-code"))
+	failure.requestID = firstNonEmpty(failure.requestID, response.Header.Get("x-ms-request-id"))
+	failure.retryAfter = retryAfter(response.Header.Get("Retry-After"))
+
+	if response.StatusCode == http.StatusServiceUnavailable && failure.code == "ServerBusy" {
+		failure.Reason = ReasonRateLimited
+	}
+
+	return nil, failure
+}
+
+func retryAfter(raw string) time.Duration {
+	seconds, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || seconds <= 0 {
+		return 0
+	}
+
+	return time.Duration(seconds) * time.Second
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+
+	return ""
 }
 
 func (c *Client) get(ctx context.Context, provider, stage, endpoint, bearer string, headers map[string]string) error {

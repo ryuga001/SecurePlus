@@ -26,6 +26,10 @@ const toneVariant: Record<string, "success" | "warning" | "info" | "destructive"
   blocked: "destructive",
   failed: "destructive",
   error: "destructive",
+  running: "info",
+  partial: "warning",
+  completed: "success",
+  succeeded: "success",
 };
 
 export function StatusBadge({ status }: { status: string }) {

@@ -81,6 +81,10 @@ var (
 	ErrInvalidDiscoveryTarget     = errors.New(MsgInvalidDiscoveryTarget)
 	ErrUnknownFileType            = errors.New(MsgUnknownFileType)
 	ErrCredentialUnavailable      = errors.New(MsgCredentialUnavailable)
+	ErrDiscoveryScanNotFound      = errors.New(MsgDiscoveryScanNotFound)
+	ErrDiscoveryScanActive        = errors.New(MsgDiscoveryScanActive)
+	ErrDiscoveryPolicyInactive    = errors.New(MsgDiscoveryPolicyInactive)
+	ErrSourceNotScannable         = errors.New(MsgSourceNotScannable)
 
 	ErrBrandingNotFound = errors.New(MsgBrandingNotFound)
 	ErrInvalidTheme     = errors.New(MsgInvalidTheme)

@@ -51,6 +51,50 @@ const (
 )
 
 const (
+	ScanStatusPending   = "PENDING"
+	ScanStatusRunning   = "RUNNING"
+	ScanStatusPartial   = "PARTIAL"
+	ScanStatusCompleted = "COMPLETED"
+	ScanStatusFailed    = "FAILED"
+
+	TargetStatusPending   = "PENDING"
+	TargetStatusRunning   = "RUNNING"
+	TargetStatusCompleted = "COMPLETED"
+	TargetStatusPartial   = "PARTIAL"
+	TargetStatusFailed    = "FAILED"
+
+	FileStatusSucceeded = "SUCCEEDED"
+	FileStatusFailed    = "FAILED"
+)
+
+const (
+	ScanErrorPolicyNotFound        = "POLICY_NOT_FOUND"
+	ScanErrorPolicyInactive        = "POLICY_INACTIVE"
+	ScanErrorConfigurationInactive = "CONFIGURATION_INACTIVE"
+	ScanErrorCredentialUnavailable = "CREDENTIAL_UNAVAILABLE"
+	ScanErrorSourceUnsupported     = "SOURCE_UNSUPPORTED"
+	ScanErrorSourceAuthFailed      = "SOURCE_AUTH_FAILED"
+	ScanErrorSourceUnavailable     = "SOURCE_UNAVAILABLE"
+	ScanErrorNoRules               = "NO_RULES"
+	ScanErrorRulesTooLarge         = "RULES_TOO_LARGE"
+	ScanErrorDatabaseUnavailable   = "DATABASE_UNAVAILABLE"
+	ScanErrorInterrupted           = "INTERRUPTED"
+	ScanErrorAllTargetsFailed      = "ALL_TARGETS_FAILED"
+	ScanErrorInitializationFailed  = "INITIALIZATION_FAILED"
+
+	TargetErrorListingFailed = "LISTING_FAILED"
+
+	FileErrorFetchFailed      = "FETCH_FAILED"
+	FileErrorParseFailed      = "PARSE_FAILED"
+	FileErrorLimitExceeded    = "LIMIT_EXCEEDED"
+	FileErrorTooLarge         = "FILE_TOO_LARGE"
+	FileErrorTimeout          = "TIMEOUT"
+	FileErrorEvaluationFailed = "EVALUATION_FAILED"
+	FileErrorCancelled        = "CANCELLED"
+	FileErrorPersistFailed    = "PERSIST_FAILED"
+)
+
+const (
 	ScheduleTypeRealTime = "REAL_TIME"
 	ScheduleTypeCustom   = "CUSTOM"
 

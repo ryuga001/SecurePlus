@@ -80,6 +80,10 @@ const (
 	MsgInvalidDiscoveryTarget     = "target list contains an entry that is not valid for this source type"
 	MsgUnknownFileType            = "one or more selected file types are not available"
 	MsgCredentialUnavailable      = "stored credential could not be opened"
+	MsgDiscoveryScanNotFound      = "data discovery scan not found"
+	MsgDiscoveryScanActive        = "a scan is already pending or running for this policy"
+	MsgDiscoveryPolicyInactive    = "the policy must be active to start a scan"
+	MsgSourceNotScannable         = "scanning is not available for this source type yet"
 
 	MsgBrandingNotFound = "branding settings are not available"
 	MsgInvalidTheme     = "choose either LIGHT or DARK"
@@ -142,6 +146,10 @@ const (
 	CodeDiscoveryPolicyNameTaken   = "discovery_policy_name_taken"
 	CodeInvalidDiscoveryTarget     = "invalid_discovery_target"
 	CodeFileTypeNotFound           = "file_type_not_found"
+	CodeDiscoveryScanNotFound      = "discovery_scan_not_found"
+	CodeDiscoveryScanActive        = "discovery_scan_active"
+	CodeDiscoveryPolicyInactive    = "discovery_policy_inactive"
+	CodeSourceNotScannable         = "source_not_scannable"
 
 	CodeInvalidTheme    = "invalid_theme"
 	CodeInvalidLanguage = "invalid_language"

@@ -128,7 +128,7 @@ export const routes = {
                 labelKey: "discoveryScans",
                 routePath: "/admin/data-discovery/scans",
                 icon: ScanSearch,
-                privileges: ["admin.discovery.policy.view"],
+                privileges: ["admin.discovery.scan.view"],
             },
             dd_analysis: {
                 labelKey: "discoveryAnalysis",

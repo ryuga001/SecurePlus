@@ -92,20 +92,7 @@ func (a *Automaton) Find(text string) []dto.AutomatonHit {
 	current := rootNode
 
 	for position := range len(text) {
-		character := text[position]
-
-		for {
-			if following, ok := a.nodes[current].next[character]; ok {
-				current = following
-				break
-			}
-
-			if current == rootNode {
-				break
-			}
-
-			current = a.nodes[current].fail
-		}
+		current = a.step(current, text[position])
 
 		for index, pattern := range a.nodes[current].outputs {
 			length := a.nodes[current].lengths[index]
@@ -119,4 +106,35 @@ func (a *Automaton) Find(text string) []dto.AutomatonHit {
 	}
 
 	return hits
+}
+
+func (a *Automaton) Scan(state int, text []byte, hit func(pattern, end int)) int {
+	current := state
+	if current < rootNode || current >= len(a.nodes) {
+		current = rootNode
+	}
+
+	for position, character := range text {
+		current = a.step(current, character)
+
+		for _, pattern := range a.nodes[current].outputs {
+			hit(pattern, position+1)
+		}
+	}
+
+	return current
+}
+
+func (a *Automaton) step(current int, character byte) int {
+	for {
+		if following, ok := a.nodes[current].next[character]; ok {
+			return following
+		}
+
+		if current == rootNode {
+			return rootNode
+		}
+
+		current = a.nodes[current].fail
+	}
 }

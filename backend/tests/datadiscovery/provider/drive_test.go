@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -24,10 +26,12 @@ type fakeDrive struct {
 	mu        sync.Mutex
 	files     map[string][]object
 	drives    []object
+	users     []object
 	byID      map[string]string
 	downloads map[string]string
 	statuses  map[string][]int
 	queries   []string
+	bearers   map[string]string
 }
 
 func newFakeDrive() *fakeDrive {
@@ -36,7 +40,39 @@ func newFakeDrive() *fakeDrive {
 		byID:      map[string]string{},
 		downloads: map[string]string{},
 		statuses:  map[string][]int{},
+		bearers:   map[string]string{},
 	}
+}
+
+func impersonatedToken(request *http.Request) string {
+	body, _ := io.ReadAll(request.Body)
+	form, _ := url.ParseQuery(string(body))
+	parts := strings.Split(form.Get("assertion"), ".")
+
+	if len(parts) != 3 {
+		return "token-invalid"
+	}
+
+	payload, _ := base64.RawURLEncoding.DecodeString(parts[1])
+
+	var claims struct {
+		Sub   string `json:"sub"`
+		Scope string `json:"scope"`
+	}
+
+	_ = json.Unmarshal(payload, &claims)
+
+	subject := claims.Sub
+	if subject == "" {
+		subject = "service-account"
+	}
+
+	scope := "drive"
+	if strings.Contains(claims.Scope, "admin.directory") {
+		scope = "directory"
+	}
+
+	return "token-" + subject + "-" + scope
 }
 
 func (f *fakeDrive) client() *provider.Client {
@@ -48,11 +84,19 @@ func (f *fakeDrive) do(request *http.Request) (*http.Response, error) {
 	defer f.mu.Unlock()
 
 	if request.URL.Host == "oauth2.googleapis.com" {
-		return respond(http.StatusOK, `{"access_token":"drive-token","expires_in":3600}`, nil), nil
+		return respond(http.StatusOK, `{"access_token":"`+impersonatedToken(request)+`","expires_in":3600}`, nil), nil
 	}
 
 	path := request.URL.Path
 	query := request.URL.Query()
+	f.bearers[path] = strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer ")
+
+	if request.URL.Host == "admin.googleapis.com" {
+		f.queries = append(f.queries, "directory|"+query.Get("query")+"|"+query.Get("customer"))
+		encoded, _ := json.Marshal(object{"users": f.users})
+
+		return respond(http.StatusOK, string(encoded), nil), nil
+	}
 
 	if queued := f.statuses[path]; len(queued) > 0 {
 		f.statuses[path] = queued[1:]
@@ -105,7 +149,13 @@ func privateKeyPEM(t *testing.T) string {
 func connectDrive(t *testing.T, fake *fakeDrive, key string) *provider.DriveSource {
 	t.Helper()
 
-	source, err := provider.NewDriveSource(context.Background(), fake.client(), "sa@project.iam.gserviceaccount.com", "", "", key)
+	return connectDriveAs(t, fake, key, "")
+}
+
+func connectDriveAs(t *testing.T, fake *fakeDrive, key, subject string) *provider.DriveSource {
+	t.Helper()
+
+	source, err := provider.NewDriveSource(context.Background(), fake.client(), "sa@project.iam.gserviceaccount.com", subject, "", key)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -214,5 +264,33 @@ func TestDriveRetriesRateLimit(t *testing.T) {
 
 	if got := names(listAll(t, source, "root")); got != "a.txt" {
 		t.Fatalf("files = %s", got)
+	}
+}
+
+func TestDriveScansUserDriveByImpersonation(t *testing.T) {
+	fake := newFakeDrive()
+	fake.files[folderLookup("root", "Reports")] = []object{{"id": "jane-reports"}}
+	fake.files[children("jane-reports")] = []object{{"id": "f-1", "name": "payslip.pdf", "mimeType": "application/pdf", "size": "9"}}
+	fake.downloads["/drive/v3/files/f-1"] = "pdf bytes"
+
+	source := connectDriveAs(t, fake, privateKeyPEM(t), "admin@corp.com")
+	files := listAll(t, source, "Jane@Corp.com//Reports")
+
+	if len(files) != 1 || files[0].Key != "jane@corp.com/f-1" || files[0].Name != "payslip.pdf" {
+		t.Fatalf("files = %+v", files)
+	}
+
+	if got := fake.bearers["/drive/v3/files"]; got != "token-jane@corp.com-drive" {
+		t.Fatalf("listing ran as %q, want the impersonated user", got)
+	}
+
+	body, err := source.Open(context.Background(), files[0])
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	body.Close()
+
+	if got := fake.bearers["/drive/v3/files/f-1"]; got != "token-jane@corp.com-drive" {
+		t.Fatalf("download ran as %q, want the file owner", got)
 	}
 }

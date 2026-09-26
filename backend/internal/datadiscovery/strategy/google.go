@@ -110,3 +110,30 @@ func (s GoogleStrategy) Refresh(current db.StringMap, in Input) (db.StringMap, e
 
 	return merged, nil
 }
+
+func (s GoogleStrategy) BrowseTargets(
+	ctx context.Context,
+	sourceType string,
+	config db.StringMap,
+	credential []byte,
+	query provider.TargetQuery,
+) (provider.TargetPage, error) {
+	if sourceType != db.SourceTypeGoogleDrive {
+		return provider.TargetPage{}, utils.ErrIncompatibleSource
+	}
+
+	var secret googleCredential
+	if err := json.Unmarshal(credential, &secret); err != nil || secret.PrivateKey == "" {
+		return provider.TargetPage{}, utils.ErrCredentialUnavailable
+	}
+
+	source, err := provider.NewDriveSource(
+		ctx, s.client, config["clientEmail"], config["subject"], config["tokenUri"], secret.PrivateKey)
+	if err != nil {
+		return provider.TargetPage{}, err
+	}
+
+	delegated := config["accessMode"] == db.GoogleAccessModeDelegation && config["subject"] != ""
+
+	return source.Targets(ctx, query, delegated)
+}

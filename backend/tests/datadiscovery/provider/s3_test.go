@@ -24,11 +24,12 @@ type fakeS3 struct {
 	headRegion string
 	pages      map[string]string
 	objects    map[string]string
+	buckets    map[string]string
 	hosts      []string
 }
 
 func newFakeS3() *fakeS3 {
-	return &fakeS3{headStatus: http.StatusOK, pages: map[string]string{}, objects: map[string]string{}}
+	return &fakeS3{headStatus: http.StatusOK, pages: map[string]string{}, objects: map[string]string{}, buckets: map[string]string{}}
 }
 
 func (f *fakeS3) client() *provider.Client {
@@ -53,6 +54,13 @@ func (f *fakeS3) do(request *http.Request) (*http.Response, error) {
 		}
 
 		return xmlResponse(f.headStatus, "", header), nil
+	case request.URL.Query().Has("max-buckets"):
+		key := request.URL.Query().Get("prefix") + "|" + request.URL.Query().Get("continuation-token")
+		if body, ok := f.buckets[key]; ok {
+			return xmlResponse(http.StatusOK, body, nil), nil
+		}
+
+		return xmlResponse(http.StatusForbidden, `<Error><Code>AccessDenied</Code><Message>denied</Message></Error>`, nil), nil
 	case request.URL.Query().Get("list-type") == "2":
 		key := request.URL.Query().Get("prefix") + "|" + request.URL.Query().Get("continuation-token")
 		if page, ok := f.pages[key]; ok {

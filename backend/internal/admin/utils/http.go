@@ -181,6 +181,10 @@ func statusFor(err error) (int, string) {
 		return http.StatusConflict, CodeDiscoveryPolicyInactive
 	case errors.Is(err, ErrSourceNotScannable):
 		return http.StatusBadRequest, CodeSourceNotScannable
+	case errors.Is(err, ErrInvalidCursor):
+		return http.StatusBadRequest, CodeInvalidCursor
+	case errors.Is(err, ErrTargetBrowseFailed):
+		return http.StatusBadRequest, CodeTargetBrowseFailed
 
 	case errors.Is(err, ErrProviderUnavailable):
 		return http.StatusBadGateway, CodeProviderUnavailable

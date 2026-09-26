@@ -20,6 +20,7 @@ type fakeGraph struct {
 	responses map[string]string
 	statuses  map[string][]int
 	requests  []string
+	queries   []string
 }
 
 func newFakeGraph() *fakeGraph {
@@ -44,6 +45,7 @@ func (f *fakeGraph) do(request *http.Request) (*http.Response, error) {
 	}
 
 	f.requests = append(f.requests, key)
+	f.queries = append(f.queries, request.URL.Query().Encode())
 
 	if queued := f.statuses[key]; len(queued) > 0 {
 		f.statuses[key] = queued[1:]

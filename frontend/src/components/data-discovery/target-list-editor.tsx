@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { emptyTargetValues, targetFields, type SourceType } from "@/lib/data-discovery";
 import { cn } from "@/lib/utils";
 
-export type TargetRow = { key: string; values: Record<string, string> };
+export type TargetRow = { key: string; values: Record<string, string>; label?: string };
+
+export const TARGET_LIMIT = 25;
 
 export function newTargetRow(sourceType: SourceType): TargetRow {
   return { key: crypto.randomUUID(), values: emptyTargetValues(sourceType) };
@@ -21,7 +23,7 @@ export function TargetListEditor({
   onChange,
   errors,
   disabled,
-  max = 25,
+  max = TARGET_LIMIT,
   min = 1,
 }: {
   sourceType: SourceType;

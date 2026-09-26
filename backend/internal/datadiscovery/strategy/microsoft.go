@@ -170,3 +170,66 @@ func (s AzureStorageStrategy) Refresh(current db.StringMap, in Input) (db.String
 
 	return merged, nil
 }
+
+func (s EntraStrategy) BrowseTargets(
+	ctx context.Context,
+	sourceType string,
+	config db.StringMap,
+	credential []byte,
+	query provider.TargetQuery,
+) (provider.TargetPage, error) {
+	mode := ""
+
+	switch sourceType {
+	case db.SourceTypeSharePoint:
+		mode = provider.GraphSharePoint
+	case db.SourceTypeOneDrive:
+		mode = provider.GraphOneDrive
+	default:
+		return provider.TargetPage{}, utils.ErrIncompatibleSource
+	}
+
+	var secret entraCredential
+	if err := json.Unmarshal(credential, &secret); err != nil || secret.ClientSecret == "" {
+		return provider.TargetPage{}, utils.ErrCredentialUnavailable
+	}
+
+	source, err := provider.NewGraphSource(ctx, s.client, config["tenantId"], config["clientId"], secret.ClientSecret, mode)
+	if err != nil {
+		return provider.TargetPage{}, err
+	}
+
+	switch {
+	case mode == provider.GraphOneDrive:
+		return source.Users(ctx, query)
+	case query.Parent != "":
+		return source.Libraries(ctx, query)
+	}
+
+	return source.Sites(ctx, query)
+}
+
+func (s AzureStorageStrategy) BrowseTargets(
+	ctx context.Context,
+	sourceType string,
+	config db.StringMap,
+	credential []byte,
+	query provider.TargetQuery,
+) (provider.TargetPage, error) {
+	if sourceType != db.SourceTypeAzureBlob {
+		return provider.TargetPage{}, utils.ErrIncompatibleSource
+	}
+
+	var secret entraCredential
+	if err := json.Unmarshal(credential, &secret); err != nil || secret.ClientSecret == "" {
+		return provider.TargetPage{}, utils.ErrCredentialUnavailable
+	}
+
+	source, err := provider.NewBlobSource(
+		ctx, s.client, config["storageAccount"], config["tenantId"], config["clientId"], secret.ClientSecret)
+	if err != nil {
+		return provider.TargetPage{}, err
+	}
+
+	return source.Containers(ctx, query)
+}

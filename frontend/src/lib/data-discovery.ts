@@ -267,7 +267,7 @@ export const SOURCE_TYPE_META = {
     icon: Cloud,
     configurationTypes: ["GOOGLE_SERVICE_ACCOUNT"],
     targetFields: [
-      { key: "sharedDrive", labelKey: "sharedDrive", kind: "text", required: true, placeholder: "Finance" },
+      { key: "sharedDrive", labelKey: "sharedDrive", kind: "text", required: true, placeholder: "Finance or user@example.com" },
       { key: "folder", labelKey: "folder", kind: "text", required: false, mono: true, placeholder: "/Reports" },
     ],
   },

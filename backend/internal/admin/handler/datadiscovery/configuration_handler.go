@@ -49,6 +49,7 @@ func (h *ConfigurationHandler) RegisterRoutes(
 	group.POST("", guard(PrivilegeConfigurationCreate), h.create)
 	group.PUT("/:id", guard(PrivilegeConfigurationEdit), h.update)
 	group.DELETE("/:id", guard(PrivilegeConfigurationDelete), h.remove)
+	group.GET("/:id/targets", guard(PrivilegePolicyView), h.targets)
 
 	protected.GET("/admin/data-discovery/source-capabilities",
 		guard(PrivilegeConfigurationView), h.capabilities)
@@ -287,4 +288,42 @@ func text(value *string) string {
 	}
 
 	return *value
+}
+
+func (h *ConfigurationHandler) targets(c *gin.Context) {
+	actor, id, ok := utils.ActorAndID(c)
+	if !ok {
+		return
+	}
+
+	var query dto.TargetBrowseQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		utils.BadRequest(c)
+		return
+	}
+
+	listing, err := h.svc.Targets(c.Request.Context(), actor.CustomerID, id, service.TargetInput{
+		SourceType: query.SourceType,
+		Search:     query.Search,
+		Parent:     query.Parent,
+		Cursor:     query.Cursor,
+		Limit:      query.Limit,
+	})
+	if err != nil {
+		utils.Respond(c, err)
+		return
+	}
+
+	items := make([]dto.TargetOptionItem, 0, len(listing.Items))
+	for _, item := range listing.Items {
+		items = append(items, dto.TargetOptionItem{
+			Value:       item.Value,
+			Label:       item.Label,
+			Description: item.Description,
+			Kind:        item.Kind,
+			Expandable:  item.Expandable,
+		})
+	}
+
+	c.JSON(http.StatusOK, dto.TargetBrowseResponse{Items: items, NextCursor: listing.NextCursor})
 }

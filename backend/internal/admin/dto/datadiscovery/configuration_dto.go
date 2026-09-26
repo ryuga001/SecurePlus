@@ -69,3 +69,24 @@ type SourceCapabilityResponse struct {
 	SourceType        string `json:"source_type"`
 	Label             string `json:"label"`
 }
+
+type TargetBrowseQuery struct {
+	SourceType string `form:"source_type" binding:"required,oneof=SHARE_POINT ONE_DRIVE AZURE_BLOB GOOGLE_DRIVE AWS_S3"`
+	Search     string `form:"search" binding:"max=100"`
+	Parent     string `form:"parent" binding:"max=1024"`
+	Cursor     string `form:"cursor" binding:"max=8192"`
+	Limit      int    `form:"limit" binding:"omitempty,min=1,max=100"`
+}
+
+type TargetOptionItem struct {
+	Value       string `json:"value"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Kind        string `json:"kind"`
+	Expandable  bool   `json:"expandable"`
+}
+
+type TargetBrowseResponse struct {
+	Items      []TargetOptionItem `json:"items"`
+	NextCursor string             `json:"next_cursor"`
+}

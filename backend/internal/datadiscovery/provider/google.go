@@ -44,6 +44,13 @@ func (c *Client) GoogleAccessToken(
 	ctx context.Context,
 	clientEmail, subject, tokenURI, privateKeyPEM string,
 ) (Token, error) {
+	return c.GoogleScopedToken(ctx, clientEmail, subject, tokenURI, privateKeyPEM, GoogleDriveScope)
+}
+
+func (c *Client) GoogleScopedToken(
+	ctx context.Context,
+	clientEmail, subject, tokenURI, privateKeyPEM, scope string,
+) (Token, error) {
 	endpoint, err := TrustedTokenURI(tokenURI)
 	if err != nil {
 		return Token{}, err
@@ -58,7 +65,7 @@ func (c *Client) GoogleAccessToken(
 
 	claims := jwt.MapClaims{
 		"iss":   clientEmail,
-		"scope": GoogleDriveScope,
+		"scope": scope,
 		"aud":   endpoint,
 		"iat":   now.Unix(),
 		"exp":   now.Add(GoogleAssertionTTL).Unix(),

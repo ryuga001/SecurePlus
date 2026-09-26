@@ -26,6 +26,13 @@ type ConfigurationStrategy interface {
 	Normalize(in Input) (db.StringMap, []byte, error)
 	Refresh(current db.StringMap, in Input) (db.StringMap, error)
 	Test(ctx context.Context, config db.StringMap, credential []byte) error
+	BrowseTargets(
+		ctx context.Context,
+		sourceType string,
+		config db.StringMap,
+		credential []byte,
+		query provider.TargetQuery,
+	) (provider.TargetPage, error)
 	ConnectionKeys() []string
 	SecretKeys() []string
 }

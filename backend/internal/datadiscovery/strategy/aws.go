@@ -70,3 +70,27 @@ func (s AWSStrategy) Refresh(current db.StringMap, in Input) (db.StringMap, erro
 
 	return merged, nil
 }
+
+func (s AWSStrategy) BrowseTargets(
+	ctx context.Context,
+	sourceType string,
+	config db.StringMap,
+	credential []byte,
+	query provider.TargetQuery,
+) (provider.TargetPage, error) {
+	if sourceType != db.SourceTypeAWSS3 {
+		return provider.TargetPage{}, utils.ErrIncompatibleSource
+	}
+
+	var secret awsCredential
+	if err := json.Unmarshal(credential, &secret); err != nil || secret.SecretAccessKey == "" {
+		return provider.TargetPage{}, utils.ErrCredentialUnavailable
+	}
+
+	source, err := provider.NewS3Source(ctx, s.client, config["accessKeyId"], secret.SecretAccessKey, config["region"])
+	if err != nil {
+		return provider.TargetPage{}, err
+	}
+
+	return source.Buckets(ctx, query)
+}

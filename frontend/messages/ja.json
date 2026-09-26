@@ -487,7 +487,7 @@
       "documentLibrary": "Document library",
       "folder": "Folder",
       "drive": "Drive or user",
-      "sharedDrive": "Shared drive",
+      "sharedDrive": "共有ドライブまたはユーザー",
       "container": "Container"
     },
     "fieldHints": {
@@ -680,7 +680,32 @@
         "updated": "Policy updated",
         "saveFailed": "Could not save this policy",
         "create": "Create policy",
-        "saveChanges": "Save changes"
+        "saveChanges": "Save changes",
+        "browser": {
+          "label": "利用可能なターゲット",
+          "hint": "この構成で参照できるターゲットを選択します。フォルダーやプレフィックスは下の一覧で調整できます。",
+          "selectConfiguration": "ターゲットを参照するには構成を選択してください。",
+          "searchPlaceholder": "名前で検索",
+          "searchLibraries": "ライブラリを検索",
+          "all": "すべて",
+          "selected": "選択済み ({count})",
+          "selectedOf": "件選択 · 最大 {max}",
+          "loadingMore": "さらに読み込み中…",
+          "scrollForMore": "スクロールしてさらに表示",
+          "end": "一覧の終わり",
+          "empty": "見つかりません",
+          "emptySelected": "選択されたターゲットはまだありません",
+          "loadFailed": "この構成のターゲットを一覧表示できませんでした。",
+          "allSites": "すべてのサイト",
+          "browseLibraries": "{name} のライブラリを参照",
+          "selectTarget": "{name} を選択",
+          "removeTarget": "{name} を削除",
+          "limitReached": "ターゲットは最大 {max} 件まで追加できます。",
+          "kinds": {
+            "shared_drive": "共有ドライブ",
+            "user_drive": "ユーザーのドライブ"
+          }
+        }
       }
     },
     "scans": {

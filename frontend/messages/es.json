@@ -487,7 +487,7 @@
       "documentLibrary": "Document library",
       "folder": "Folder",
       "drive": "Drive or user",
-      "sharedDrive": "Shared drive",
+      "sharedDrive": "Unidad compartida o usuario",
       "container": "Container"
     },
     "fieldHints": {
@@ -680,7 +680,32 @@
         "updated": "Policy updated",
         "saveFailed": "Could not save this policy",
         "create": "Create policy",
-        "saveChanges": "Save changes"
+        "saveChanges": "Save changes",
+        "browser": {
+          "label": "Destinos disponibles",
+          "hint": "Elija los destinos que esta configuración puede ver. Ajuste carpetas o prefijos en la lista inferior.",
+          "selectConfiguration": "Seleccione una configuración para explorar sus destinos.",
+          "searchPlaceholder": "Buscar por nombre",
+          "searchLibraries": "Buscar bibliotecas",
+          "all": "Todos",
+          "selected": "Seleccionados ({count})",
+          "selectedOf": "seleccionados · hasta {max}",
+          "loadingMore": "Cargando más…",
+          "scrollForMore": "Desplácese para ver más",
+          "end": "Fin de la lista",
+          "empty": "No se encontró nada",
+          "emptySelected": "Aún no hay destinos seleccionados",
+          "loadFailed": "No se pudieron listar los destinos de esta configuración.",
+          "allSites": "Todos los sitios",
+          "browseLibraries": "Explorar bibliotecas de {name}",
+          "selectTarget": "Seleccionar {name}",
+          "removeTarget": "Quitar {name}",
+          "limitReached": "Puede agregar hasta {max} destinos.",
+          "kinds": {
+            "shared_drive": "Unidad compartida",
+            "user_drive": "Unidad de usuario"
+          }
+        }
       }
     },
     "scans": {

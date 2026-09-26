@@ -54,6 +54,28 @@ export type SourceCapability = {
   label: string;
 };
 
+export type TargetOption = {
+  value: string;
+  label: string;
+  description: string;
+  kind: string;
+  expandable: boolean;
+};
+
+export type TargetPage = {
+  items: TargetOption[];
+  next_cursor: string;
+};
+
+export type BrowseTargetsArgs = {
+  configurationId: number;
+  sourceType: SourceType;
+  search: string;
+  parent: string;
+};
+
+export const TARGET_PAGE_SIZE = 50;
+
 const BASE_URL = "/admin/data-discovery/configurations";
 
 export const dataDiscoveryConfigurationsApi = baseApi.injectEndpoints({
@@ -111,6 +133,23 @@ export const dataDiscoveryConfigurationsApi = baseApi.injectEndpoints({
     listSourceCapabilities: builder.query<PaginatedResponse<SourceCapability>, void>({
       query: () => "/admin/data-discovery/source-capabilities",
     }),
+
+    browseDiscoveryTargets: builder.infiniteQuery<TargetPage, BrowseTargetsArgs, string>({
+      infiniteQueryOptions: {
+        initialPageParam: "",
+        getNextPageParam: (lastPage) => lastPage.next_cursor || undefined,
+      },
+      query: ({ queryArg, pageParam }) => ({
+        url: `${BASE_URL}/${queryArg.configurationId}/targets`,
+        params: {
+          source_type: queryArg.sourceType,
+          limit: TARGET_PAGE_SIZE,
+          ...(queryArg.search ? { search: queryArg.search } : {}),
+          ...(queryArg.parent ? { parent: queryArg.parent } : {}),
+          ...(pageParam ? { cursor: pageParam } : {}),
+        },
+      }),
+    }),
   }),
 });
 
@@ -122,4 +161,5 @@ export const {
   useDeleteDiscoveryConfigurationMutation,
   useTestDiscoveryConfigurationMutation,
   useListSourceCapabilitiesQuery,
+  useBrowseDiscoveryTargetsInfiniteQuery,
 } = dataDiscoveryConfigurationsApi;

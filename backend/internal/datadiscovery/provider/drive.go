@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/mail"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,7 +18,7 @@ const (
 	driveFileFields   = "nextPageToken,files(id,name,mimeType,size,modifiedTime)"
 )
 
-var ErrInvalidDriveTarget = errors.New("target does not identify a Google shared drive")
+var ErrInvalidDriveTarget = errors.New("target does not identify a Google shared drive or user")
 
 type driveExport struct {
 	mime      string
@@ -41,12 +43,22 @@ var driveExports = map[string]driveExport{
 var driveQueryEscaper = strings.NewReplacer(`\`, `\\`, `'`, `\'`)
 
 type DriveSource struct {
-	auth *authorized
+	client      *Client
+	clientEmail string
+	subject     string
+	tokenURI    string
+	privateKey  string
+	auth        *authorized
+
+	mu        sync.Mutex
+	users     map[string]*authorized
+	directory *authorized
 }
 
 type driveScope struct {
 	driveID string
 	root    string
+	subject string
 }
 
 type driveFile struct {
@@ -67,16 +79,57 @@ func NewDriveSource(
 	client *Client,
 	clientEmail, subject, tokenURI, privateKey string,
 ) (*DriveSource, error) {
-	auth := newAuthorized(client, ProviderGoogle, map[string]string{"Accept": "application/json"},
-		func(ctx context.Context) (Token, error) {
-			return client.GoogleAccessToken(ctx, clientEmail, subject, tokenURI, privateKey)
-		})
+	source := &DriveSource{
+		client:      client,
+		clientEmail: clientEmail,
+		subject:     subject,
+		tokenURI:    tokenURI,
+		privateKey:  privateKey,
+		users:       map[string]*authorized{},
+	}
 
-	if _, err := auth.bearer(ctx); err != nil {
+	source.auth = source.impersonate(subject, GoogleDriveScope)
+
+	if _, err := source.auth.bearer(ctx); err != nil {
 		return nil, err
 	}
 
-	return &DriveSource{auth: auth}, nil
+	return source, nil
+}
+
+func (s *DriveSource) impersonate(subject, scope string) *authorized {
+	return newAuthorized(s.client, ProviderGoogle, map[string]string{"Accept": "application/json"},
+		func(ctx context.Context) (Token, error) {
+			return s.client.GoogleScopedToken(ctx, s.clientEmail, subject, s.tokenURI, s.privateKey, scope)
+		})
+}
+
+func (s *DriveSource) authFor(subject string) *authorized {
+	if subject == "" || strings.EqualFold(subject, s.subject) {
+		return s.auth
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	auth, ok := s.users[subject]
+	if !ok {
+		auth = s.impersonate(subject, GoogleDriveScope)
+		s.users[subject] = auth
+	}
+
+	return auth
+}
+
+func (s *DriveSource) directoryAuth() *authorized {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.directory == nil {
+		s.directory = s.impersonate(s.subject, GoogleDirectoryScope)
+	}
+
+	return s.directory
 }
 
 func (s *DriveSource) List(ctx context.Context, target string, emit func(File) error) error {
@@ -99,11 +152,12 @@ func (s *DriveSource) List(ctx context.Context, target string, emit func(File) e
 }
 
 func (s *DriveSource) Open(ctx context.Context, file File) (io.ReadCloser, error) {
-	if file.Key == "" {
+	subject, fileID := splitDriveKey(file.Key)
+	if fileID == "" {
 		return nil, ErrInvalidDriveTarget
 	}
 
-	endpoint := GoogleDriveBaseURL + "/files/" + url.PathEscape(file.Key)
+	endpoint := GoogleDriveBaseURL + "/files/" + url.PathEscape(fileID)
 
 	if export, ok := driveExports[file.MIMEType]; ok {
 		endpoint += "/export?mimeType=" + url.QueryEscape(export.mime)
@@ -111,7 +165,7 @@ func (s *DriveSource) Open(ctx context.Context, file File) (io.ReadCloser, error
 		endpoint += "?alt=media&supportsAllDrives=true"
 	}
 
-	response, err := s.auth.get(ctx, StageDownload, endpoint)
+	response, err := s.authFor(subject).get(ctx, StageDownload, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +184,7 @@ func (s *DriveSource) children(scope driveScope) pageFetcher {
 		}
 
 		var list driveFileList
-		if err := s.auth.getJSON(ctx, StageList, GoogleDriveBaseURL+"/files?"+query.Encode(), &list); err != nil {
+		if err := s.authFor(scope.subject).getJSON(ctx, StageList, GoogleDriveBaseURL+"/files?"+query.Encode(), &list); err != nil {
 			return folderPage{}, err
 		}
 
@@ -155,7 +209,7 @@ func (s *DriveSource) children(scope driveScope) pageFetcher {
 			}
 
 			page.files = append(page.files, File{
-				Key:        item.ID,
+				Key:        driveKey(scope.subject, item.ID),
 				Name:       path,
 				MIMEType:   item.MIMEType,
 				Size:       item.Size,
@@ -171,6 +225,10 @@ func (s *DriveSource) resolveDrive(ctx context.Context, name string) (driveScope
 	switch strings.ToLower(name) {
 	case "my drive", "mydrive", "root":
 		return driveScope{root: "root"}, nil
+	}
+
+	if isEmailTarget(name) {
+		return driveScope{root: "root", subject: strings.ToLower(name)}, nil
 	}
 
 	query := url.Values{}
@@ -222,7 +280,7 @@ func (s *DriveSource) resolveFolder(ctx context.Context, scope driveScope, segme
 		query.Set("pageSize", "2")
 
 		var list driveFileList
-		if err := s.auth.getJSON(ctx, StageList, GoogleDriveBaseURL+"/files?"+query.Encode(), &list); err != nil {
+		if err := s.authFor(scope.subject).getJSON(ctx, StageList, GoogleDriveBaseURL+"/files?"+query.Encode(), &list); err != nil {
 			return "", err
 		}
 
@@ -248,4 +306,31 @@ func (s *DriveSource) query(scope driveScope, q string) url.Values {
 	}
 
 	return query
+}
+
+func driveKey(subject, fileID string) string {
+	if subject == "" {
+		return fileID
+	}
+
+	return subject + "/" + fileID
+}
+
+func splitDriveKey(key string) (string, string) {
+	subject, fileID, ok := strings.Cut(key, "/")
+	if !ok {
+		return "", key
+	}
+
+	return subject, fileID
+}
+
+func isEmailTarget(value string) bool {
+	if strings.ContainsAny(value, " /") || !strings.Contains(value, "@") {
+		return false
+	}
+
+	address, err := mail.ParseAddress(value)
+
+	return err == nil && strings.EqualFold(address.Address, value)
 }

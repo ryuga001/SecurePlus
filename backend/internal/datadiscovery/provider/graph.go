@@ -168,6 +168,22 @@ func (s *GraphSource) resolveSharePoint(ctx context.Context, raw string) (string
 		return "", "", err
 	}
 
+	siteID, err := s.resolveSite(ctx, target)
+	if err != nil {
+		return "", "", err
+	}
+
+	driveID, folder, err := s.siteDrive(ctx, siteID, target.library, target.folder)
+	if err != nil {
+		return "", "", err
+	}
+
+	rootID, err := s.resolveFolder(ctx, driveID, folder)
+
+	return driveID, rootID, err
+}
+
+func (s *GraphSource) resolveSite(ctx context.Context, target sharePointTarget) (string, error) {
 	if target.host == "" {
 		var root struct {
 			SiteCollection struct {
@@ -176,7 +192,7 @@ func (s *GraphSource) resolveSharePoint(ctx context.Context, raw string) (string
 		}
 
 		if err := s.auth.getJSON(ctx, StageList, GraphBaseURL+"/sites/root?$select=siteCollection", &root); err != nil {
-			return "", "", err
+			return "", err
 		}
 
 		target.host = root.SiteCollection.Hostname
@@ -189,17 +205,10 @@ func (s *GraphSource) resolveSharePoint(ctx context.Context, raw string) (string
 
 	var site graphItem
 	if err := s.auth.getJSON(ctx, StageList, endpoint+"?$select=id", &site); err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	driveID, folder, err := s.siteDrive(ctx, site.ID, target.library, target.folder)
-	if err != nil {
-		return "", "", err
-	}
-
-	rootID, err := s.resolveFolder(ctx, driveID, folder)
-
-	return driveID, rootID, err
+	return site.ID, nil
 }
 
 func (s *GraphSource) siteDrive(ctx context.Context, siteID, library, folder string) (string, string, error) {

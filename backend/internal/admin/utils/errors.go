@@ -85,6 +85,8 @@ var (
 	ErrDiscoveryScanActive        = errors.New(MsgDiscoveryScanActive)
 	ErrDiscoveryPolicyInactive    = errors.New(MsgDiscoveryPolicyInactive)
 	ErrSourceNotScannable         = errors.New(MsgSourceNotScannable)
+	ErrInvalidCursor              = errors.New(MsgInvalidCursor)
+	ErrTargetBrowseFailed         = errors.New(MsgTargetBrowseFailed)
 
 	ErrBrandingNotFound = errors.New(MsgBrandingNotFound)
 	ErrInvalidTheme     = errors.New(MsgInvalidTheme)
@@ -99,6 +101,10 @@ func Taken(sentinel error, value string) error {
 
 func ConnectionFailed(reason string) error {
 	return fmt.Errorf("%w (%s)", ErrConnectionFailed, reason)
+}
+
+func TargetBrowseFailed(reason string) error {
+	return fmt.Errorf("%w (%s)", ErrTargetBrowseFailed, reason)
 }
 
 func InvalidRegex(cause error) error {

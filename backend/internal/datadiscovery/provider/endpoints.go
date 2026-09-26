@@ -17,5 +17,8 @@ const (
 	GoogleDriveBaseURL = "https://www.googleapis.com/drive/v3"
 	GoogleDriveAbout   = "/about?fields=user(emailAddress)"
 	GoogleGrantType    = "urn:ietf:params:oauth:grant-type:jwt-bearer"
-	GoogleAssertionTTL = time.Hour
+
+	GoogleDirectoryScope    = "https://www.googleapis.com/auth/admin.directory.user.readonly"
+	GoogleDirectoryUsersURL = "https://admin.googleapis.com/admin/directory/v1/users"
+	GoogleAssertionTTL      = time.Hour
 )

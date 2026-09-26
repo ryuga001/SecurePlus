@@ -22,6 +22,7 @@ import {
   type PolicyTab,
 } from "@/components/data-discovery/policy-tabs";
 import { RulePicker, type SelectedRule } from "@/components/data-discovery/rule-picker";
+import { TargetBrowser } from "@/components/data-discovery/target-browser";
 import {
   TargetListEditor,
   newTargetRow,
@@ -407,6 +408,27 @@ function PolicyForm({
                 onChange={(next) => {
                   setConfiguration(next);
                   setFieldErrors(({ configuration_id: _removed, ...rest }) => rest);
+                  setError("");
+                }}
+              />
+            </Field>
+
+            <Field
+              id="policy-target-browser"
+              label={t("policies.dialog.browser.label")}
+              hint={t("policies.dialog.browser.hint")}
+            >
+              <TargetBrowser
+                key={`${sourceType}-${configuration?.id ?? "none"}`}
+                id="policy-target-browser"
+                configurationId={configuration?.id ?? null}
+                sourceType={sourceType}
+                value={targets}
+                disabled={pending}
+                onChange={(next) => {
+                  setTargets(next);
+                  setTargetErrors({});
+                  setFieldErrors(({ targets: _removed, ...rest }) => rest);
                   setError("");
                 }}
               />

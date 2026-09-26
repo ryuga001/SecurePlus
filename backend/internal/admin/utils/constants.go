@@ -84,6 +84,8 @@ const (
 	MsgDiscoveryScanActive        = "a scan is already pending or running for this policy"
 	MsgDiscoveryPolicyInactive    = "the policy must be active to start a scan"
 	MsgSourceNotScannable         = "scanning is not available for this source type yet"
+	MsgInvalidCursor              = "the page cursor is invalid or has expired, reload the list"
+	MsgTargetBrowseFailed         = "the targets could not be listed with this configuration"
 
 	MsgBrandingNotFound = "branding settings are not available"
 	MsgInvalidTheme     = "choose either LIGHT or DARK"
@@ -150,6 +152,8 @@ const (
 	CodeDiscoveryScanActive        = "discovery_scan_active"
 	CodeDiscoveryPolicyInactive    = "discovery_policy_inactive"
 	CodeSourceNotScannable         = "source_not_scannable"
+	CodeInvalidCursor              = "invalid_cursor"
+	CodeTargetBrowseFailed         = "target_browse_failed"
 
 	CodeInvalidTheme    = "invalid_theme"
 	CodeInvalidLanguage = "invalid_language"

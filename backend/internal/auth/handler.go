@@ -312,7 +312,10 @@ func (h *Handler) refresh(c *gin.Context) {
 
 	snapshot, pair, err := h.svc.Refresh(c.Request.Context(), raw)
 	if err != nil {
-		h.clearCookies(c)
+		if errors.Is(err, ErrInvalidToken) || errors.Is(err, ErrTokenReplayed) {
+			h.clearCookies(c)
+		}
+
 		respond(c, err)
 		return
 	}

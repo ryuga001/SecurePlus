@@ -74,7 +74,11 @@ func (s *Service) TenantSecret(ctx context.Context, customerID int) (string, err
 
 	err := s.db.WithContext(ctx).Select("jwt_secret").First(&customer, customerID).Error
 	if err != nil {
-		return "", ErrInvalidToken
+		if db.IsNotFound(err) {
+			return "", ErrInvalidToken
+		}
+
+		return "", ErrUnavailable
 	}
 
 	return customer.JWTSecret, nil
@@ -540,7 +544,7 @@ func (s *Service) ResetPassword(ctx context.Context, email, code, password strin
 func (s *Service) Refresh(ctx context.Context, raw string) (IdentitySnapshot, TokenPair, error) {
 	claims, err := Verify(ctx, raw, s.cfg.Issuer, TypeRefresh, s.TenantSecret)
 	if err != nil {
-		return IdentitySnapshot{}, TokenPair{}, ErrInvalidToken
+		return IdentitySnapshot{}, TokenPair{}, err
 	}
 
 	userID := UserID(claims)
@@ -555,7 +559,11 @@ func (s *Service) Refresh(ctx context.Context, raw string) (IdentitySnapshot, To
 
 	user, err := s.userByID(ctx, userID)
 	if err != nil {
-		return IdentitySnapshot{}, TokenPair{}, ErrInvalidToken
+		if db.IsNotFound(err) {
+			return IdentitySnapshot{}, TokenPair{}, ErrInvalidToken
+		}
+
+		return IdentitySnapshot{}, TokenPair{}, ErrUnavailable
 	}
 
 	pair, err := s.issue(ctx, user)

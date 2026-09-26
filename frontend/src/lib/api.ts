@@ -42,7 +42,10 @@ export class ApiError extends Error {
 }
 
 let csrfToken: string | null = null;
-let refreshInflight: Promise<boolean> | null = null;
+let refreshInflight: Promise<RefreshOutcome> | null = null;
+let csrfInflight: Promise<boolean> | null = null;
+
+const sessionExpiredListeners = new Set<() => void>();
 
 const NO_REFRESH = new Set([
   "/auth/login",
@@ -56,6 +59,8 @@ const NO_REFRESH = new Set([
   "/auth/password/reset",
 ]);
 
+type RefreshOutcome = "refreshed" | "expired" | "unavailable";
+
 export function setCsrfToken(token: string | null) {
   csrfToken = token;
 }
@@ -66,36 +71,111 @@ export function getCsrfToken() {
 
 export const API_BASE_URL = BASE;
 
-async function ensureCsrfToken() {
-  if (csrfToken) return;
+export function onSessionExpired(listener: () => void) {
+  sessionExpiredListeners.add(listener);
 
-  const res = await fetch(`${BASE}/auth/csrf`, { credentials: "include" });
-  if (!res.ok) return;
-
-  const data = (await res.json()) as { token: string };
-  csrfToken = data.token;
+  return () => {
+    sessionExpiredListeners.delete(listener);
+  };
 }
 
-function refreshOnce(): Promise<boolean> {
-  refreshInflight ??= fetch(`${BASE}/auth/refresh`, {
+function notifySessionExpired() {
+  csrfToken = null;
+  sessionExpiredListeners.forEach((listener) => listener());
+}
+
+async function mintCsrfToken() {
+  try {
+    const res = await fetch(`${BASE}/auth/csrf`, { credentials: "include" });
+    if (!res.ok) return false;
+
+    const data = (await res.json()) as { token: string };
+    csrfToken = data.token;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureCsrfToken() {
+  if (!csrfToken) await mintCsrfToken();
+}
+
+export function isCsrfFailure(body: unknown) {
+  return typeof body === "object" && body !== null && (body as { error?: unknown }).error === "csrf_failed";
+}
+
+function postRefresh() {
+  return fetch(`${BASE}/auth/refresh`, {
     method: "POST",
     credentials: "include",
     headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
-  })
-    .then(async (res) => {
-      if (!res.ok) return false;
+  });
+}
+
+function refreshSession(): Promise<RefreshOutcome> {
+  refreshInflight ??= (async (): Promise<RefreshOutcome> => {
+    try {
+      await ensureCsrfToken();
+
+      let res = await postRefresh();
+
+      if (res.status === 403 && (await mintCsrfToken())) {
+        res = await postRefresh();
+      }
+
+      if (res.status === 401 || res.status === 403) return "expired";
+      if (!res.ok) return "unavailable";
+
       const data = (await res.json()) as Identity;
       csrfToken = data.csrf_token;
-      return true;
-    })
-    .catch(() => false)
-    .finally(() => {
-      queueMicrotask(() => {
-        refreshInflight = null;
-      });
+
+      return "refreshed";
+    } catch {
+      return "unavailable";
+    }
+  })().finally(() => {
+    queueMicrotask(() => {
+      refreshInflight = null;
     });
+  });
 
   return refreshInflight;
+}
+
+export async function recoverSession() {
+  const outcome = await refreshSession();
+
+  if (outcome === "expired") notifySessionExpired();
+
+  return outcome === "refreshed";
+}
+
+export function recoverCsrfToken(): Promise<boolean> {
+  csrfInflight ??= (async () => {
+    try {
+      const res = await fetch(`${BASE}/me`, { credentials: "include" });
+
+      if (res.status === 401) return recoverSession();
+      if (!res.ok) return false;
+
+      const data = (await res.json()) as Partial<Identity>;
+      if (typeof data.csrf_token !== "string") return false;
+
+      csrfToken = data.csrf_token;
+
+      return true;
+    } catch {
+      return false;
+    }
+  })().finally(() => {
+    queueMicrotask(() => {
+      csrfInflight = null;
+    });
+  });
+
+  return csrfInflight;
 }
 
 async function toError(res: Response) {
@@ -132,9 +212,13 @@ async function request<T>(path: string, options: Options = {}, allowRetry = true
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
 
-  if (res.status === 401 && allowRetry && !NO_REFRESH.has(path)) {
-    if (await refreshOnce()) {
+  if (allowRetry && !NO_REFRESH.has(path)) {
+    if (res.status === 401 && (await recoverSession())) {
       return request<T>(path, options, false);
+    }
+
+    if (res.status === 403 && isCsrfFailure(await res.clone().json().catch(() => null))) {
+      if (await recoverCsrfToken()) return request<T>(path, options, false);
     }
   }
 

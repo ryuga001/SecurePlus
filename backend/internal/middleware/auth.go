@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,11 @@ func RequireAuth(svc *auth.Service, store *auth.Store, cfg config.Auth) gin.Hand
 		}
 
 		claims, err := auth.Verify(c.Request.Context(), raw, cfg.Issuer, auth.TypeAccess, svc.TenantSecret)
+		if errors.Is(err, auth.ErrUnavailable) {
+			deny(c, http.StatusServiceUnavailable, "service_unavailable", "authentication store unavailable")
+			return
+		}
+
 		if err != nil {
 			deny(c, http.StatusUnauthorized, "unauthenticated", "invalid access token")
 			return

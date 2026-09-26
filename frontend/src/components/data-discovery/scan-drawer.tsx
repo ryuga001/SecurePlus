@@ -10,7 +10,6 @@ import { PolicyCombobox, type PolicyRef } from "@/components/data-discovery/poli
 import { DrawerWrapper } from "@/components/drawer/drawer";
 import { Button } from "@/components/ui/button";
 import { apiErrorCode, apiErrorMessage } from "@/lib/api-error";
-import { SCANNABLE_SOURCE_TYPES } from "@/lib/data-discovery";
 import { useCreateDiscoveryScanMutation } from "@/store/api/data-discovery-scans-api";
 
 const POLICY_ERRORS: Record<string, string> = {
@@ -30,7 +29,6 @@ function ScanForm({
   onStarted: (scanId: number) => void;
 }) {
   const t = useTranslations("data-discovery.scans.dialog");
-  const shared = useTranslations("data-discovery");
   const common = useTranslations("common");
 
   const [policy, setPolicy] = React.useState<PolicyRef | null>(null);
@@ -38,8 +36,6 @@ function ScanForm({
   const [error, setError] = React.useState("");
 
   const [createScan, { isLoading: pending }] = useCreateDiscoveryScanMutation();
-
-  const sources = SCANNABLE_SOURCE_TYPES.map((source) => shared(`sourceType.${source}`)).join(", ");
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,14 +73,13 @@ function ScanForm({
       <Field
         id="scan-policy"
         label={t("policy")}
-        hint={t("policyHint", { sources })}
+        hint={t("policyHint")}
         error={policyError}
       >
         <PolicyCombobox
           id="scan-policy"
           value={policy}
           activeOnly
-          sourceTypes={SCANNABLE_SOURCE_TYPES}
           disabled={pending}
           invalid={Boolean(policyError)}
           placeholder={t("searchPolicies")}

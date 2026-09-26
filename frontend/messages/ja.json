@@ -723,7 +723,7 @@
         "title": "スキャンを開始",
         "description": "ポリシーのターゲットに機密データがないかスキャンします。",
         "policy": "ポリシー",
-        "policyHint": "スキャンできるのは有効な {sources} ポリシーのみです。",
+        "policyHint": "スキャンできるのは有効なポリシーのみです。",
         "searchPolicies": "ポリシーを検索",
         "policyRequired": "ポリシーを選択してください。",
         "targets": "ターゲット",

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
-import { api, setCsrfToken, type Identity } from "@/lib/api";
+import { api, onSessionExpired, setCsrfToken, type Identity } from "@/lib/api";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 function clearStoredTheme() {
@@ -51,6 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => onSessionExpired(() => setIdentity(null)), []);
 
   const reload = useCallback(async () => {
     try {

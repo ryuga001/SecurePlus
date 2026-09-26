@@ -723,7 +723,7 @@
         "title": "Start scan",
         "description": "Scan a policy's targets for sensitive data.",
         "policy": "Policy",
-        "policyHint": "Only active {sources} policies can be scanned.",
+        "policyHint": "Only active policies can be scanned.",
         "searchPolicies": "Search policies",
         "policyRequired": "Select a policy.",
         "targets": "Targets",

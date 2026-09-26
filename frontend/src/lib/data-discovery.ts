@@ -32,8 +32,6 @@ export const DISCOVERY_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 
 export type DiscoveryStatus = (typeof DISCOVERY_STATUSES)[number];
 
-export const SCANNABLE_SOURCE_TYPES: readonly SourceType[] = ["AZURE_BLOB"];
-
 export const SCAN_STATUSES = ["PENDING", "RUNNING", "PARTIAL", "COMPLETED", "FAILED"] as const;
 
 export type ScanStatus = (typeof SCAN_STATUSES)[number];
@@ -342,18 +340,66 @@ export function encodeTarget(source: SourceType, values: Record<string, string>)
     .join("/");
 }
 
+function decodeSharePointTarget(encoded: string): Record<string, string> {
+  let value = encoded.trim();
+  let origin = "";
+
+  const absolute = /^(https?:\/\/[^/]+)(.*)$/i.exec(value);
+  if (absolute) {
+    origin = absolute[1];
+    value = absolute[2];
+  }
+
+  const parts = value.split("/");
+  let index = 0;
+
+  while (index < parts.length && parts[index] === "") index++;
+
+  let site = "/";
+  if (index + 1 < parts.length && /^(sites|teams)$/i.test(parts[index]) && parts[index + 1]) {
+    site = `/${parts[index]}/${parts[index + 1]}`;
+    index += 2;
+  }
+
+  let documentLibrary = "";
+  if (index < parts.length && parts[index] !== "") {
+    documentLibrary = parts[index];
+    index++;
+  }
+
+  const folder = parts.slice(index).filter(Boolean);
+
+  return {
+    site: origin ? origin + (site === "/" ? "" : site) : site,
+    documentLibrary,
+    folder: folder.length > 0 ? `/${folder.join("/")}` : "",
+  };
+}
+
 export function decodeTarget(source: SourceType, encoded: string): Record<string, string> {
+  if (source === "SHARE_POINT") return decodeSharePointTarget(encoded);
+
   const fields = targetFields(source);
-  const parts = encoded.split("/").filter(Boolean);
   const values = emptyTargetValues(source);
+  let rest = encoded.trim();
 
   fields.forEach((field, index) => {
     if (index === fields.length - 1) {
-      values[field.key] = parts.slice(index).join("/");
+      values[field.key] = rest;
       return;
     }
 
-    values[field.key] = parts[index] ?? "";
+    rest = rest.replace(/^\/+/, "");
+
+    const slash = rest.indexOf("/");
+    if (slash < 0) {
+      values[field.key] = rest;
+      rest = "";
+      return;
+    }
+
+    values[field.key] = rest.slice(0, slash);
+    rest = rest.slice(slash + 1);
   });
 
   return values;

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -187,6 +188,10 @@ func Verify(ctx context.Context, raw, issuer, want string, secretFn SecretFunc) 
 		jwt.WithIssuer(issuer),
 		jwt.WithExpirationRequired(),
 	)
+	if errors.Is(err, ErrUnavailable) {
+		return nil, ErrUnavailable
+	}
+
 	if err != nil || !parsed.Valid {
 		return nil, ErrInvalidToken
 	}

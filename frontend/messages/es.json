@@ -723,7 +723,7 @@
         "title": "Iniciar análisis",
         "description": "Analice los destinos de una política en busca de datos sensibles.",
         "policy": "Política",
-        "policyHint": "Solo se pueden analizar políticas activas de {sources}.",
+        "policyHint": "Solo se pueden analizar políticas activas.",
         "searchPolicies": "Buscar políticas",
         "policyRequired": "Seleccione una política.",
         "targets": "Destinos",

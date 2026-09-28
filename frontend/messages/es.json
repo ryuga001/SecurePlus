@@ -22,7 +22,6 @@
   },
   "nav": {
     "dashboard": "Panel",
-    "contentInspection": "Inspección de contenido",
     "detectionRules": "Reglas de detección",
     "emailProtection": "Protección de correo",
     "configurations": "Configuraciones",

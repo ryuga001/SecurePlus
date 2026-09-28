@@ -11,7 +11,6 @@ import {
     Radar,
     Regex,
     ScanSearch,
-    ScanText,
     ScrollText,
     Send,
     Settings,
@@ -135,19 +134,11 @@ export const routes = {
             },
         },
     },
-    contentInspection: {
-        labelKey: "contentInspection",
-        icon: ScanText,
-        privileges: [],
-        defaultOpen: true,
-        children: {
-            ci_rules: {
-                labelKey: "detectionRules",
-                routePath: "/admin/content-inspection/rules",
-                icon: Regex,
-                privileges: ["admin.rule.view"],
-            },
-        },
+    ci_rules: {
+        labelKey: "detectionRules",
+        routePath: "/admin/content-inspection/rules",
+        icon: Regex,
+        privileges: ["admin.rule.view"],
     },
     administration: {
         labelKey: "administration",

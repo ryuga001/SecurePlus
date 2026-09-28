@@ -13,6 +13,13 @@ import { useRouteAccess } from "@/hooks/use-route-access";
 import { isRouteVisible, routes, type RouteAccess, type RouteMap, type RouteNode } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
+function initials(firstName: string, lastName: string): string {
+  const first = firstName.trim().charAt(0);
+  const last = lastName.trim().charAt(0);
+
+  return (first + last).toUpperCase() || "?";
+}
+
 function isActive(pathname: string, node: RouteNode): boolean {
   if (node.routePath && (pathname === node.routePath || pathname.startsWith(`${node.routePath}/`))) {
     return true;
@@ -149,7 +156,7 @@ const Sidebar = () => {
         <span className="truncate text-base font-semibold tracking-tight">{orgName}</span>
       </Link>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+      <nav className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
         {items.map(([key, node]) =>
           isGroup(node) ? (
             <NavGroup key={key} node={node} pathname={pathname} access={access} />
@@ -159,17 +166,26 @@ const Sidebar = () => {
         )}
       </nav>
 
-      <div className="shrink-0 border-t border-sidebar-border p-3 pb-4">
+      <div className="shrink-0 border-t border-sidebar-border bg-sidebar-accent/40 p-3 pb-4">
         {identity ? (
-          <div className="mb-2.5 px-2 pt-2">
-            <p className="truncate text-sm font-medium leading-5">
-              {identity.user.first_name} {identity.user.last_name}
-            </p>
-            <p className="truncate text-xs leading-4 text-text-tertiary">{identity.user.email}</p>
+          <div className="mb-3 flex items-center gap-2.5 px-2 pt-2">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-container text-xs font-semibold text-on-primary-container">
+              {initials(identity.user.first_name, identity.user.last_name)}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium leading-5">
+                {identity.user.first_name} {identity.user.last_name}
+              </p>
+              <p className="truncate text-xs leading-4 text-text-tertiary">{identity.user.email}</p>
+            </div>
           </div>
         ) : null}
 
-        <Button variant="outline" className="w-full justify-start" onClick={onSignOut}>
+        <Button
+          variant="outline"
+          className="w-full justify-start text-text-secondary hover:border-error-border hover:bg-error-container hover:text-error-text"
+          onClick={onSignOut}
+        >
           <LogOut strokeWidth={1.75} />
           {t("signOut")}
         </Button>

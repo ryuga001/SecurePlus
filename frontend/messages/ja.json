@@ -22,7 +22,6 @@
   },
   "nav": {
     "dashboard": "ダッシュボード",
-    "contentInspection": "コンテンツ検査",
     "detectionRules": "検出ルール",
     "emailProtection": "メール保護",
     "configurations": "構成",

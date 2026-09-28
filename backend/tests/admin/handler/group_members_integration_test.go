@@ -250,12 +250,12 @@ func (h harness) findGroup(t *testing.T, name string) db.Group {
 }
 
 type groupResponse struct {
-	ID          int                `json:"id"`
-	Name        string             `json:"name"`
-	MemberCount int                `json:"member_count"`
-	Members     []memberResponse   `json:"members"`
-	CreatedAt   string             `json:"created_at"`
-	UpdatedAt   string             `json:"updated_at"`
+	ID          int              `json:"id"`
+	Name        string           `json:"name"`
+	MemberCount int              `json:"member_count"`
+	Members     []memberResponse `json:"members"`
+	CreatedAt   string           `json:"created_at"`
+	UpdatedAt   string           `json:"updated_at"`
 }
 
 type memberResponse struct {

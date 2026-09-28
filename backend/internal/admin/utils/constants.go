@@ -164,6 +164,7 @@ const (
 	CodeIncompatibleSource         = "incompatible_source_type"
 	CodeInvalidServiceAccountKey   = "invalid_service_account_key"
 	CodeConnectionFailed           = "connection_failed"
+	CodeCredentialUnavailable      = "credential_unavailable"
 	CodeProviderUnavailable        = "provider_unavailable"
 	CodeDiscoveryPolicyNotFound    = "discovery_policy_not_found"
 	CodeDiscoveryPolicyNameTaken   = "discovery_policy_name_taken"

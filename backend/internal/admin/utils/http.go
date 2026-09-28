@@ -253,6 +253,8 @@ func statusFor(err error) (int, string) {
 		return http.StatusBadRequest, CodeInvalidServiceAccountKey
 	case errors.Is(err, ErrConnectionFailed):
 		return http.StatusBadRequest, CodeConnectionFailed
+	case errors.Is(err, ErrCredentialUnavailable):
+		return http.StatusBadRequest, CodeCredentialUnavailable
 	case errors.Is(err, ErrInvalidDiscoveryTarget):
 		return http.StatusBadRequest, CodeInvalidDiscoveryTarget
 

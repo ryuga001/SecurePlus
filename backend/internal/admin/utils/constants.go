@@ -93,6 +93,13 @@ const (
 	MsgInvalidTimezone  = "enter a valid IANA timezone, for example Asia/Kolkata"
 	MsgInvalidLogo      = "logo must be a PNG, JPEG or WebP image of 1 MB or less"
 
+	MsgProfileNotFound     = "profile not found"
+	MsgOrgNameNeeded       = "organization name must be between 2 and 100 characters"
+	MsgOrgNameTaken        = "an organization with this name already exists"
+	MsgOrgEditForbidden    = "you do not have permission to change the organization name"
+	MsgNameTooLong         = "first name and last name must be 50 characters or fewer"
+	MsgAdminEmailImmutable = "the admin email is the sign-in address and cannot be changed here"
+
 	MsgInvalidRequest    = "request body is invalid"
 	MsgInvalidIdentifier = "invalid identifier"
 	MsgUnauthenticated   = "unauthenticated"
@@ -159,6 +166,10 @@ const (
 	CodeInvalidLanguage = "invalid_language"
 	CodeInvalidTimezone = "invalid_timezone"
 	CodeInvalidLogo     = "invalid_logo"
+
+	CodeForbidden           = "forbidden"
+	CodeOrgNameTaken        = "org_name_taken"
+	CodeAdminEmailImmutable = "admin_email_immutable"
 )
 
 const (

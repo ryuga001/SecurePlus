@@ -146,10 +146,14 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrAlertNotFound),
 		errors.Is(err, ErrDiscoveryConfigNotFound),
 		errors.Is(err, ErrDiscoveryPolicyNotFound),
-		errors.Is(err, ErrBrandingNotFound):
+		errors.Is(err, ErrBrandingNotFound),
+		errors.Is(err, ErrProfileNotFound):
 		return http.StatusNotFound, CodeNotFound
 	case errors.Is(err, ErrDiscoveryScanNotFound):
 		return http.StatusNotFound, CodeDiscoveryScanNotFound
+
+	case errors.Is(err, ErrOrgEditForbidden):
+		return http.StatusForbidden, CodeForbidden
 
 	case errors.Is(err, ErrDomainTaken):
 		return http.StatusConflict, CodeDomainTaken
@@ -175,6 +179,8 @@ func statusFor(err error) (int, string) {
 		return http.StatusConflict, CodeConfigurationInUse
 	case errors.Is(err, ErrConfigurationTypeImmutable):
 		return http.StatusConflict, CodeConfigurationTypeImmutable
+	case errors.Is(err, ErrOrgNameTaken):
+		return http.StatusConflict, CodeOrgNameTaken
 	case errors.Is(err, ErrDiscoveryScanActive):
 		return http.StatusConflict, CodeDiscoveryScanActive
 	case errors.Is(err, ErrDiscoveryPolicyInactive):
@@ -242,6 +248,8 @@ func statusFor(err error) (int, string) {
 		return http.StatusBadRequest, CodeInvalidTimezone
 	case errors.Is(err, ErrInvalidLogo):
 		return http.StatusBadRequest, CodeInvalidLogo
+	case errors.Is(err, ErrAdminEmailImmutable):
+		return http.StatusBadRequest, CodeAdminEmailImmutable
 
 	case errors.Is(err, ErrInvalidAction),
 		errors.Is(err, ErrInvalidRestrictionMode),
@@ -262,6 +270,8 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrConfigFieldNeeded),
 		errors.Is(err, ErrSecretNeeded),
 		errors.Is(err, ErrDiscoveryTargetsNeeded),
+		errors.Is(err, ErrOrgNameNeeded),
+		errors.Is(err, ErrNameTooLong),
 		errors.Is(err, ErrTooManyItems):
 		return http.StatusBadRequest, CodeValidation
 	}

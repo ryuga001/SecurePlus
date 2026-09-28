@@ -1,10 +1,12 @@
 "use client";
 
-import { CircleAlert, Loader2 } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { LoadingRegion } from "@/components/loading/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useListFileTypesQuery } from "@/store/api/policies-api";
@@ -28,10 +30,26 @@ export function FileTypePicker({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        {t("oneMoment")}
-      </div>
+      <LoadingRegion label={t("oneMoment")} className="overflow-hidden rounded-lg border">
+        <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+          <Skeleton className="h-5 w-24" />
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-20" />
+            <Skeleton className="h-8 w-16" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
+          {Array.from({ length: 6 }, (_, index) => (
+            <div key={index} className="flex items-center gap-2 rounded-md border p-2">
+              <Skeleton className="h-5 w-9 shrink-0 rounded-full" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <Skeleton className="h-3.5 w-12" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </LoadingRegion>
     );
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CircleAlert, ListFilter, Loader2 } from "lucide-react";
+import { ArrowLeft, CircleAlert, ListFilter } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -27,7 +27,14 @@ import type {
   DataTableQueryArgs,
   TableAction,
 } from "@/components/data-table/types";
+import {
+  DataTableSkeleton,
+  LoadingRegion,
+  MetricsSkeleton,
+  TableFrameSkeleton,
+} from "@/components/loading/skeletons";
 import { Button } from "@/components/ui/button";
+import { LiveDot } from "@/components/ui/live-dot";
 import { usePrivileges } from "@/hooks/use-privileges";
 import { apiErrorMessage } from "@/lib/api-error";
 import {
@@ -75,7 +82,7 @@ function Summary({ scan }: { scan: DiscoveryScan }) {
 
       {isScanActive(scan.status) ? (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="size-3 animate-spin" />
+          <LiveDot />
           {t("live")}
         </p>
       ) : null}
@@ -86,7 +93,6 @@ function Summary({ scan }: { scan: DiscoveryScan }) {
 export default function DiscoveryScanFilesPage() {
   const t = useTranslations("data-discovery.scans");
   const shared = useTranslations("data-discovery");
-  const common = useTranslations("common");
   const table = useTranslations("table");
   const router = useRouter();
   const errorLabel = useScanErrorLabel();
@@ -222,10 +228,7 @@ export default function DiscoveryScanFilesPage() {
   function body() {
     if (privilegesLoading) {
       return (
-        <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {common("loading")}
-        </div>
+        <DataTableSkeleton />
       );
     }
 
@@ -260,10 +263,12 @@ export default function DiscoveryScanFilesPage() {
 
     if (scanLoading || !scan) {
       return (
-        <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {t("details.loading")}
-        </div>
+        <LoadingRegion label={t("details.loading")} className="flex flex-col gap-4">
+          <div className="border bg-surface-container-low p-4">
+            <MetricsSkeleton count={7} className="lg:grid-cols-7" />
+          </div>
+          <TableFrameSkeleton columns={columns.length} rows={8} />
+        </LoadingRegion>
       );
     }
 

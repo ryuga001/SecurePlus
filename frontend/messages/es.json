@@ -22,10 +22,11 @@
   },
   "nav": {
     "dashboard": "Panel",
+    "contentInspection": "Inspección de contenido",
+    "detectionRules": "Reglas de detección",
     "emailProtection": "Protección de correo",
     "configurations": "Configuraciones",
     "policies": "Políticas",
-    "rules": "Reglas",
     "users": "Usuarios",
     "groups": "Grupos",
     "audits": "Auditorías",
@@ -97,8 +98,8 @@
     "id": "ID {id}"
   },
   "rules": {
-    "heading": "Reglas",
-    "subheading": "Coincidencias por palabra clave y expresión regular que las políticas aplican al correo.",
+    "heading": "Reglas de detección",
+    "subheading": "Detectores por palabra clave y expresión regular que las políticas de protección de correo y de descubrimiento de datos usan para encontrar contenido sensible.",
     "searchPlaceholder": "Nombre de la regla",
     "empty": "Todavía no hay reglas",
     "add": "Añadir regla",
@@ -1042,8 +1043,34 @@
   "settings": {
     "profile": {
       "heading": "Perfil",
-      "subheading": "Los datos de tu cuenta.",
-      "placeholder": "La configuración del perfil todavía no está disponible."
+      "subheading": "Administra los datos de tu organización y del administrador.",
+      "loading": "Cargando perfil…",
+      "loadFailed": "No se pudo cargar el perfil.",
+      "organizationTitle": "Organización",
+      "organizationDescription": "El nombre de tu organización aparece en la consola, en los correos de alerta y en los avisos enviados a tus usuarios.",
+      "orgName": "Nombre de la organización",
+      "orgNameHint": "Entre {min} y {max} caracteres. Debe ser único.",
+      "orgNameLocked": "Necesitas el privilegio de edición de la organización para cambiarlo.",
+      "administratorTitle": "Administrador",
+      "administratorDescription": "La cuenta con la que has iniciado sesión.",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "nameHint": "Hasta {max} caracteres.",
+      "adminEmail": "Correo del administrador",
+      "adminEmailHint": "Tu dirección de inicio de sesión. No se puede cambiar aquí.",
+      "unsavedChanges": "Cambios sin guardar",
+      "discard": "Descartar cambios",
+      "saveChanges": "Guardar cambios",
+      "updated": "Perfil actualizado",
+      "saveFailed": "No se pudo guardar el perfil.",
+      "errors": {
+        "orgNameLength": "El nombre de la organización debe tener entre {min} y {max} caracteres.",
+        "orgNameTaken": "Otra organización ya usa este nombre.",
+        "firstNameRequired": "Introduce un nombre.",
+        "lastNameRequired": "Introduce un apellido.",
+        "nameTooLong": "Usa {max} caracteres o menos.",
+        "forbidden": "No tienes permiso para cambiar el nombre de la organización."
+      }
     },
     "branding": {
       "heading": "Personalización",

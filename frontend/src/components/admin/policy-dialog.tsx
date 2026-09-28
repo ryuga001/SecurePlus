@@ -14,6 +14,7 @@ import type {
   FilterConfig,
   RowAction,
 } from "@/components/data-table/types";
+import { FormSkeleton } from "@/components/loading/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1005,12 +1006,7 @@ function PolicyLoader({
   } = useListFileTypesQuery();
 
   if (loadingPolicy || loadingFileTypes) {
-    return (
-      <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        {t("dialog.oneMoment")}
-      </div>
-    );
+    return <FormSkeleton fields={5} label={t("dialog.oneMoment")} />;
   }
 
   return (

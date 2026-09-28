@@ -93,6 +93,13 @@ var (
 	ErrInvalidLanguage  = errors.New(MsgInvalidLanguage)
 	ErrInvalidTimezone  = errors.New(MsgInvalidTimezone)
 	ErrInvalidLogo      = errors.New(MsgInvalidLogo)
+
+	ErrProfileNotFound     = errors.New(MsgProfileNotFound)
+	ErrOrgNameNeeded       = errors.New(MsgOrgNameNeeded)
+	ErrOrgNameTaken        = errors.New(MsgOrgNameTaken)
+	ErrOrgEditForbidden    = errors.New(MsgOrgEditForbidden)
+	ErrNameTooLong         = errors.New(MsgNameTooLong)
+	ErrAdminEmailImmutable = errors.New(MsgAdminEmailImmutable)
 )
 
 func Taken(sentinel error, value string) error {

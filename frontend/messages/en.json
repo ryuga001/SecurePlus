@@ -22,10 +22,11 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "contentInspection": "Content Inspection",
+    "detectionRules": "Detection Rules",
     "emailProtection": "Email Protection",
     "configurations": "Configurations",
     "policies": "Policies",
-    "rules": "Rules",
     "users": "Users",
     "groups": "Groups",
     "audits": "Audits",
@@ -97,8 +98,8 @@
     "id": "ID {id}"
   },
   "rules": {
-    "heading": "Rules",
-    "subheading": "Keyword and regular-expression matchers that policies apply to mail.",
+    "heading": "Detection rules",
+    "subheading": "Keyword and regular-expression detectors that email protection and data discovery policies use to find sensitive content.",
     "searchPlaceholder": "Rule name",
     "empty": "No rules yet",
     "add": "Add Rule",
@@ -1042,8 +1043,34 @@
   "settings": {
     "profile": {
       "heading": "Profile",
-      "subheading": "Your account details.",
-      "placeholder": "Profile settings are not available yet."
+      "subheading": "Manage your organization and administrator details.",
+      "loading": "Loading profile…",
+      "loadFailed": "The profile could not be loaded.",
+      "organizationTitle": "Organization",
+      "organizationDescription": "Your organization name appears in the console, alert emails and notices sent to your users.",
+      "orgName": "Organization name",
+      "orgNameHint": "Between {min} and {max} characters. Must be unique.",
+      "orgNameLocked": "You need the organization edit privilege to change this.",
+      "administratorTitle": "Administrator",
+      "administratorDescription": "The account you are signed in with.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "nameHint": "Up to {max} characters.",
+      "adminEmail": "Admin email",
+      "adminEmailHint": "Your sign-in address. It can't be changed here.",
+      "unsavedChanges": "Unsaved changes",
+      "discard": "Discard changes",
+      "saveChanges": "Save changes",
+      "updated": "Profile updated",
+      "saveFailed": "The profile could not be saved.",
+      "errors": {
+        "orgNameLength": "Organization name must be between {min} and {max} characters.",
+        "orgNameTaken": "Another organization already uses this name.",
+        "firstNameRequired": "Enter a first name.",
+        "lastNameRequired": "Enter a last name.",
+        "nameTooLong": "Use {max} characters or fewer.",
+        "forbidden": "You don't have permission to change the organization name."
+      }
     },
     "branding": {
       "heading": "Branding",

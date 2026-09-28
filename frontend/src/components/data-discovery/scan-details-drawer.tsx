@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, FileSearch, Loader2 } from "lucide-react";
+import { CircleAlert, FileSearch } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -8,7 +8,9 @@ import * as React from "react";
 import { useAuth } from "@/components/auth-provider";
 import { StatusBadge } from "@/components/data-table/status-badge";
 import { DrawerWrapper } from "@/components/drawer/drawer";
+import { DetailSkeleton } from "@/components/loading/skeletons";
 import { Button } from "@/components/ui/button";
+import { LiveDot } from "@/components/ui/live-dot";
 import { apiErrorMessage } from "@/lib/api-error";
 import {
   SCAN_POLL_INTERVAL,
@@ -146,7 +148,7 @@ function Details({ scan }: { scan: DiscoveryScan }) {
 
           {isScanActive(scan.status) ? (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
+              <LiveDot />
               {t("live")}
             </p>
           ) : null}
@@ -259,12 +261,7 @@ export function ScanDetailsDrawer({
       onClose={() => onOpenChange(false)}
       width="3xl"
     >
-      {isLoading ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
-          <Loader2 className="size-6 animate-spin text-primary" />
-          <p className="text-sm">{t("loading")}</p>
-        </div>
-      ) : null}
+      {isLoading ? <DetailSkeleton label={t("loading")} /> : null}
 
       {!isLoading && isError ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">

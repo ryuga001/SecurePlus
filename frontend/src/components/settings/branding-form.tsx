@@ -15,6 +15,8 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth-provider";
 import { FormError } from "@/components/auth/auth-form";
+import { SettingsSkeleton } from "@/components/loading/skeletons";
+import { SettingsActionBar, SettingsRow } from "@/components/settings/settings-layout";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,7 +27,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api-error";
 import type { Branding, Language, Theme } from "@/lib/api";
@@ -56,7 +57,7 @@ export function BrandingForm() {
   const t = useTranslations("settings.branding");
   const branding = identity?.branding;
 
-  if (loading) return <BrandingSkeleton />;
+  if (loading) return <SettingsSkeleton cards={[1, 1, 2]} />;
 
   if (!branding) {
     return (
@@ -285,7 +286,7 @@ function BrandingFields({
         </CardHeader>
 
         <CardContent className="flex flex-col gap-6">
-          <LocalizationRow
+          <SettingsRow
             id="language"
             label={t("language")}
             hint={t("languageHint")}
@@ -297,66 +298,28 @@ function BrandingFields({
               options={LANGUAGES}
               onChange={(event) => setLanguage(event.target.value as Language)}
             />
-          </LocalizationRow>
+          </SettingsRow>
 
-          <LocalizationRow
+          <SettingsRow
             id="timezone-search"
             label={t("timezone")}
             hint={t("timezoneHint")}
           >
             <TimezonePicker value={timezone} disabled={busy} onChange={setTimezone} />
-          </LocalizationRow>
+          </SettingsRow>
         </CardContent>
       </Card>
 
-      <div
-        data-slot="settings-action-bar"
-        className="sticky bottom-0 -mx-6 -mb-6 flex min-h-16 flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-6 py-4 shadow-[0_-2px_8px_rgba(15,23,42,0.08)]"
-      >
-        <span
-          aria-live="polite"
-          className={cn(
-            "flex items-center gap-2 text-sm",
-            dirty ? "text-foreground" : "text-transparent"
-          )}
-        >
-          <span className={cn("size-2 rounded-full", dirty ? "bg-amber-500" : "bg-transparent")} />
-          {t("unsavedChanges")}
-        </span>
-
-        <span className="flex items-center gap-2">
-          <Button type="button" variant="ghost" disabled={busy} onClick={onResetDefaults}>
-            {t("resetDefaults")}
-          </Button>
-          <Button type="submit" disabled={!dirty || busy}>
-            {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-            {saving ? common("saving") : t("saveChanges")}
-          </Button>
-        </span>
-      </div>
+      <SettingsActionBar dirty={dirty} unsavedLabel={t("unsavedChanges")}>
+        <Button type="button" variant="ghost" disabled={busy} onClick={onResetDefaults}>
+          {t("resetDefaults")}
+        </Button>
+        <Button type="submit" disabled={!dirty || busy}>
+          {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+          {saving ? common("saving") : t("saveChanges")}
+        </Button>
+      </SettingsActionBar>
     </form>
-  );
-}
-
-function LocalizationRow({
-  id,
-  label,
-  hint,
-  children,
-}: {
-  id: string;
-  label: string;
-  hint: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-2 md:grid-cols-[minmax(0,220px)_1fr] md:items-start md:gap-8">
-      <div className="flex flex-col gap-1">
-        <Label htmlFor={id}>{label}</Label>
-        <p className="text-xs text-muted-foreground">{hint}</p>
-      </div>
-      <div className="md:max-w-xl">{children}</div>
-    </div>
   );
 }
 
@@ -501,16 +464,6 @@ function TimezonePicker({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function BrandingSkeleton() {
-  return (
-    <div className="flex animate-pulse flex-col gap-6">
-      <div className="h-36 w-full border bg-muted/50" />
-      <div className="h-60 w-full border bg-muted/50" />
-      <div className="h-48 w-full border bg-muted/50" />
     </div>
   );
 }

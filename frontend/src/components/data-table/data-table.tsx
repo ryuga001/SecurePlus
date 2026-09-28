@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown, CircleAlert, Inbox, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CircleAlert, Inbox } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { useAuth } from "@/components/auth-provider";
+import { TableRowsSkeleton } from "@/components/loading/skeletons";
 import { Button } from "@/components/ui/button";
 import type { Language } from "@/lib/api";
 import { formatInZone } from "@/lib/datetime";
@@ -25,6 +26,8 @@ import type {
   SortState,
   TableAction,
 } from "./types";
+
+const SKELETON_ROWS = 10;
 
 function initialFilterState(filters: FilterConfig[]): FilterState {
   const state: FilterState = {};
@@ -134,6 +137,7 @@ export function DataTable<Row>({
   className,
 }: DataTableProps<Row>) {
   const t = useTranslations("table");
+  const common = useTranslations("common");
   const { identity } = useAuth();
   const timezone = identity?.branding?.timezone ?? "UTC";
   const language = identity?.branding?.language ?? "ENGLISH";
@@ -228,7 +232,11 @@ export function DataTable<Row>({
           <div className="absolute inset-x-0 top-0 h-0.5 animate-pulse bg-primary" />
         ) : null}
 
-        <table className="w-full border-collapse text-sm">
+        <span role="status" aria-live="polite" className="sr-only">
+          {isLoading ? common("loading") : ""}
+        </span>
+
+        <table aria-busy={isLoading || undefined} className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border-subtle bg-surface-container-low">
               {columns.map((column) => {
@@ -279,14 +287,7 @@ export function DataTable<Row>({
 
           <tbody>
             {isLoading ? (
-              <tr>
-                <td colSpan={columnCount} className="px-4 py-12">
-                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                    <Loader2 className="size-6 animate-spin text-primary" />
-                    <p className="text-sm">Loading records...</p>
-                  </div>
-                </td>
-              </tr>
+              <TableRowsSkeleton columns={columnCount} rows={Math.min(pageSize, SKELETON_ROWS)} />
             ) : null}
 
             {!isLoading && isError ? (

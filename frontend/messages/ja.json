@@ -22,10 +22,11 @@
   },
   "nav": {
     "dashboard": "ダッシュボード",
+    "contentInspection": "コンテンツ検査",
+    "detectionRules": "検出ルール",
     "emailProtection": "メール保護",
     "configurations": "構成",
     "policies": "ポリシー",
-    "rules": "ルール",
     "users": "ユーザー",
     "groups": "グループ",
     "audits": "監査",
@@ -97,8 +98,8 @@
     "id": "ID {id}"
   },
   "rules": {
-    "heading": "ルール",
-    "subheading": "ポリシーがメールに適用するキーワードおよび正規表現のマッチャーです。",
+    "heading": "検出ルール",
+    "subheading": "メール保護とデータディスカバリーのポリシーが機密コンテンツを見つけるために使用する、キーワードおよび正規表現の検出器です。",
     "searchPlaceholder": "ルール名",
     "empty": "ルールがまだありません",
     "add": "ルールを追加",
@@ -1042,8 +1043,34 @@
   "settings": {
     "profile": {
       "heading": "プロフィール",
-      "subheading": "アカウント情報です。",
-      "placeholder": "プロフィール設定はまだ利用できません。"
+      "subheading": "組織と管理者の情報を管理します。",
+      "loading": "プロフィールを読み込み中…",
+      "loadFailed": "プロフィールを読み込めませんでした。",
+      "organizationTitle": "組織",
+      "organizationDescription": "組織名はコンソール、アラートメール、ユーザーへの通知に表示されます。",
+      "orgName": "組織名",
+      "orgNameHint": "{min}〜{max}文字。他の組織と重複しない名前にしてください。",
+      "orgNameLocked": "変更するには組織の編集権限が必要です。",
+      "administratorTitle": "管理者",
+      "administratorDescription": "現在サインインしているアカウントです。",
+      "firstName": "名",
+      "lastName": "姓",
+      "nameHint": "{max}文字以内。",
+      "adminEmail": "管理者メールアドレス",
+      "adminEmailHint": "サインインに使用するアドレスです。ここでは変更できません。",
+      "unsavedChanges": "未保存の変更があります",
+      "discard": "変更を破棄",
+      "saveChanges": "変更を保存",
+      "updated": "プロフィールを更新しました",
+      "saveFailed": "プロフィールを保存できませんでした。",
+      "errors": {
+        "orgNameLength": "組織名は{min}〜{max}文字で入力してください。",
+        "orgNameTaken": "この名前はすでに別の組織で使用されています。",
+        "firstNameRequired": "名を入力してください。",
+        "lastNameRequired": "姓を入力してください。",
+        "nameTooLong": "{max}文字以内で入力してください。",
+        "forbidden": "組織名を変更する権限がありません。"
+      }
     },
     "branding": {
       "heading": "ブランディング",

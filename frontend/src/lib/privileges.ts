@@ -25,6 +25,10 @@ export const DISCOVERY_SCAN_PRIVILEGES = {
   create: "admin.discovery.scan.create",
 } as const;
 
+export const ORGANIZATION_PRIVILEGES = {
+  edit: "admin.organization.edit",
+} as const;
+
 export function hasPrivilege(granted: readonly string[] | undefined, required: string) {
   return granted?.includes(required) ?? false;
 }

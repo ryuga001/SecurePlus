@@ -1,10 +1,11 @@
 "use client";
 
-import { CircleAlert, Loader2 } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { StatusBadge } from "@/components/data-table/status-badge";
 import { DrawerWrapper } from "@/components/drawer/drawer";
+import { DetailSkeleton } from "@/components/loading/skeletons";
 import { apiErrorMessage } from "@/lib/api-error";
 import { useGetDeliveryAuditQuery, type DeliveryAudit } from "@/store/api/delivery-audits-api";
 
@@ -196,13 +197,7 @@ export function DeliveryAuditDrawer({
       description={t("description")}
       onClose={() => onOpenChange(false)}
     >
-      {isLoading ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
-          <Loader2 className="size-6 animate-spin text-primary" />
-
-          <p className="text-sm">{t("loading")}</p>
-        </div>
-      ) : null}
+      {isLoading ? <DetailSkeleton label={t("loading")} /> : null}
 
       {!isLoading && isError ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">

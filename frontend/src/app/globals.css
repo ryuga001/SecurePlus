@@ -263,3 +263,9 @@
     color: var(--popover-foreground, var(--text-primary));
   }
 }
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

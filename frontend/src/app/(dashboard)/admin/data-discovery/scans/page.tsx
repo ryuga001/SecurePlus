@@ -5,7 +5,6 @@ import {
   Eye,
   FileSearch,
   ListFilter,
-  Loader2,
   MoreHorizontal,
   Play,
   RotateCcw,
@@ -37,6 +36,7 @@ import type {
   DataTableQueryArgs,
   TableAction,
 } from "@/components/data-table/types";
+import { DataTableSkeleton } from "@/components/loading/skeletons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -69,7 +69,6 @@ function useLiveScanList(args: DataTableQueryArgs) {
 export default function DiscoveryScansPage() {
   const t = useTranslations("data-discovery.scans");
   const shared = useTranslations("data-discovery");
-  const common = useTranslations("common");
   const table = useTranslations("table");
   const router = useRouter();
   const errorLabel = useScanErrorLabel();
@@ -256,10 +255,7 @@ export default function DiscoveryScansPage() {
   function body() {
     if (privilegesLoading) {
       return (
-        <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {common("loading")}
-        </div>
+        <DataTableSkeleton />
       );
     }
 

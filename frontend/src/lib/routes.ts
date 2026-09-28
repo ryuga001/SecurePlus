@@ -10,6 +10,7 @@ import {
     Radar,
     Regex,
     ScanSearch,
+    ScanText,
     ScrollText,
     Send,
     Settings,
@@ -58,12 +59,6 @@ export const routes = {
                 labelKey: "policies",
                 routePath: "/admin/policies",
                 icon: ShieldCheck,
-                privileges: [],
-            },
-            rules: {
-                labelKey: "rules",
-                routePath: "/admin/rules",
-                icon: Regex,
                 privileges: [],
             },
             users: {
@@ -135,6 +130,20 @@ export const routes = {
                 routePath: "/admin/data-discovery/analysis",
                 icon: ChartNoAxesCombined,
                 privileges: ["admin.discovery.policy.view"],
+            },
+        },
+    },
+    contentInspection: {
+        labelKey: "contentInspection",
+        icon: ScanText,
+        privileges: [],
+        defaultOpen: true,
+        children: {
+            ci_rules: {
+                labelKey: "detectionRules",
+                routePath: "/admin/content-inspection/rules",
+                icon: Regex,
+                privileges: [],
             },
         },
     },

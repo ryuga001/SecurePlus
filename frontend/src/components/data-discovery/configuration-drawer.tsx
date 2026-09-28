@@ -13,6 +13,7 @@ import {
 } from "@/components/data-discovery/test-connection-panel";
 import { Field, FormError } from "@/components/auth/auth-form";
 import { DrawerWrapper } from "@/components/drawer/drawer";
+import { FormSkeleton } from "@/components/loading/skeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -474,12 +475,7 @@ function ConfigurationLoader({
   });
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        {t("oneMoment")}
-      </div>
-    );
+    return <FormSkeleton fields={5} label={t("oneMoment")} />;
   }
 
   if (isError) {

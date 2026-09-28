@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, CircleAlert, Inbox, Loader2, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleAlert, Inbox, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
@@ -9,6 +9,7 @@ import {
   newTargetRow,
   type TargetRow,
 } from "@/components/data-discovery/target-list-editor";
+import { ListSkeleton } from "@/components/loading/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -194,12 +195,7 @@ export function TargetBrowser({
 
   function allView() {
     if (isLoading || (options.length === 0 && !isError && (hasNextPage || isFetchingNextPage))) {
-      return (
-        <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {common("loading")}
-        </div>
-      );
+      return <ListSkeleton rows={6} />;
     }
 
     if (isError && options.length === 0) {
@@ -278,12 +274,11 @@ export function TargetBrowser({
           })}
         </ul>
 
+        {isFetchingNextPage ? <ListSkeleton rows={2} label={t("loadingMore")} className="border-t" /> : null}
+
         <div className="flex min-h-10 items-center justify-center gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
           {isFetchingNextPage ? (
-            <>
-              <Loader2 className="size-3 animate-spin" />
-              {t("loadingMore")}
-            </>
+            t("loadingMore")
           ) : isError ? (
             <span className="flex flex-wrap items-center justify-center gap-2 text-center">
               <span className="text-error-text">{apiErrorMessage(error, t("loadFailed"))}</span>

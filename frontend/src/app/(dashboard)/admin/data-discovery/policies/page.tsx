@@ -3,7 +3,6 @@
 import {
   CircleAlert,
   ListFilter,
-  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -30,6 +29,7 @@ import type {
   DataTableQueryArgs,
   TableAction,
 } from "@/components/data-table/types";
+import { DataTableSkeleton } from "@/components/loading/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -220,10 +220,7 @@ export default function DiscoveryPoliciesPage() {
   function body() {
     if (privilegesLoading) {
       return (
-        <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {common("loading")}
-        </div>
+        <DataTableSkeleton />
       );
     }
 

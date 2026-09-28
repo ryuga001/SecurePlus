@@ -1,9 +1,10 @@
 "use client";
 
-import { CheckCheck, CircleAlert, Inbox, Loader2, Search, X } from "lucide-react";
+import { CheckCheck, CircleAlert, Inbox, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { ListSkeleton } from "@/components/loading/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -175,10 +176,7 @@ export function PolicyMultiSelect({
         ) : null}
 
         {isLoading ? (
-          <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            {common("loading")}
-          </div>
+          <ListSkeleton rows={5} />
         ) : isError ? (
           <div className="flex min-h-48 flex-col items-center justify-center gap-2 text-sm">
             <CircleAlert className="size-5 text-error" />

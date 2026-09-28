@@ -22,6 +22,7 @@ import (
 	userhandler "dpdp-backend/internal/admin/handler/emailuser"
 	grouphandler "dpdp-backend/internal/admin/handler/group"
 	policyhandler "dpdp-backend/internal/admin/handler/policy"
+	profilehandler "dpdp-backend/internal/admin/handler/profile"
 	rulehandler "dpdp-backend/internal/admin/handler/rule"
 	alertrepo "dpdp-backend/internal/admin/repositories/alert"
 	brandingrepo "dpdp-backend/internal/admin/repositories/branding"
@@ -30,6 +31,7 @@ import (
 	userrepo "dpdp-backend/internal/admin/repositories/emailuser"
 	grouprepo "dpdp-backend/internal/admin/repositories/group"
 	policyrepo "dpdp-backend/internal/admin/repositories/policy"
+	profilerepo "dpdp-backend/internal/admin/repositories/profile"
 	rulerepo "dpdp-backend/internal/admin/repositories/rule"
 	alertsvc "dpdp-backend/internal/admin/services/alert"
 	brandingsvc "dpdp-backend/internal/admin/services/branding"
@@ -38,6 +40,7 @@ import (
 	usersvc "dpdp-backend/internal/admin/services/emailuser"
 	groupsvc "dpdp-backend/internal/admin/services/group"
 	policysvc "dpdp-backend/internal/admin/services/policy"
+	profilesvc "dpdp-backend/internal/admin/services/profile"
 	rulesvc "dpdp-backend/internal/admin/services/rule"
 	audithandler "dpdp-backend/internal/audit/handler/deliveryaudit"
 	incidenthandler "dpdp-backend/internal/audit/handler/emailincident"
@@ -174,6 +177,10 @@ func main() {
 
 	service := auth.NewService(database, store, notifier, brandingService, cfg.Auth, cfg.App)
 	authHandler := auth.NewHandler(service, cfg.Auth)
+
+	profileHandler := profilehandler.NewProfileHandler(
+		profilesvc.NewProfileService(profilerepo.NewProfileRepository(database), service, store),
+	)
 
 	providerRepository := providerrepo.NewEmailProviderRepository(database)
 	domainRegistry := providerrepo.NewRedisRepository(rdb)
@@ -346,6 +353,7 @@ func main() {
 	discoveryPolicyHandler.RegisterRoutes(protected, guard)
 	discoveryScanHandler.RegisterRoutes(protected, guard)
 	brandingHandler.RegisterRoutes(protected, guard)
+	profileHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
 	incidentHandler.RegisterRoutes(protected, guard)
 

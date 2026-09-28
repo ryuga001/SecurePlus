@@ -2,6 +2,8 @@
 
 An outbound email security gateway. Mail from a tenant's mail system is accepted over SMTP, queued, evaluated against that tenant's data-loss-prevention policies, DKIM-signed, relayed to the recipient's MX, and recorded — with a dashboard over the resulting delivery audits and policy incidents.
 
+It also finds personal data at rest. [Data discovery](#data-discovery) scans a tenant's cloud storage — Azure Blob, AWS S3, Google Drive, SharePoint and OneDrive — with the same keyword and regex rules, and records what each file contains.
+
 ## How mail flows
 
 ```
@@ -64,11 +66,16 @@ Each customer also has its own dashboard branding — logo, light/dark theme, la
 ```
 frontend/             Next.js 16 App Router, RTK Query, Tailwind v4, base-ui
 backend/
-  cmd/api/            one binary: HTTP API + SMTP receiver + delivery workers
+  cmd/api/            one binary: HTTP API + SMTP receiver + delivery workers + discovery scanner
   internal/
     auth/             registration, login, JWT cookies, CSRF, identity cache
     middleware/       origin, auth, CSRF, privilege guards
-    admin/            configurations, policies, rules, email users, groups, branding
+    admin/            configurations, policies, rules, email users, groups, branding,
+                      data discovery configurations, policies and scans
+    datadiscovery/
+      provider/       one file per source: listing, streaming download, target browsing
+      strategy/       per-source validation, Connect, per-configuration BrowseTargets
+      scanner/        scan lifecycle, file queue, workers, processors, evaluator
     delivery/
       model.go        EmailMessage, results, the Processor and Sender seams
       queue.go        Redis Streams handoff
@@ -98,9 +105,10 @@ Redis carries three unrelated things: the delivery stream, the policy and signin
 
 ```bash
 cd backend
-cp ../.env.example .env
 make up
 ```
+
+Create `backend/.env` first with the variables under [Configuration](#configuration). There is no committed template (`.env.example` is git-ignored).
 
 Brings up Postgres, Redis, MongoDB, Mailpit and MinIO from `backend/docker-compose.yml` under compose project `dpdp`. Mailpit's UI is on <http://localhost:8025>, MinIO's console on <http://localhost:9001>.
 
@@ -220,6 +228,199 @@ The database stores `logo_key`; the presigned GET URL is minted when the brandin
 
 Replacement order is upload → update `logo_key` → commit → invalidate cache → delete the old object. A failure at any step leaves the old logo working; the worst case is an orphaned object.
 
+## Profile
+
+The profile page edits four fields: the organization name, which is customer-level, and the signed-in user's first name, last name and admin email.
+
+```
+GET    /api/v1/admin/profile   → 200 {org_name, first_name, last_name, admin_email}
+PATCH  /api/v1/admin/profile   {org_name?, first_name?, last_name?} → 200 with the updated profile
+```
+
+- Any authenticated user can read their profile and change their own name.
+- Changing `org_name` requires `admin.organization.edit` (migration 000009, granted to `admin` roles). Without it the request returns `403 forbidden` and nothing is written, including any name change in the same request.
+- Resending an unchanged `org_name` does not need the privilege.
+- `admin_email` is the sign-in identity. It is returned but never written: sending it returns `400 admin_email_immutable`. Changing it safely needs an ownership check on the new address first.
+- Values are trimmed and inner whitespace is collapsed:
+  - `org_name` must be 2–100 characters, and unique ignoring case; a clash returns `409 org_name_taken`.
+  - Names must be 1–50 characters.
+- The whole update runs in one transaction.
+- A name change drops only the caller's cached `/me`. An org rename drops the cached `/me` of every user in that customer, because the sidebar shows the org name.
+
+## Sessions
+
+Login sets three cookies:
+
+| Cookie | Holds | Lifetime | Notes |
+|---|---|---|---|
+| `dpdp_at` | access JWT | `ACCESS_TTL` (15 m) | HttpOnly |
+| `dpdp_rt` | refresh JWT | `REFRESH_TTL` (30 days) | HttpOnly, path `/api/v1/auth` only, SameSite Strict |
+| `dpdp_csrf` | CSRF token | 30 days | readable by the page |
+
+Mutating requests send `X-CSRF-Token`. On authenticated routes it must equal an HMAC of the access token's id, so it changes on every refresh. On `POST /auth/refresh` it must equal the `dpdp_csrf` cookie.
+
+**Refresh tokens rotate.** Each refresh blacklists the token it used. A second refresh with the same token within 10 seconds (parallel tabs) receives the same new pair. After that, a reused token is treated as stolen: the user's token version is bumped and every session ends.
+
+**The frontend refreshes silently.** Both API clients — `lib/api.ts` and RTK Query's `baseQuery` in `store/api/base-api.ts` — handle expiry the same way:
+
+- A 401 triggers one shared refresh, and the request is retried once.
+- A `csrf_failed` 403, which means another tab refreshed, re-reads the token from `/me` and retries.
+- After a reload the CSRF token is gone from memory, so the client mints one through `/auth/csrf` before refreshing.
+
+Only a rejected refresh token signs the user out. A backend outage (503) keeps the session, and the refresh endpoint clears cookies only for invalid or replayed tokens.
+
+## Data discovery
+
+An admin connects a cloud account (a **configuration**, whose secret is encrypted with `DATA_DISCOVERY_MASTER_KEY`). They then say where to look and what to look for (a **policy**: targets, file types, rules) and run a **scan**. Every supported file is streamed through the policy's rules, and each file's matches are recorded. The record holds counts and byte offsets per rule, never the matched text.
+
+```
+POST /admin/data-discovery/scans
+        │  scan row PENDING · one active scan per policy
+        ▼
+┌───────────────┐  claim the oldest PENDING row · FOR UPDATE SKIP LOCKED
+│    Scanner    │  one scan per process · wakes on create, polls every 30s
+└───────┬───────┘  load policy · decrypt credential · compile rules · connect
+        │                                                PENDING → RUNNING
+        ▼
+┌───────────────┐  targets strictly one after another
+│   Producer    │  Source.List → file-type filter → FileQueue.Put
+└───────┬───────┘  blocks while QUEUE_CAPACITY files are waiting
+        ▼
+┌───────────────┐  FILE_WORKERS goroutines per target, one file each
+│ File workers  │  Source.Open → processor → evaluator → upsert result
+└───────┬───────┘
+        ▼
+  next target … then COMPLETED · PARTIAL · FAILED
+```
+
+**The scan row is the job.** There is no queue service:
+
+- A PENDING row is pending work, and `started_at` marks it claimed.
+- Every status change is a conditional `UPDATE … WHERE status = …`, so a scan is finalized exactly once.
+- Counters are rewritten every 5 seconds, which doubles as a heartbeat. A RUNNING scan silent for 2 minutes belonged to a crashed process, and the next sweep marks it `FAILED` / `INTERRUPTED`. A graceful shutdown writes that status itself.
+
+**Targets run one after another; files within a target run in parallel.** A target is finished only when all of these hold:
+
+- its listing has ended;
+- the queue is drained;
+- every worker has saved its last file.
+
+**The queue holds waiting files only**, and only as metadata, never content. A worker taking a file frees that slot immediately, so `FILE_WORKERS` alone caps how many files are open at once. Files finish in any order.
+
+**Results are upserted per file** on `(scan_id, file_key)`. Nothing accumulates in memory, and reprocessing a file is idempotent.
+
+**Counters are exact.** For every completed or partial scan:
+
+- `discovered = supported + skipped`
+- `supported = processed = succeeded + failed`
+
+Skipped files (no processor, or not in the policy's file types) never make a scan PARTIAL.
+
+**One bad file doesn't stop a scan.**
+
+| Failure | Effect |
+|---|---|
+| A single file (`FETCH_NOT_FOUND`, `PARSE_FAILED`, `TIMEOUT`, `LIMIT_EXCEEDED`, …) | That file is recorded FAILED and its worker moves on |
+| A target's listing | That target fails; the next target still runs |
+| Scan level: credential, rules, database, cancellation | The whole scan fails |
+
+**Logs never carry file names or content.** Files are identified by `file_ref`, a truncated SHA-256 of the key.
+
+### Sources
+
+| Source | Target, as stored | Available targets lists | Grant |
+|---|---|---|---|
+| Azure Blob | `container/prefix` | containers | Storage Blob Data Reader on the account |
+| AWS S3 | `bucket/prefix` | buckets, with region | `s3:ListAllMyBuckets`, `s3:ListBucket`, `s3:GetObject`, `sts:GetCallerIdentity` |
+| SharePoint | `/sites/x/Library//folder`, or a full site URL | sites, then a site's libraries | Graph application `Sites.Read.All`, `Files.Read.All` |
+| OneDrive | `user@domain//folder` | users | Graph application `Files.Read.All`, `User.Read.All` |
+| Google Drive | shared drive name or ID, `user@domain` or `My Drive`, then `//folder` | shared drives, then Workspace users | Drive API, `drive.readonly`; see below for user drives |
+
+**Google user drives** need extra setup:
+
+- Domain-wide delegation for the service account, with both `drive.readonly` and `admin.directory.user.readonly`.
+- The Admin SDK API enabled in the service account's Cloud project.
+- An admin as the configuration's subject. User listing impersonates that admin; each user's drive is scanned by impersonating that user.
+- Files shared with a user but not in their My Drive aren't included.
+- Google Docs, Sheets and Slides are exported as DOCX, XLSX and PPTX.
+
+**How sources behave:**
+
+- **Case:** bucket and container names are lowercased, but prefixes keep their case because object keys are case-sensitive.
+- **Folder walking:** SharePoint, OneDrive and Drive are walked depth-first. Memory is bounded by depth × page size. Folders deeper than 64 levels are skipped with a warning.
+- **Tokens:** cached and refreshed 5 minutes before expiry.
+- **Retries:** 429 and 503 responses are retried, honouring Retry-After.
+
+The policy form's **Available targets** picker calls `GET /admin/data-discovery/configurations/:id/targets`:
+
+- Search is done server-side, pages come from a cursor, and the list scrolls infinitely.
+- The All / Selected filter shows what is already picked.
+- Each cursor is sealed with the credential secret box and bound to the tenant, configuration, source and search. This matters because Graph cursors are URLs that the stored credential would follow; a tampered one is rejected.
+
+### File formats
+
+| Formats | Handling |
+|---|---|
+| txt, csv, json, xml, js | streamed; UTF-8 and UTF-16 BOMs detected |
+| docx, xlsx, pptx | spooled to `DATA_DISCOVERY_SPOOL_DIR` (ZIP needs random access), then each XML part is inflated and stripped as a stream; 2 GiB decompressed cap against zip bombs |
+| pdf | spooled (128 MB max), parsed one page at a time; image-only PDFs have no text |
+| doc, xls, ppt, archives, images, executables | skipped and counted |
+
+A policy's file types match by extension. A name without one falls back to the provider's MIME type. An empty list means every supported format.
+
+### Matching
+
+Rules compile once per scan through the email engine's compiler (`delivery/services/policy`), so a keyword or regex means the same thing in both products.
+
+- **Keywords** are NFKC-normalized and lowercased, then matched in one Aho-Corasick pass whose state carries across chunks. Matches that span chunk boundaries are found without re-reading anything.
+- **Regexes** (RE2) run over 1 MiB windows that overlap by 4 KiB, and a match counts only where it starts. Matches up to 4 KiB long are therefore counted exactly once.
+- **Evaluation concurrency:** `DATA_DISCOVERY_EVALUATOR_WORKERS` goroutines evaluate rule shards, shared by every file worker.
+- **Size limits:** a policy whose keywords exceed 64 KiB, or whose regexes compile past 64k instructions, fails with `RULES_TOO_LARGE`. That limit keeps rule state inside the memory budget.
+- **Speed:** Go's RE2 does roughly 15–40 MB/s per regex per core on patterns without a literal prefix, so large regex sets are CPU-bound.
+
+### Memory
+
+Scanner memory grows with concurrency, not with file size.
+
+| Contributor | Worst case |
+|---|---|
+| Shared state: automaton, compiled regexes, one listing page, queue | about 40 MB |
+| Each active file: download buffers, extraction, evaluation window | about 10 MB more |
+| An active PDF, instead of the per-file figure above | up to ~32 MB for a 128 MB file (the parser holds the xref table and a page) |
+
+Plan for the case where every worker has a PDF open at once.
+
+Spooled files live on disk, up to `FILE_WORKERS × MAX_SPOOL_BYTES`.
+
+A progress line is logged every 5 seconds with `heap_inuse_mb`, `files_active` and `queue_pending`. For a hard ceiling, set `GOMEMLIMIT`; it applies to the whole process, API included.
+
+### Endpoints
+
+```
+POST   /api/v1/admin/data-discovery/scans                      admin.discovery.scan.create   {"policy_id": N} → 202
+GET    /api/v1/admin/data-discovery/scans                      admin.discovery.scan.view     ?policy_id=&status=
+GET    /api/v1/admin/data-discovery/scans/:id                  admin.discovery.scan.view     counters and targets
+GET    /api/v1/admin/data-discovery/scans/:id/files            admin.discovery.scan.view     ?status=&with_findings=true
+GET    /api/v1/admin/data-discovery/configurations/:id/targets admin.discovery.policy.view   ?source_type=&search=&cursor=&parent=
+```
+
+A second scan for a policy that already has one PENDING or RUNNING returns `409`. Configurations and policies have the usual CRUD under `/admin/data-discovery/configurations` and `/admin/data-discovery/policies`.
+
+In the dashboard, **Data Discovery → Scans** lists scans and refreshes them while they run. Clicking a scan opens its counters and targets, and from there its per-file results, each with the rules it matched.
+
+### Where the code is
+
+| Path | Role |
+|---|---|
+| [`scanner/scanner.go`](backend/internal/datadiscovery/scanner/scanner.go) | claim loop, `Receive` → preProcess / process / postProcess, terminal status |
+| [`scanner/pipeline.go`](backend/internal/datadiscovery/scanner/pipeline.go) | per-target producer and file workers, counters, progress |
+| [`scanner/queue.go`](backend/internal/datadiscovery/scanner/queue.go) | the bounded queue of waiting files |
+| [`scanner/evaluator.go`](backend/internal/datadiscovery/scanner/evaluator.go) | windowed keyword and regex evaluation |
+| [`scanner/processor.go`](backend/internal/datadiscovery/scanner/processor.go), `office.go`, `pdf.go` | format processors and spooling |
+| [`provider/`](backend/internal/datadiscovery/provider/) | per-source listing, download, target browsing, token handling |
+| [`strategy/`](backend/internal/datadiscovery/strategy/) | per-source `Connect`, per-configuration `BrowseTargets` |
+| [`services/datadiscovery/scan_service.go`](backend/internal/admin/services/datadiscovery/scan_service.go) | the scan API, and the store the scanner writes through |
+
 ## Migrations
 
 ```bash
@@ -227,6 +428,8 @@ make migrate-up
 make migrate-down
 make migrate-create name=add_something
 ```
+
+Scans need migration `000008_data_discovery_scans`. It adds the scan, target and file-result tables, and the `admin.discovery.scan.*` privileges for admin roles. Role privileges are cached in Redis for 10 minutes, so signed-in users see the new privileges once that expires and they reload the page.
 
 ## Tests
 
@@ -258,6 +461,14 @@ TEST_S3_USE_SSL        false
 
 `TEST_S3_*` is the only optional group. Unset or unreachable object storage skips the logo round-trip tests and leaves the rest running — the bucket is created on connect, so it need not exist beforehand.
 
+Data discovery tests need no network or cloud accounts. Provider tests drive fake HTTP backends (including the real AWS SDK), and pipeline tests use a fake source and store:
+
+```bash
+go test ./tests/datadiscovery/...                        # includes 128 MiB streaming memory tests
+go test -short -race ./tests/datadiscovery/scanner/      # skips the memory tests, checks the workers for races
+go test -tags integration ./tests/datadiscovery/scans/   # needs TEST_DATABASE_URL
+```
+
 `make` loads `.env` itself; a bare `go test` does not. To run a subset directly:
 
 ```bash
@@ -277,6 +488,7 @@ Everything is environment-driven. The ones without defaults:
 | `PASSWORD_PEPPER`, `CSRF_SECRET` | mixed into every password hash and CSRF token |
 | `CORS_ALLOWED_ORIGIN` | exact origin, no trailing slash; credentials forbid wildcards |
 | `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` | object storage for customer logos; the process exits if it is unreachable. The endpoint may include a scheme and a path — `https://<ref>.storage.supabase.co/storage/v1/s3` works, as does a bare `localhost:9000` |
+| `DATA_DISCOVERY_MASTER_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`); encrypts every data discovery credential, and the process exits without it. Losing it makes stored credentials unreadable |
 
 Notable defaults:
 
@@ -299,6 +511,17 @@ Notable defaults:
 | `RELAY_MX_OVERRIDE` | empty | force all mail to one host, for development |
 | `RELAY_MAX_ATTEMPTS` | `3` | with 1m → 5m backoff, capped at 15m |
 | `SHUTDOWN_TIMEOUT` | `30s` | bounds the worker drain |
+| `ACCESS_TTL` / `REFRESH_TTL` | `15m` / `720h` | see [Sessions](#sessions) |
+| `DATA_DISCOVERY_SCANNER_ENABLED` | `true` | turn off to run an API-only instance that never claims scans |
+| `DATA_DISCOVERY_FILE_WORKERS` | `5` | 1–8; files processed at once within a target |
+| `DATA_DISCOVERY_QUEUE_CAPACITY` | `100` | 1–5000; files waiting for a worker |
+| `DATA_DISCOVERY_EVALUATOR_WORKERS` | `4` | 1–16; rule-evaluation goroutines shared by all file workers |
+| `DATA_DISCOVERY_CHUNK_BYTES` | 1 MiB | 64 KiB–8 MiB; evaluation window size |
+| `DATA_DISCOVERY_FILE_TIMEOUT` | `30m` | per file; a slow file fails with `TIMEOUT` and the scan moves on |
+| `DATA_DISCOVERY_SPOOL_DIR` | OS temp dir | must exist; holds office and PDF files while they are parsed |
+| `DATA_DISCOVERY_MAX_SPOOL_BYTES` | 1 GiB | larger office and PDF files fail with `FILE_TOO_LARGE` |
+| `DATA_DISCOVERY_TEST_TIMEOUT` | `20s` | connection tests and target browsing; also the response-header timeout for scan downloads |
+| `DATA_DISCOVERY_KEY_VERSION` | `1` | bumped when the master key is rotated |
 
 The remaining `SMTP_*`, `RELAY_*` and `DELIVERY_*` knobs live in `internal/config/smtpserver.go`, `internal/config/relay.go` and `internal/config/delivery.go`.
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, ListFilter, Loader2, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { CircleAlert, ListFilter, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import type {
   DataTableQueryArgs,
   TableAction,
 } from "@/components/data-table/types";
+import { DataTableSkeleton } from "@/components/loading/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -234,10 +235,7 @@ export default function AlertsPage() {
   function body() {
     if (privilegesLoading) {
       return (
-        <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {common("loading")}
-        </div>
+        <DataTableSkeleton />
       );
     }
 

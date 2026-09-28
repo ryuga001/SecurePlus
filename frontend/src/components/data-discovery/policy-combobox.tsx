@@ -1,9 +1,10 @@
 "use client";
 
-import { CircleAlert, Loader2 } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { OptionSkeleton } from "@/components/loading/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -117,11 +118,10 @@ export function PolicyCombobox({
         </div>
 
         <ComboboxContent>
-          {isFetching ? (
-            <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
-              {t("scans.picker.searching")}
-            </div>
+          {isFetching && items.length === 0 ? <OptionSkeleton label={t("scans.picker.searching")} /> : null}
+
+          {isFetching && items.length > 0 ? (
+            <div role="status" aria-label={t("scans.picker.searching")} className="h-0.5 animate-pulse bg-primary" />
           ) : null}
 
           {isError ? (
@@ -134,7 +134,7 @@ export function PolicyCombobox({
             </div>
           ) : null}
 
-          <ComboboxEmpty>{t("scans.picker.noPolicies")}</ComboboxEmpty>
+          {!isFetching ? <ComboboxEmpty>{t("scans.picker.noPolicies")}</ComboboxEmpty> : null}
 
           <ComboboxList>
             {items.map((item) => (

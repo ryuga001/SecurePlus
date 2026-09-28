@@ -30,6 +30,7 @@ import {
 } from "@/components/data-discovery/target-list-editor";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { DrawerWrapper } from "@/components/drawer/drawer";
+import { FormSkeleton } from "@/components/loading/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -529,12 +530,7 @@ function PolicyLoader({
   });
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        {t("oneMoment")}
-      </div>
-    );
+    return <FormSkeleton fields={5} label={t("oneMoment")} />;
   }
 
   if (isError) {

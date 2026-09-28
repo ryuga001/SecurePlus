@@ -3,7 +3,6 @@
 import {
   CircleAlert,
   ListFilter,
-  Loader2,
   MoreHorizontal,
   Pencil,
   PlugZap,
@@ -31,6 +30,7 @@ import type {
   DataTableQueryArgs,
   TableAction,
 } from "@/components/data-table/types";
+import { DataTableSkeleton } from "@/components/loading/skeletons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -252,10 +252,7 @@ export default function DiscoveryConfigurationsPage() {
   function body() {
     if (privilegesLoading) {
       return (
-        <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {common("loading")}
-        </div>
+        <DataTableSkeleton />
       );
     }
 

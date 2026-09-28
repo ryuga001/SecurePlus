@@ -288,6 +288,41 @@ DELETE /api/v1/admin/users/:id
 - **Changing a user's role** is eventually consistent. It applies at their next token refresh (at most `ACCESS_TTL`, 15 minutes by default) and does not log them out.
 - **Deleting a user** bumps their token version, so their current sessions end immediately.
 
+## Email Protection analytics
+
+The dashboard's Email Protection section is served by one aggregation endpoint. It reads the same `email_incidents` collection the incident list uses — no new collection, no new index, no new privilege.
+
+```
+GET /api/v1/admin/email/analytics?period=day|week|month
+```
+
+Guarded by `admin.email.incident.view`. One `period` parameter drives every widget:
+
+| `period` | Trend bucket | Trend points | Summary + top-5 window |
+|---|---|---|---|
+| `day` | day | 14 | last 24 h |
+| `week` | week (Monday start) | 8 | last 7 d |
+| `month` | calendar month | 6 | last 30 d |
+
+The trend deliberately covers **more** history than the rankings: the headline numbers describe the current period, the bars show the run-up to it. Both windows are returned so the UI can label them. `period` defaults to `week`.
+
+The response carries a `summary`, a zero-filled `trend`, and `top_users` / `top_policies` / `top_rules`. Arrays are always present — `[]`, never `null`. Trend points are zero-filled to a fixed length in the service, so a quiet week renders as a gap rather than a collapsed axis.
+
+**Every count is split blocked vs flagged.** A bare incident count hides the distinction that matters most: a `BLOCK` withheld the recipients, while everything else was recorded and delivered. Note that `QUARANTINE` and `REDACT` currently only log and deliver (`adjudication` registers a log executor for all three non-block actions), so the split is deliberately two-way — a "quarantined" metric would claim a containment that does not happen yet.
+
+**Rankings count incidents, not matches.** One email matching a policy through three rules counts once for that policy; a rule matching fifty times in one email counts once. Without that dedupe a single noisy message dominates every ranking. It is done with a two-stage `$group` — first keyed on `(correlation_id, policy_id)`, then on the policy.
+
+Everything is one `$facet` aggregation, so the whole dashboard is a single round trip. The leading `$match` on `customer_id` runs before any grouping, so tenant isolation holds throughout, and it is covered by the existing `customer_id + created_at` index. `$dateTrunc` needs MongoDB 5.0 or newer.
+
+Code lives under the audit module, mirroring the admin module's per-feature layering:
+
+| Path | Role |
+|---|---|
+| [`dto/emailanalytics`](backend/internal/audit/dto/emailanalytics/email_analytics_dto.go) | period constants, internal types, JSON response types |
+| [`repositories/emailanalytics`](backend/internal/audit/repositories/emailanalytics/email_analytics_repository.go) | the `$facet` pipeline; returns sparse rows |
+| [`services/emailanalytics`](backend/internal/audit/services/emailanalytics/email_analytics_service.go) | `Plan` and `ZeroFill` — pure, unit-tested without Mongo |
+| [`handler/emailanalytics`](backend/internal/audit/handler/emailanalytics/email_analytics_handler.go) | route, query binding, response mapping |
+
 ## Sessions
 
 Login sets three cookies:

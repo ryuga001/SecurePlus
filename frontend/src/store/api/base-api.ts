@@ -55,6 +55,7 @@ export const baseApi = createApi({
     "EmailConfiguration",
     "AuditLog",
     "EmailIncident",
+    "EmailAnalytics",
     "Alert",
     "DiscoveryConfiguration",
     "DiscoveryPolicy",

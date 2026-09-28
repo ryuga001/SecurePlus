@@ -49,10 +49,13 @@ import (
 	rolesvc "dpdp-backend/internal/admin/services/role"
 	rulesvc "dpdp-backend/internal/admin/services/rule"
 	audithandler "dpdp-backend/internal/audit/handler/deliveryaudit"
+	analyticshandler "dpdp-backend/internal/audit/handler/emailanalytics"
 	incidenthandler "dpdp-backend/internal/audit/handler/emailincident"
 	auditrepo "dpdp-backend/internal/audit/repositories/deliveryaudit"
+	analyticsrepo "dpdp-backend/internal/audit/repositories/emailanalytics"
 	incidentrepo "dpdp-backend/internal/audit/repositories/emailincident"
 	auditsvc "dpdp-backend/internal/audit/services/deliveryaudit"
+	analyticssvc "dpdp-backend/internal/audit/services/emailanalytics"
 	incidentsvc "dpdp-backend/internal/audit/services/emailincident"
 	"dpdp-backend/internal/auth"
 	"dpdp-backend/internal/config"
@@ -118,6 +121,7 @@ func main() {
 	}
 
 	incidents := incidentsvc.NewEmailIncidentService(incidentrepo.NewEmailIncidentRepository(mongoClient, cfg.Mongo.Database))
+	emailAnalytics := analyticssvc.NewEmailAnalyticsService(analyticsrepo.NewEmailAnalyticsRepository(mongoClient, cfg.Mongo.Database))
 	if err := incidents.EnsureIndexes(startupCtx); err != nil {
 		slog.Error("email incident index creation failed", "error", err)
 		os.Exit(1)
@@ -327,6 +331,7 @@ func main() {
 	})
 	auditHandler := audithandler.NewDeliveryAuditHandler(recorder)
 	incidentHandler := incidenthandler.NewEmailIncidentHandler(incidents)
+	emailAnalyticsHandler := analyticshandler.NewEmailAnalyticsHandler(emailAnalytics)
 
 	if cfg.App.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -376,6 +381,7 @@ func main() {
 	profileHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
 	incidentHandler.RegisterRoutes(protected, guard)
+	emailAnalyticsHandler.RegisterRoutes(protected, guard)
 
 	requireAdmin := middleware.RequireAdminRole(database)
 	roleHandler.RegisterRoutes(protected, requireAdmin)

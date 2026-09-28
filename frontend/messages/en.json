@@ -88,14 +88,73 @@
   },
   "dashboard": {
     "welcome": "Welcome, {name}",
-    "signedInTo": "You are signed in to {org}",
-    "organization": "Organization",
-    "tenantDetails": "Tenant details",
-    "account": "Account",
-    "yourDashboardUser": "Your dashboard user",
-    "role": "Role",
-    "accessLevel": "Access level",
-    "id": "ID {id}"
+    "subheading": "Monitor your organization's security activity and incidents.",
+    "email": {
+      "loadFailed": "The dashboard could not be loaded.",
+      "topFive": "TOP 5",
+      "denied": {
+        "title": "Nothing to show yet",
+        "description": "You need the email incident view privilege to see security activity here."
+      },
+      "period": {
+        "label": "Time range",
+        "short": {
+          "day": "24h",
+          "week": "7d",
+          "month": "30d"
+        },
+        "caption": {
+          "day": "Last 24 hours",
+          "week": "Last 7 days",
+          "month": "Last 30 days"
+        }
+      },
+      "summary": {
+        "label": "Incident summary",
+        "total": "Total incidents",
+        "totalHint": "Detected during the selected period",
+        "blocked": "Blocked",
+        "blockedHint": "Recipients were withheld by a policy",
+        "flagged": "Flagged",
+        "flaggedHint": "Recorded for review, mail still delivered"
+      },
+      "trend": {
+        "title": "Security incident activity",
+        "subtitle": "Incident volume and enforcement outcome over time",
+        "blocked": "Blocked",
+        "flagged": "Flagged (delivered)",
+        "bucket": "Period",
+        "total": "Total",
+        "totalValue": "{count} total",
+        "barLabel": "{bucket}: {blocked} blocked, {flagged} flagged"
+      },
+      "senders": {
+        "title": "Top senders",
+        "subtitle": "People whose mail raised the most incidents",
+        "split": "{blocked} blocked · {flagged} flagged",
+        "empty": "No incidents in this period"
+      },
+      "policies": {
+        "title": "Top triggered policies",
+        "subtitle": "Incidents involving each policy",
+        "empty": "No policies triggered in this period"
+      },
+      "rules": {
+        "title": "Top triggered rules",
+        "subtitle": "Incidents involving each rule",
+        "empty": "No rules matched in this period"
+      },
+      "activity": {
+        "title": "Recent security activity",
+        "subtitle": "Latest incidents across email protection",
+        "viewAll": "View all",
+        "blockedTitle": "Incident blocked by an active policy",
+        "flaggedTitle": "Incident flagged for review",
+        "detail": "{sender} · {matches} rule matches",
+        "empty": "No incidents recorded yet",
+        "loadFailed": "Recent activity could not be loaded."
+      }
+    }
   },
   "rules": {
     "heading": "Detection rules",

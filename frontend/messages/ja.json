@@ -87,15 +87,74 @@
     "succeeded": "成功"
   },
   "dashboard": {
-    "welcome": "ようこそ、{name}さん",
-    "signedInTo": "{org} にサインインしています",
-    "organization": "組織",
-    "tenantDetails": "テナント情報",
-    "account": "アカウント",
-    "yourDashboardUser": "ダッシュボードユーザー",
-    "role": "ロール",
-    "accessLevel": "アクセスレベル",
-    "id": "ID {id}"
+    "welcome": "{name} さん、ようこそ",
+    "subheading": "組織のセキュリティ活動とインシデントを監視します。",
+    "email": {
+      "loadFailed": "ダッシュボードを読み込めませんでした。",
+      "topFive": "上位5件",
+      "denied": {
+        "title": "表示できる情報がありません",
+        "description": "ここでセキュリティ活動を確認するには、メールインシデントの閲覧権限が必要です。"
+      },
+      "period": {
+        "label": "期間",
+        "short": {
+          "day": "24時間",
+          "week": "7日",
+          "month": "30日"
+        },
+        "caption": {
+          "day": "過去24時間",
+          "week": "過去7日間",
+          "month": "過去30日間"
+        }
+      },
+      "summary": {
+        "label": "インシデントの概要",
+        "total": "インシデント総数",
+        "totalHint": "選択した期間に検出された件数",
+        "blocked": "ブロック",
+        "blockedHint": "ポリシーにより受信者への送信を保留しました",
+        "flagged": "フラグ",
+        "flaggedHint": "確認用に記録し、メールは配信されました"
+      },
+      "trend": {
+        "title": "セキュリティインシデントの推移",
+        "subtitle": "インシデント件数と適用結果の推移",
+        "blocked": "ブロック",
+        "flagged": "フラグ(配信済み)",
+        "bucket": "期間",
+        "total": "合計",
+        "totalValue": "合計 {count} 件",
+        "barLabel": "{bucket}: ブロック {blocked} 件、フラグ {flagged} 件"
+      },
+      "senders": {
+        "title": "送信者の上位",
+        "subtitle": "インシデントが最も多かった送信者",
+        "split": "ブロック {blocked} 件 · フラグ {flagged} 件",
+        "empty": "この期間のインシデントはありません"
+      },
+      "policies": {
+        "title": "適用の多いポリシー",
+        "subtitle": "各ポリシーに関連するインシデント",
+        "empty": "この期間に適用されたポリシーはありません"
+      },
+      "rules": {
+        "title": "検出の多いルール",
+        "subtitle": "各ルールに関連するインシデント",
+        "empty": "この期間に一致したルールはありません"
+      },
+      "activity": {
+        "title": "最近のセキュリティ活動",
+        "subtitle": "メール保護における最新のインシデント",
+        "viewAll": "すべて表示",
+        "blockedTitle": "有効なポリシーによりインシデントをブロックしました",
+        "flaggedTitle": "確認用にインシデントをフラグしました",
+        "detail": "{sender} · ルール一致 {matches} 件",
+        "empty": "記録されたインシデントはまだありません",
+        "loadFailed": "最近の活動を読み込めませんでした。"
+      }
+    }
   },
   "rules": {
     "heading": "検出ルール",

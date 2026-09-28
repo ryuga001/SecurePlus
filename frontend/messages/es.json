@@ -87,15 +87,74 @@
     "succeeded": "Correcto"
   },
   "dashboard": {
-    "welcome": "Bienvenido, {name}",
-    "signedInTo": "Has iniciado sesión en {org}",
-    "organization": "Organización",
-    "tenantDetails": "Detalles del inquilino",
-    "account": "Cuenta",
-    "yourDashboardUser": "Tu usuario del panel",
-    "role": "Rol",
-    "accessLevel": "Nivel de acceso",
-    "id": "ID {id}"
+    "welcome": "Hola, {name}",
+    "subheading": "Supervisa la actividad de seguridad y los incidentes de tu organización.",
+    "email": {
+      "loadFailed": "No se pudo cargar el panel.",
+      "topFive": "TOP 5",
+      "denied": {
+        "title": "Todavía no hay nada que mostrar",
+        "description": "Necesitas el privilegio de ver incidentes de correo para consultar la actividad de seguridad aquí."
+      },
+      "period": {
+        "label": "Intervalo de tiempo",
+        "short": {
+          "day": "24 h",
+          "week": "7 d",
+          "month": "30 d"
+        },
+        "caption": {
+          "day": "Últimas 24 horas",
+          "week": "Últimos 7 días",
+          "month": "Últimos 30 días"
+        }
+      },
+      "summary": {
+        "label": "Resumen de incidentes",
+        "total": "Incidentes totales",
+        "totalHint": "Detectados durante el periodo seleccionado",
+        "blocked": "Bloqueados",
+        "blockedHint": "Una política retuvo a los destinatarios",
+        "flagged": "Marcados",
+        "flaggedHint": "Registrados para revisión, el correo se entregó"
+      },
+      "trend": {
+        "title": "Actividad de incidentes de seguridad",
+        "subtitle": "Volumen de incidentes y resultado de la aplicación a lo largo del tiempo",
+        "blocked": "Bloqueados",
+        "flagged": "Marcados (entregados)",
+        "bucket": "Periodo",
+        "total": "Total",
+        "totalValue": "{count} en total",
+        "barLabel": "{bucket}: {blocked} bloqueados, {flagged} marcados"
+      },
+      "senders": {
+        "title": "Remitentes principales",
+        "subtitle": "Personas cuyo correo generó más incidentes",
+        "split": "{blocked} bloqueados · {flagged} marcados",
+        "empty": "Sin incidentes en este periodo"
+      },
+      "policies": {
+        "title": "Políticas más activadas",
+        "subtitle": "Incidentes que implican cada política",
+        "empty": "Ninguna política se activó en este periodo"
+      },
+      "rules": {
+        "title": "Reglas más activadas",
+        "subtitle": "Incidentes que implican cada regla",
+        "empty": "Ninguna regla coincidió en este periodo"
+      },
+      "activity": {
+        "title": "Actividad de seguridad reciente",
+        "subtitle": "Últimos incidentes de la protección de correo",
+        "viewAll": "Ver todo",
+        "blockedTitle": "Incidente bloqueado por una política activa",
+        "flaggedTitle": "Incidente marcado para revisión",
+        "detail": "{sender} · {matches} coincidencias de reglas",
+        "empty": "Todavía no se ha registrado ningún incidente",
+        "loadFailed": "No se pudo cargar la actividad reciente."
+      }
+    }
   },
   "rules": {
     "heading": "Reglas de detección",

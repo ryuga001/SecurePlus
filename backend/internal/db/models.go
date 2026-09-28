@@ -17,11 +17,14 @@ type Customer struct {
 func (Customer) TableName() string { return "customers" }
 
 type Role struct {
-	ID         int         `gorm:"column:id;primaryKey"`
-	Name       string      `gorm:"column:name"`
-	Type       string      `gorm:"column:type"`
-	CustomerID int         `gorm:"column:customer_id"`
-	Privileges []Privilege `gorm:"many2many:role_privileges;joinForeignKey:role_id;joinReferences:privilege_id"`
+	ID          int         `gorm:"column:id;primaryKey"`
+	Name        string      `gorm:"column:name"`
+	Description string      `gorm:"column:description"`
+	Type        string      `gorm:"column:type"`
+	CustomerID  int         `gorm:"column:customer_id"`
+	CreatedAt   time.Time   `gorm:"column:created_at"`
+	UpdatedAt   time.Time   `gorm:"column:updated_at"`
+	Privileges  []Privilege `gorm:"many2many:role_privileges;joinForeignKey:role_id;joinReferences:privilege_id"`
 }
 
 func (Role) TableName() string { return "roles" }

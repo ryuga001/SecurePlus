@@ -43,20 +43,7 @@ func (r rolePrivileges) Privileges(ctx context.Context, roleID int) ([]string, e
 func dashboardUser(t *testing.T, h harness, customerID int, roleID *int, email string) db.DashboardUser {
 	t.Helper()
 
-	user := db.DashboardUser{
-		CustomerID:   customerID,
-		RoleID:       roleID,
-		FirstName:    "Asha",
-		LastName:     "Rao",
-		Email:        email,
-		PasswordHash: "!",
-	}
-
-	if err := h.database.Omit("Customer", "Role", "PasswordSalt", "CreatedAt").Create(&user).Error; err != nil {
-		t.Fatalf("dashboard user insert failed: %v", err)
-	}
-
-	return user
+	return testsupport.DashboardUser(t, h.database, customerID, roleID, email)
 }
 
 func profileRouter(t *testing.T, h harness, user db.DashboardUser) *gin.Engine {

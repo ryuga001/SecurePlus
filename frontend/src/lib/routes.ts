@@ -3,6 +3,7 @@ import {
     Building2,
     ChartNoAxesCombined,
     FileText,
+    KeyRound,
     LayoutDashboard,
     Mail,
     Palette,
@@ -28,6 +29,7 @@ export type RouteNode = {
     routePath?: string;
     icon?: LucideIcon;
     privileges: readonly string[];
+    adminOnly?: boolean;
     hidden?: boolean;
     defaultOpen?: boolean;
     children?: Record<string, RouteNode>;
@@ -53,25 +55,25 @@ export const routes = {
                 labelKey: "configurations",
                 routePath: "/admin/email/configurations",
                 icon: SlidersHorizontal,
-                privileges: [],
+                privileges: ["admin.email.provider.view"],
             },
             policies: {
                 labelKey: "policies",
                 routePath: "/admin/policies",
                 icon: ShieldCheck,
-                privileges: [],
+                privileges: ["admin.policy.view"],
             },
             users: {
                 labelKey: "users",
                 routePath: "/admin/email/users",
                 icon: Users,
-                privileges: [],
+                privileges: ["admin.email.user.view"],
             },
             groups: {
                 labelKey: "groups",
                 routePath: "/admin/email/groups",
                 icon: UsersRound,
-                privileges: [],
+                privileges: ["admin.email.group.view"],
             },
             audits: {
                 labelKey: "audits",
@@ -143,7 +145,7 @@ export const routes = {
                 labelKey: "detectionRules",
                 routePath: "/admin/content-inspection/rules",
                 icon: Regex,
-                privileges: [],
+                privileges: ["admin.rule.view"],
             },
         },
     },
@@ -158,18 +160,21 @@ export const routes = {
                 routePath: "/admin/console",
                 icon: ScrollText,
                 privileges: [],
+                adminOnly: true,
                 children: {
                     user_roles: {
                         labelKey: "userRoles",
                         routePath: "/admin/console/user-roles",
-                        icon: Users,
+                        icon: KeyRound,
                         privileges: [],
+                        adminOnly: true,
                     },
                     user_management: {
                         labelKey: "userManagement",
                         routePath: "/admin/console/user-management",
                         icon: Users,
                         privileges: [],
+                        adminOnly: true,
                     },
                 }
             },
@@ -196,3 +201,24 @@ export const routes = {
         },
     },
 } as const satisfies RouteMap;
+
+export type RouteAccess = {
+    isAdmin: boolean;
+    granted: readonly string[] | null;
+};
+
+function permitted(node: RouteNode, access: RouteAccess) {
+    if (node.privileges.length === 0 || access.granted === null) return true;
+    return node.privileges.some((privilege) => access.granted?.includes(privilege));
+}
+
+export function isRouteVisible(node: RouteNode, access: RouteAccess): boolean {
+    if (node.hidden) return false;
+    if (node.adminOnly && !access.isAdmin) return false;
+
+    const childVisible = Object.values(node.children ?? {}).some((child) => isRouteVisible(child, access));
+
+    if (!node.routePath) return childVisible;
+
+    return permitted(node, access) || childVisible;
+}

@@ -9,7 +9,8 @@ import { useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
-import { routes, type RouteMap, type RouteNode } from "@/lib/routes";
+import { useRouteAccess } from "@/hooks/use-route-access";
+import { isRouteVisible, routes, type RouteAccess, type RouteMap, type RouteNode } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 function isActive(pathname: string, node: RouteNode): boolean {
@@ -60,7 +61,7 @@ function NavLink({
   );
 }
 
-function NavGroup({ node, pathname }: { node: RouteNode; pathname: string }) {
+function NavGroup({ node, pathname, access }: { node: RouteNode; pathname: string; access: RouteAccess }) {
   const active = isActive(pathname, node);
   const [open, setOpen] = useState(active || node.defaultOpen === true);
   const Icon = node.icon;
@@ -89,9 +90,11 @@ function NavGroup({ node, pathname }: { node: RouteNode; pathname: string }) {
 
       {open ? (
         <div className="mt-1 flex flex-col">
-          {Object.entries(node.children ?? {}).map(([key, child]) =>
+          {Object.entries(node.children ?? {})
+            .filter(([, child]) => isRouteVisible(child, access))
+            .map(([key, child]) =>
             isGroup(child) ? (
-              <NavGroup key={key} node={child} pathname={pathname} />
+              <NavGroup key={key} node={child} pathname={pathname} access={access} />
             ) : (
               <NavLink key={key} node={child} pathname={pathname} nested />
             )
@@ -118,7 +121,8 @@ const Sidebar = () => {
     router.replace("/login");
   }
 
-  const items = Object.entries(routes as RouteMap).filter(([, node]) => !node.hidden);
+  const access = useRouteAccess();
+  const items = Object.entries(routes as RouteMap).filter(([, node]) => isRouteVisible(node, access));
 
   return (
     <aside className="flex h-svh w-60 shrink-0 flex-col overflow-hidden border-r bg-sidebar">
@@ -148,7 +152,7 @@ const Sidebar = () => {
       <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
         {items.map(([key, node]) =>
           isGroup(node) ? (
-            <NavGroup key={key} node={node} pathname={pathname} />
+            <NavGroup key={key} node={node} pathname={pathname} access={access} />
           ) : (
             <NavLink key={key} node={node} pathname={pathname} />
           )

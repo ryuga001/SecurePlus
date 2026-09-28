@@ -100,6 +100,20 @@ const (
 	MsgNameTooLong         = "first name and last name must be 50 characters or fewer"
 	MsgAdminEmailImmutable = "the admin email is the sign-in address and cannot be changed here"
 
+	MsgRoleNotFound           = "role not found"
+	MsgRoleNameNeeded         = "role name must be between 2 and 50 characters"
+	MsgRoleDescriptionTooLong = "description must be 255 characters or fewer"
+	MsgRoleNameTaken          = "a role with this name already exists"
+	MsgPrivilegesNeeded       = "select at least one privilege"
+	MsgUnknownPrivilege       = "one or more selected privileges are not available"
+	MsgSystemRoleImmutable    = "system roles cannot be modified or deleted"
+	MsgRoleInUse              = "this role is assigned to one or more users"
+	MsgUnknownRole            = "the selected role is not available"
+	MsgDashboardUserNotFound  = "user not found"
+	MsgSelfModification       = "you cannot change your own role or delete your own account"
+	MsgLastAdministrator      = "at least one administrator must remain"
+	MsgUserEmailImmutable     = "the email is the sign-in address and cannot be changed"
+
 	MsgInvalidRequest    = "request body is invalid"
 	MsgInvalidIdentifier = "invalid identifier"
 	MsgUnauthenticated   = "unauthenticated"
@@ -170,6 +184,14 @@ const (
 	CodeForbidden           = "forbidden"
 	CodeOrgNameTaken        = "org_name_taken"
 	CodeAdminEmailImmutable = "admin_email_immutable"
+
+	CodeRoleNameTaken       = "role_name_taken"
+	CodePrivilegeNotFound   = "privilege_not_found"
+	CodeSystemRoleImmutable = "system_role_immutable"
+	CodeRoleInUse           = "role_in_use"
+	CodeRoleNotFound        = "role_not_found"
+	CodeSelfModification    = "self_modification"
+	CodeLastAdministrator   = "last_administrator"
 )
 
 const (

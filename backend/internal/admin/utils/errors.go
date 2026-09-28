@@ -100,6 +100,20 @@ var (
 	ErrOrgEditForbidden    = errors.New(MsgOrgEditForbidden)
 	ErrNameTooLong         = errors.New(MsgNameTooLong)
 	ErrAdminEmailImmutable = errors.New(MsgAdminEmailImmutable)
+
+	ErrRoleNotFound           = errors.New(MsgRoleNotFound)
+	ErrRoleNameNeeded         = errors.New(MsgRoleNameNeeded)
+	ErrRoleDescriptionTooLong = errors.New(MsgRoleDescriptionTooLong)
+	ErrRoleNameTaken          = errors.New(MsgRoleNameTaken)
+	ErrPrivilegesNeeded       = errors.New(MsgPrivilegesNeeded)
+	ErrUnknownPrivilege       = errors.New(MsgUnknownPrivilege)
+	ErrSystemRoleImmutable    = errors.New(MsgSystemRoleImmutable)
+	ErrRoleInUse              = errors.New(MsgRoleInUse)
+	ErrUnknownRole            = errors.New(MsgUnknownRole)
+	ErrDashboardUserNotFound  = errors.New(MsgDashboardUserNotFound)
+	ErrSelfModification       = errors.New(MsgSelfModification)
+	ErrLastAdministrator      = errors.New(MsgLastAdministrator)
+	ErrUserEmailImmutable     = errors.New(MsgUserEmailImmutable)
 )
 
 func Taken(sentinel error, value string) error {

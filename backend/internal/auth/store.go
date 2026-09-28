@@ -247,6 +247,10 @@ func (s *Store) CachePrivileges(ctx context.Context, roleID int, names []string,
 	return err
 }
 
+func (s *Store) DropPrivileges(ctx context.Context, roleID int) error {
+	return s.rdb.Del(ctx, privilegeKey(roleID)).Err()
+}
+
 func (s *Store) Identity(ctx context.Context, userID int) (IdentitySnapshot, error) {
 	raw, err := s.rdb.Get(ctx, identityKey(userID)).Bytes()
 	if errors.Is(err, redis.Nil) {

@@ -254,6 +254,80 @@ func Role(t *testing.T, database *gorm.DB, customerID int, privileges ...string)
 	return role
 }
 
+func CustomRole(t *testing.T, database *gorm.DB, customerID int, name string, privileges ...string) db.Role {
+	t.Helper()
+
+	role := db.Role{Name: name, Type: db.RoleTypeCustom, CustomerID: customerID}
+
+	if err := database.Omit("Privileges").Create(&role).Error; err != nil {
+		t.Fatalf("custom role insert failed: %v", err)
+	}
+
+	for _, privilege := range privileges {
+		grant := `INSERT INTO role_privileges (role_id, privilege_id) SELECT ?, id FROM privileges WHERE name = ? ON CONFLICT DO NOTHING`
+
+		if err := database.Exec(grant, role.ID, privilege).Error; err != nil {
+			t.Fatalf("privilege grant failed: %v", err)
+		}
+	}
+
+	return role
+}
+
+func SystemAdminRole(t *testing.T, database *gorm.DB) db.Role {
+	t.Helper()
+
+	var role db.Role
+
+	err := database.
+		Where("customer_id = ? AND type = ?", db.SystemCustomerID, db.RoleTypeAdmin).
+		Take(&role).Error
+	if err != nil {
+		t.Fatalf("system admin role lookup failed: %v", err)
+	}
+
+	return role
+}
+
+func DashboardUser(t *testing.T, database *gorm.DB, customerID int, roleID *int, email string) db.DashboardUser {
+	t.Helper()
+
+	user := db.DashboardUser{
+		CustomerID:   customerID,
+		RoleID:       roleID,
+		FirstName:    "Asha",
+		LastName:     "Rao",
+		Email:        email,
+		PasswordHash: "!",
+	}
+
+	if err := database.Omit("Customer", "Role", "PasswordSalt", "CreatedAt").Create(&user).Error; err != nil {
+		t.Fatalf("dashboard user insert failed: %v", err)
+	}
+
+	return user
+}
+
+func ActorRouter(t *testing.T, user db.DashboardUser) (*gin.Engine, *gin.RouterGroup) {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	group := router.Group("/api/v1")
+
+	group.Use(func(c *gin.Context) {
+		auth.SetClaims(c, &auth.Claims{
+			RegisteredClaims: jwt.RegisteredClaims{Subject: strconv.Itoa(user.ID)},
+			CustomerID:       user.CustomerID,
+			RoleID:           user.RoleID,
+		})
+		c.Next()
+	})
+
+	return router, group
+}
+
 func Group(t *testing.T, database *gorm.DB, customerID int, name string) db.Group {
 	t.Helper()
 

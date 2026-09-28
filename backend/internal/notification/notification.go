@@ -21,6 +21,7 @@ const (
 	TemplatePasswordReset     = "password_reset"
 	TemplatePasswordChanged   = "password_changed"
 	TemplatePolicyBreachAlert = "policy_breach_alert"
+	TemplateUserInvited       = "user_invited_credentials"
 )
 
 const MessageTypeEmail = "EMAIL"

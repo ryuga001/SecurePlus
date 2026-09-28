@@ -61,6 +61,7 @@ export const baseApi = createApi({
     "DiscoveryScan",
     "Branding",
     "Profile",
+    "Role",
   ],
   endpoints: () => ({}),
 });

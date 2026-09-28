@@ -57,6 +57,7 @@ type IdentityUser struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	Role      string `json:"role,omitempty"`
+	RoleType  string `json:"role_type,omitempty"`
 }
 
 type IdentityCustomer struct {
@@ -726,6 +727,7 @@ func ToSnapshot(user db.DashboardUser) IdentitySnapshot {
 
 	if user.Role != nil {
 		snapshot.User.Role = user.Role.Name
+		snapshot.User.RoleType = user.Role.Type
 	}
 
 	return snapshot

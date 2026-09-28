@@ -18,6 +18,7 @@ export type Identity = {
     first_name: string;
     last_name: string;
     role?: string;
+    role_type?: string;
   };
   customer: { id: number; org_name: string };
   branding?: Branding;

@@ -9,6 +9,7 @@ import { GroupDrawer } from "@/components/admin/group-dialog";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import Consolepage from "@/components/dashboard/pageThemes/consolepage";
 import { DataTable } from "@/components/data-table/data-table";
+import { NameChips } from "@/components/data-table/name-chips";
 import type {
   ColumnConfig,
   FilterConfig,
@@ -63,37 +64,16 @@ export default function EmailGroupsPage() {
     {
       key: "member_count",
       label: t("columns.members"),
-      render: (_value, row) => {
-        const members = row.members ?? [];
-        const visible = members.slice(0, 3);
-        const remaining = Math.max(row.member_count - visible.length, 0);
-
-        if (visible.length === 0 && row.member_count === 0) {
-          return (
-            <span className="text-sm text-muted-foreground">—</span>
-          );
-        }
-
-        return (
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            {visible.map((member) => (
-              <span
-                key={member.id}
-                title={member.email}
-                className="max-w-32 truncate rounded-md bg-muted px-2 py-1 text-xs font-medium"
-              >
-                {member.name || member.email}
-              </span>
-            ))}
-
-            {remaining > 0 ? (
-              <span className="rounded-md border px-2 py-1 text-xs font-medium">
-                +{remaining}
-              </span>
-            ) : null}
-          </div>
-        );
-      },
+      render: (_value, row) => (
+        <NameChips
+          items={(row.members ?? []).slice(0, 3).map((member) => ({
+            key: member.id,
+            label: member.name || member.email,
+            title: member.email,
+          }))}
+          total={row.member_count}
+        />
+      ),
     },
     {
       key: "updated_at",

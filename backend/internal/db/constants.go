@@ -5,6 +5,7 @@ const (
 
 	RoleTypeSuperAdmin = "super_admin"
 	RoleTypeAdmin      = "admin"
+	RoleTypeCustom     = "custom"
 
 	PrivilegeTypeDashboard = "DASHBOARD"
 )

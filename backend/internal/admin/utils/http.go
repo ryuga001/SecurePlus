@@ -147,7 +147,9 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrDiscoveryConfigNotFound),
 		errors.Is(err, ErrDiscoveryPolicyNotFound),
 		errors.Is(err, ErrBrandingNotFound),
-		errors.Is(err, ErrProfileNotFound):
+		errors.Is(err, ErrProfileNotFound),
+		errors.Is(err, ErrRoleNotFound),
+		errors.Is(err, ErrDashboardUserNotFound):
 		return http.StatusNotFound, CodeNotFound
 	case errors.Is(err, ErrDiscoveryScanNotFound):
 		return http.StatusNotFound, CodeDiscoveryScanNotFound
@@ -181,6 +183,16 @@ func statusFor(err error) (int, string) {
 		return http.StatusConflict, CodeConfigurationTypeImmutable
 	case errors.Is(err, ErrOrgNameTaken):
 		return http.StatusConflict, CodeOrgNameTaken
+	case errors.Is(err, ErrRoleNameTaken):
+		return http.StatusConflict, CodeRoleNameTaken
+	case errors.Is(err, ErrSystemRoleImmutable):
+		return http.StatusConflict, CodeSystemRoleImmutable
+	case errors.Is(err, ErrRoleInUse):
+		return http.StatusConflict, CodeRoleInUse
+	case errors.Is(err, ErrSelfModification):
+		return http.StatusConflict, CodeSelfModification
+	case errors.Is(err, ErrLastAdministrator):
+		return http.StatusConflict, CodeLastAdministrator
 	case errors.Is(err, ErrDiscoveryScanActive):
 		return http.StatusConflict, CodeDiscoveryScanActive
 	case errors.Is(err, ErrDiscoveryPolicyInactive):
@@ -226,6 +238,10 @@ func statusFor(err error) (int, string) {
 		return http.StatusBadRequest, CodeDiscoveryConfigNotFound
 	case errors.Is(err, ErrUnknownFileType):
 		return http.StatusBadRequest, CodeFileTypeNotFound
+	case errors.Is(err, ErrUnknownPrivilege):
+		return http.StatusBadRequest, CodePrivilegeNotFound
+	case errors.Is(err, ErrUnknownRole):
+		return http.StatusBadRequest, CodeRoleNotFound
 
 	case errors.Is(err, ErrInvalidConfigurationType):
 		return http.StatusBadRequest, CodeInvalidConfigurationType
@@ -248,7 +264,8 @@ func statusFor(err error) (int, string) {
 		return http.StatusBadRequest, CodeInvalidTimezone
 	case errors.Is(err, ErrInvalidLogo):
 		return http.StatusBadRequest, CodeInvalidLogo
-	case errors.Is(err, ErrAdminEmailImmutable):
+	case errors.Is(err, ErrAdminEmailImmutable),
+		errors.Is(err, ErrUserEmailImmutable):
 		return http.StatusBadRequest, CodeAdminEmailImmutable
 
 	case errors.Is(err, ErrInvalidAction),
@@ -272,6 +289,9 @@ func statusFor(err error) (int, string) {
 		errors.Is(err, ErrDiscoveryTargetsNeeded),
 		errors.Is(err, ErrOrgNameNeeded),
 		errors.Is(err, ErrNameTooLong),
+		errors.Is(err, ErrRoleNameNeeded),
+		errors.Is(err, ErrRoleDescriptionTooLong),
+		errors.Is(err, ErrPrivilegesNeeded),
 		errors.Is(err, ErrTooManyItems):
 		return http.StatusBadRequest, CodeValidation
 	}

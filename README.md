@@ -247,6 +247,47 @@ PATCH  /api/v1/admin/profile   {org_name?, first_name?, last_name?} → 200 with
 - The whole update runs in one transaction.
 - A name change drops only the caller's cached `/me`. An org rename drops the cached `/me` of every user in that customer, because the sidebar shows the org name.
 
+## Admin Console: roles and users
+
+Admins can create custom roles (named sets of privileges) and add dashboard users, each with one role. This reuses the existing `roles`, `privileges` and `role_privileges` tables and the existing `RequirePrivilege` checks. There is no second permission system.
+
+**Who can use it.** Every route below is behind `RequireAdminRole`: the caller's role must have type `admin`. Adding a privilege for these routes was ruled out on purpose, so a custom role can never manage roles or users.
+
+**Roles a tenant sees and can assign:**
+- the shared system Admin role (customer 1, type `admin`), which every registered tenant already uses;
+- the tenant's own roles of type `custom`.
+
+`Super Admin` is never exposed. The system Admin role is read-only: `syncPrivileges` keeps it at every privilege, and editing it would change every tenant.
+
+```
+GET    /api/v1/admin/privileges          every DASHBOARD privilege name
+GET    /api/v1/admin/roles               list, with up to 3 privilege and user previews plus totals
+GET    /api/v1/admin/roles/options       id, name, system: for the user role picker and filter
+GET    /api/v1/admin/roles/:id
+POST   /api/v1/admin/roles               {name, description?, privileges: [names]}
+PUT    /api/v1/admin/roles/:id           same body; replaces the whole privilege set
+DELETE /api/v1/admin/roles/:id
+GET    /api/v1/admin/users?search=&role_id=
+GET    /api/v1/admin/users/:id
+POST   /api/v1/admin/users               {first_name, last_name, email, role_id} → {user, invitation_sent}
+PUT    /api/v1/admin/users/:id           {first_name, last_name, role_id}
+DELETE /api/v1/admin/users/:id
+```
+
+**Rules the backend enforces:**
+- **Privileges** are identified by name, not numeric id. An unknown or non-DASHBOARD name rejects the whole request with `400 privilege_not_found`.
+- **Role names** keep the existing case-sensitive `UNIQUE(customer_id, name)`. A clash, or a name matching the system `Admin` role ignoring case, returns `409 role_name_taken`.
+- **Writing to a system role** returns `409 system_role_immutable`.
+- **A role with users can't be deleted** (`409 role_in_use`). Migration `000010` changed `dashboard_users.role_id` from `ON DELETE SET NULL` to `NO ACTION`, so the database refuses to orphan users even under a race.
+- **`role_id`** must be the system Admin role or one of the tenant's custom roles. Anything else (Super Admin, another tenant's role, a missing id) returns `400 role_not_found`.
+- **Admins can't change their own role or delete themselves** (`409 self_modification`). A tenant always keeps at least one system-Admin user (`409 last_administrator`), checked under row locks.
+- **Email:** new users get the `user_invited_credentials` email with a random temporary password. If sending fails, the user is still created and the response says `invitation_sent: false`, so they can use Forgot password instead. The email is the sign-in identity and can't be changed later.
+
+**When changes take effect:**
+- **Editing a custom role's privileges** drops that role's `priv:role:<id>` cache, so the change applies on the users' next request. The system Admin role's cache is never touched.
+- **Changing a user's role** is eventually consistent. It applies at their next token refresh (at most `ACCESS_TTL`, 15 minutes by default) and does not log them out.
+- **Deleting a user** bumps their token version, so their current sessions end immediately.
+
 ## Sessions
 
 Login sets three cookies:

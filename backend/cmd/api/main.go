@@ -17,30 +17,36 @@ import (
 
 	alerthandler "dpdp-backend/internal/admin/handler/alert"
 	brandinghandler "dpdp-backend/internal/admin/handler/branding"
+	dashboarduserhandler "dpdp-backend/internal/admin/handler/dashboarduser"
 	discoveryhandler "dpdp-backend/internal/admin/handler/datadiscovery"
 	providerhandler "dpdp-backend/internal/admin/handler/emailprovider"
 	userhandler "dpdp-backend/internal/admin/handler/emailuser"
 	grouphandler "dpdp-backend/internal/admin/handler/group"
 	policyhandler "dpdp-backend/internal/admin/handler/policy"
 	profilehandler "dpdp-backend/internal/admin/handler/profile"
+	rolehandler "dpdp-backend/internal/admin/handler/role"
 	rulehandler "dpdp-backend/internal/admin/handler/rule"
 	alertrepo "dpdp-backend/internal/admin/repositories/alert"
 	brandingrepo "dpdp-backend/internal/admin/repositories/branding"
+	dashboarduserrepo "dpdp-backend/internal/admin/repositories/dashboarduser"
 	discoveryrepo "dpdp-backend/internal/admin/repositories/datadiscovery"
 	providerrepo "dpdp-backend/internal/admin/repositories/emailprovider"
 	userrepo "dpdp-backend/internal/admin/repositories/emailuser"
 	grouprepo "dpdp-backend/internal/admin/repositories/group"
 	policyrepo "dpdp-backend/internal/admin/repositories/policy"
 	profilerepo "dpdp-backend/internal/admin/repositories/profile"
+	rolerepo "dpdp-backend/internal/admin/repositories/role"
 	rulerepo "dpdp-backend/internal/admin/repositories/rule"
 	alertsvc "dpdp-backend/internal/admin/services/alert"
 	brandingsvc "dpdp-backend/internal/admin/services/branding"
+	dashboardusersvc "dpdp-backend/internal/admin/services/dashboarduser"
 	discoverysvc "dpdp-backend/internal/admin/services/datadiscovery"
 	providersvc "dpdp-backend/internal/admin/services/emailprovider"
 	usersvc "dpdp-backend/internal/admin/services/emailuser"
 	groupsvc "dpdp-backend/internal/admin/services/group"
 	policysvc "dpdp-backend/internal/admin/services/policy"
 	profilesvc "dpdp-backend/internal/admin/services/profile"
+	rolesvc "dpdp-backend/internal/admin/services/role"
 	rulesvc "dpdp-backend/internal/admin/services/rule"
 	audithandler "dpdp-backend/internal/audit/handler/deliveryaudit"
 	incidenthandler "dpdp-backend/internal/audit/handler/emailincident"
@@ -180,6 +186,20 @@ func main() {
 
 	profileHandler := profilehandler.NewProfileHandler(
 		profilesvc.NewProfileService(profilerepo.NewProfileRepository(database), service, store),
+	)
+
+	roleRepository := rolerepo.NewRoleRepository(database)
+	roleHandler := rolehandler.NewRoleHandler(rolesvc.NewRoleService(database, roleRepository, store))
+	dashboardUserHandler := dashboarduserhandler.NewDashboardUserHandler(
+		dashboardusersvc.NewDashboardUserService(
+			database,
+			dashboarduserrepo.NewDashboardUserRepository(database),
+			roleRepository,
+			store,
+			notifier,
+			dashboardusersvc.Hashing{Pepper: cfg.Auth.Pepper, Cost: cfg.Auth.BcryptCost},
+			cfg.App.FrontendBaseURL,
+		),
 	)
 
 	providerRepository := providerrepo.NewEmailProviderRepository(database)
@@ -356,6 +376,10 @@ func main() {
 	profileHandler.RegisterRoutes(protected, guard)
 	auditHandler.RegisterRoutes(protected, guard)
 	incidentHandler.RegisterRoutes(protected, guard)
+
+	requireAdmin := middleware.RequireAdminRole(database)
+	roleHandler.RegisterRoutes(protected, requireAdmin)
+	dashboardUserHandler.RegisterRoutes(protected, requireAdmin)
 
 	rest.NewSubmitHandler(
 		authorizer,

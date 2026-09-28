@@ -4,7 +4,8 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { routes, type RouteMap, type RouteNode } from "@/lib/routes";
+import { useRouteAccess } from "@/hooks/use-route-access";
+import { isRouteVisible, routes, type RouteMap, type RouteNode } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 function owns(pathname: string, node: RouteNode) {
@@ -32,9 +33,10 @@ function findTabParent(pathname: string, map: RouteMap): RouteNode | undefined {
 const PageTabs = () => {
   const pathname = usePathname();
   const t = useTranslations("nav");
+  const access = useRouteAccess();
   const parent = findTabParent(pathname, routes as RouteMap);
   const tabs = Object.entries(parent?.children ?? {}).filter(
-    ([, child]) => child.routePath && !child.hidden
+    ([, child]) => child.routePath && isRouteVisible(child, access)
   );
 
   if (tabs.length === 0) return null;

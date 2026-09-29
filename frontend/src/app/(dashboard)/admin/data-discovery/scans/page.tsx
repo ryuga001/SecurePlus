@@ -94,14 +94,11 @@ export default function DiscoveryScansPage() {
   const appliedKey = React.useMemo(() => JSON.stringify(appliedParams), [appliedParams]);
   const activeCount = activeScanFilterCount(applied);
 
-  const query = React.useCallback(
-    (args: DataTableQueryArgs) =>
-      useLiveScanList({
-        ...args,
-        filters: { ...args.filters, ...appliedParams },
-      }),
-    [appliedParams],
-  );
+  const useScopedQuery = (args: DataTableQueryArgs) =>
+    useLiveScanList({
+      ...args,
+      filters: { ...args.filters, ...appliedParams },
+    });
 
   async function rescan(row: DiscoveryScanListItem) {
     try {
@@ -281,7 +278,7 @@ export default function DiscoveryScansPage() {
       <>
         <DataTable
           key={appliedKey}
-          query={query}
+          query={useScopedQuery}
           columns={columns}
           filters={[]}
           actions={actions}

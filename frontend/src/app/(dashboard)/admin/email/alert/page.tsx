@@ -70,11 +70,8 @@ export default function AlertsPage() {
   const appliedKey = React.useMemo(() => JSON.stringify(appliedParams), [appliedParams]);
   const activeCount = activeAlertFilterCount(applied);
 
-  const query = React.useCallback(
-    (args: DataTableQueryArgs) =>
-      useListAlertsQuery({ ...args, filters: { ...args.filters, ...appliedParams } }),
-    [appliedParams],
-  );
+  const useScopedQuery = (args: DataTableQueryArgs) =>
+    useListAlertsQuery({ ...args, filters: { ...args.filters, ...appliedParams } });
 
   const columns: ColumnConfig<AlertListItem>[] = [
     {
@@ -264,7 +261,7 @@ export default function AlertsPage() {
       <>
         <DataTable
           key={appliedKey}
-          query={query}
+          query={useScopedQuery}
           columns={columns}
           filters={[]}
           actions={actions}

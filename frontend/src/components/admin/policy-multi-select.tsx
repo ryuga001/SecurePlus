@@ -36,7 +36,7 @@ export function PolicyMultiSelect({
 
   const [search, setSearch] = React.useState("");
   const [debounced, setDebounced] = React.useState("");
-  const [page, setPage] = React.useState(1);
+  const [paging, setPaging] = React.useState({ page: 1, search: "" });
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebounced(search.trim()), SEARCH_DEBOUNCE);
@@ -44,9 +44,15 @@ export function PolicyMultiSelect({
     return () => clearTimeout(timer);
   }, [search]);
 
-  React.useEffect(() => {
-    setPage(1);
-  }, [debounced]);
+  const page = paging.search === debounced ? paging.page : 1;
+
+  function setPage(update: (current: number) => number) {
+    setPaging((current) => {
+      const base = current.search === debounced ? current.page : 1;
+
+      return { page: update(base), search: debounced };
+    });
+  }
 
   const { data, isLoading, isFetching, isError, refetch } = useListPoliciesQuery({
     page,

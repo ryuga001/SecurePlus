@@ -116,17 +116,6 @@ function PolicyForm({
   const pending = creating || updating;
 
   React.useEffect(() => {
-    setMountedTabs((current) => {
-      if (current.has(tab)) return current;
-
-      const next = new Set(current);
-      next.add(tab);
-
-      return next;
-    });
-  }, [tab]);
-
-  React.useEffect(() => {
     if (!focusField) return;
 
     const node = focusRefs.current[focusField];
@@ -139,8 +128,13 @@ function PolicyForm({
     return () => cancelAnimationFrame(frame);
   }, [focusField, tab]);
 
+  function openTab(next: PolicyTab) {
+    setTab(next);
+    setMountedTabs((current) => (current.has(next) ? current : new Set(current).add(next)));
+  }
+
   function jumpTo(field: PolicyFieldKey) {
-    setTab(TAB_BY_FIELD[field]);
+    openTab(TAB_BY_FIELD[field]);
     setFocusField(field);
   }
 
@@ -305,7 +299,7 @@ function PolicyForm({
 
       <Tabs
         value={tab}
-        onValueChange={(next) => setTab(next as PolicyTab)}
+        onValueChange={(next) => openTab(next as PolicyTab)}
         className="mt-4 flex min-h-0 flex-1 flex-col"
       >
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">

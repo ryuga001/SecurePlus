@@ -127,14 +127,11 @@ export default function DiscoveryScanFilesPage() {
   const appliedKey = React.useMemo(() => JSON.stringify(appliedParams), [appliedParams]);
   const activeCount = activeFileResultFilterCount(applied);
 
-  const query = React.useCallback(
-    (args: DataTableQueryArgs) =>
-      useListDiscoveryScanFilesQuery(
-        { ...args, scanId, filters: { ...args.filters, ...appliedParams } },
-        { pollingInterval: live ? SCAN_POLL_INTERVAL : 0, skipPollingIfUnfocused: true },
-      ),
-    [appliedParams, scanId, live],
-  );
+  const useScopedQuery = (args: DataTableQueryArgs) =>
+    useListDiscoveryScanFilesQuery(
+      { ...args, scanId, filters: { ...args.filters, ...appliedParams } },
+      { pollingInterval: live ? SCAN_POLL_INTERVAL : 0, skipPollingIfUnfocused: true },
+    );
 
   const targets = React.useMemo(
     () => new Map((scan?.targets ?? []).map((target) => [target.position, target.target])),
@@ -278,7 +275,7 @@ export default function DiscoveryScanFilesPage() {
 
         <DataTable
           key={appliedKey}
-          query={query}
+          query={useScopedQuery}
           columns={columns}
           filters={[]}
           actions={actions}

@@ -83,14 +83,11 @@ export default function DiscoveryConfigurationsPage() {
   const appliedKey = React.useMemo(() => JSON.stringify(appliedParams), [appliedParams]);
   const activeCount = activeConfigurationFilterCount(applied);
 
-  const query = React.useCallback(
-    (args: DataTableQueryArgs) =>
-      useListDiscoveryConfigurationsQuery({
-        ...args,
-        filters: { ...args.filters, ...appliedParams },
-      }),
-    [appliedParams],
-  );
+  const useScopedQuery = (args: DataTableQueryArgs) =>
+    useListDiscoveryConfigurationsQuery({
+      ...args,
+      filters: { ...args.filters, ...appliedParams },
+    });
 
   const columns: ColumnConfig<DiscoveryConfigurationListItem>[] = [
     {
@@ -278,7 +275,7 @@ export default function DiscoveryConfigurationsPage() {
       <>
         <DataTable
           key={appliedKey}
-          query={query}
+          query={useScopedQuery}
           columns={columns}
           filters={[]}
           actions={actions}
